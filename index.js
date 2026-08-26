@@ -31,9 +31,8 @@ const client = new Client({
     }),
 
     puppeteer: {
-
-        headless: true
-
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
     }
 
 });
