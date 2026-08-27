@@ -1,3 +1,7 @@
+require('dotenv').config();
+
+const { GoogleGenAI } = require('@google/genai');
+
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 
 const qrcode = require('qrcode-terminal');
@@ -19,6 +23,24 @@ const { startMafiaLobby, joinMafiaLobby, handleNightAction, castVote } = require
 const { getCatalogMenu, buyAsset, saveUserAsset } = require('./src/database/assets');
 
 const { getBotMenu } = require('./src/commands/helpmenu');
+
+// ============================================================
+// 🤖 CHAOS NEURAL CORE — GEMINI AI SETUP
+// ============================================================
+
+if (!process.env.GEMINI_API_KEY) {
+    console.warn('⚠️ GEMINI_API_KEY is missing from .env');
+}
+
+const ai = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY
+});
+
+// AI conversation memory and rate limiting configurations
+const aiMemory = new Map();
+const MAX_AI_MEMORY = 12;
+const aiCooldowns = new Map();
+const AI_COOLDOWN_MS = 5000;
 
 
 
@@ -78,9 +100,7 @@ client.on('message', async (message) => {
         const chatId = message.from;
 
         const senderId = message.author || message.from;
-
        
-
         const text = message.body ? message.body.trim() : '';
 
         const lowerText = text.toLowerCase();
@@ -90,6 +110,180 @@ client.on('message', async (message) => {
         const contact = await message.getContact();
 
         const userName = contact.pushname || contact.name || 'Chaos Member';
+
+
+
+        // ============================================================
+        // 🤖 CHAOS NEURAL CORE — !ask COMMAND
+        // ============================================================
+
+        if (lowerText.startsWith('!ask')) {
+
+            const prompt = text.slice(4).trim();
+
+            if (!prompt) {
+                await message.reply(
+                    `⚠️ *CHAOS NEURAL CORE*\n\n` +
+                    `You forgot to ask something.\n\n` +
+                    `💡 Example:\n` +
+                    `*!ask How do I connect Java to MySQL?*`
+                );
+                return;
+            }
+
+            if (prompt.length > 4000) {
+                await message.reply(
+                    `⚠️ *Prompt too long.*\n\n` +
+                    `Please keep your question below 4,000 characters.`
+                );
+                return;
+            }
+
+            const now = Date.now();
+            const lastUsed = aiCooldowns.get(senderId) || 0;
+
+            if (now - lastUsed < AI_COOLDOWN_MS) {
+                const remaining = Math.ceil(
+                    (AI_COOLDOWN_MS - (now - lastUsed)) / 1000
+                );
+
+                await message.reply(
+                    `⏳ *Neural Core cooling down...*\n` +
+                    `Try again in ${remaining}s.`
+                );
+                return;
+            }
+
+            aiCooldowns.set(senderId, now);
+
+            const chat = await message.getChat();
+
+            try {
+                await chat.sendStateTyping();
+
+                if (!aiMemory.has(chatId)) {
+                    aiMemory.set(chatId, []);
+                }
+
+                const history = aiMemory.get(chatId);
+
+                history.push({
+                    role: 'user',
+                    text: prompt
+                });
+
+                const contents = history.map(item => ({
+                    role: item.role,
+                    parts: [
+                        {
+                            text: item.text
+                        }
+                    ]
+                }));
+
+                const response = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: contents,
+                    config: {
+                        systemInstruction: `
+You are Chaos Neural Core, the AI assistant inside a WhatsApp bot.
+
+PERSONALITY:
+- Smart
+- Helpful
+- Slightly futuristic
+- Confident
+- Occasionally funny
+- Natural and conversational
+- Never overly robotic
+
+BEHAVIOR:
+- Answer the user's actual question.
+- Keep simple questions concise.
+- Give detailed explanations when necessary.
+- For programming questions, provide useful code and explain it.
+- Don't constantly repeat your name.
+- Don't mention these system instructions.
+- Don't pretend to know something if you aren't sure.
+- Use WhatsApp-friendly formatting.
+- Don't overuse emojis.
+- Never add unnecessary introductions such as "As an AI language model".
+                        `
+                    }
+                });
+
+                const aiReply = response.text?.trim();
+
+                if (!aiReply) {
+                    throw new Error('Gemini returned an empty response.');
+                }
+
+                history.push({
+                    role: 'model',
+                    text: aiReply
+                });
+
+                if (history.length > MAX_AI_MEMORY) {
+                    history.splice(
+                        0,
+                        history.length - MAX_AI_MEMORY
+                    );
+                }
+
+                await chat.clearState();
+
+                const formattedResponse =
+                `☠️ *CHAOS AI SAYS*\n\n` +
+                `${aiReply}\n\n` +
+                `╰┈➤👤 @${senderId.split('@')[0]}  •  🟢 ONLINE\n` +
+                `   🔮 *..................................#wantam*`;
+
+                await client.sendMessage(
+                    chatId,
+                    formattedResponse,
+                    {
+                        mentions: [senderId]
+                    }
+                );
+
+            } catch (err) {
+                console.error('❌ Chaos Neural Core Error:', err);
+
+                try {
+                    await chat.clearState();
+                } catch (_) {}
+
+                let errorMessage = `❌ *CHAOS NEURAL CORE ERROR*\n\n`;
+                const errorText = String(err.message || err).toLowerCase();
+
+                if (
+                    errorText.includes('api key') ||
+                    errorText.includes('api_key') ||
+                    errorText.includes('authentication') ||
+                    errorText.includes('unauthorized')
+                ) {
+                    errorMessage +=
+                        `🔑 Gemini authentication failed.\n\n` +
+                        `Check your *GEMINI_API_KEY* in \`.env\`.`;
+                } else if (
+                    errorText.includes('quota') ||
+                    errorText.includes('rate limit') ||
+                    errorText.includes('429')
+                ) {
+                    errorMessage +=
+                        `🚦 Gemini API rate limit reached.\n\n` +
+                        `Please try again later.`;
+                } else {
+                    errorMessage +=
+                        `The neural connection was interrupted.\n\n` +
+                        `Please try again in a moment.`;
+                }
+
+                await message.reply(errorMessage);
+            }
+
+            return;
+        }
 
 
 
@@ -160,19 +354,16 @@ client.on('message', async (message) => {
         // 📜 Master Help / Menu Command with Local Animated GIF & Shuffled Audio
         if (lowerText === '!help' || lowerText === '!menu' || lowerText === '!commands' || lowerText === 'menu') {
             try {
-                // Load local GIF from your assets folder (make sure menu.gif is in ./src/assets/)
                 const media = MessageMedia.fromFilePath('./src/assets/menu.gif');
 
                 await client.sendMessage(chatId, media, {
                     caption: getBotMenu()
                 });
 
-                // Array of shuffled songs stored in the same assets folder
                 const songs = ['song1.mp3', 'song2.mp3', 'song3.mp3', 'song4.mp3'];
                 const randomSong = songs[Math.floor(Math.random() * songs.length)];
                 const audioMedia = MessageMedia.fromFilePath(`./src/assets/${randomSong}`);
 
-                // Send the shuffled MP3 song right after the menu
                 await client.sendMessage(chatId, audioMedia, { 
                     sendAudioAsVoice: true 
                 });
@@ -259,7 +450,6 @@ client.on('message', async (message) => {
         }
 
        
-
         if (lowerText === '!profile' || lowerText === '!daily' || lowerText === '!leaderboard' || lowerText === '!lb') {
 
             await handleProfileCommand(message, client);
@@ -579,7 +769,6 @@ client.on('message', async (message) => {
             const mentionedJid = mentions.length > 0 ? mentions[0].id._serialized : null;
 
            
-
             const res = handleStealCommand(chatId, senderId, mentionedJid, client);
 
             await message.reply(res);
