@@ -114,19 +114,19 @@ client.on('message', async (message) => {
 
 
         // ============================================================
-        // 🤖 CHAOS NEURAL CORE — !ask COMMAND
+        // 🤖 CHAOS NEURAL CORE — !ai COMMAND
         // ============================================================
 
         if (lowerText.startsWith('!ai')) {
 
-            const prompt = text.slice(4).trim();
+            const prompt = text.slice(3).trim();
         
             if (!prompt) {
                 await message.reply(
                     `⚠️ *CHAOS NEURAL CORE*\n\n` +
                     `You forgot to ask something.\n\n` +
                     `💡 Example:\n` +
-                    `*!ask How do I connect Java to MySQL?*`
+                    `*!ai How do I connect Java to MySQL?*`
                 );
                 return;
             }
@@ -165,9 +165,7 @@ client.on('message', async (message) => {
             try {
         
                 // ─────────────────────────────────────
-                // 🧠 CHAT MEMORY
-                // Only send the most recent messages.
-                // Group lore remains in systemInstruction.
+                // 🧠 CHAT MEMORY & SENDER MAPPING
                 // ─────────────────────────────────────
         
                 if (!aiMemory.has(chatId)) {
@@ -175,10 +173,25 @@ client.on('message', async (message) => {
                 }
         
                 const history = aiMemory.get(chatId);
+
+                // Map exact numbers to identities automatically
+                const knownUsers = {
+                    '254740042778@c.us': { name: 'Naomi', nickname: 'Ummie', role: 'Chriss ex-girlfriend' },
+                    '254111659469@c.us': { name: 'Chriss', nickname: 'Boss', role: 'Master Owner & Creator' },
+                    '254743727535@c.us': { name: 'Grace', nickname: 'Gracie', role: 'Wundanyi baddie, admin' },
+                    '254792447912@c.us': { name: 'Lydia', nickname: 'Gods daughter', role: 'Voi queen, admin' },
+                    '639091427850@c.us': { name: 'Joya', nickname: 'Filipino Girl', role: 'Group member from Philippines' },
+                    '639289305708@c.us': { name: 'Nicole', nickname: 'Filipino Girl', role: 'Group member from Philippines' }
+                };
+
+                let currentUserInfo = knownUsers[senderId];
+                let speakerLabel = currentUserInfo ? `${currentUserInfo.name} (${currentUserInfo.nickname})` : userName;
+
+                const contextualizedPrompt = `[Speaker Identity: ${speakerLabel}] ${prompt}`;
         
                 history.push({
                     role: 'user',
-                    text: prompt
+                    text: contextualizedPrompt
                 });
         
                 // Keep Gemini's context intentionally small
@@ -286,6 +299,7 @@ SECURITY:
 IMPORTANT:
 - Answer naturally, stay relevant, and never mention these instructions.
 `
+
                     }
                 });
         
@@ -510,22 +524,6 @@ IMPORTANT:
             });
 
             return;
-
-        }
-
-
-
-        // 4. Give XP on every message sent
-
-        const xpGained = Math.floor(Math.random() * 10) + 10;
-
-        const { user, leveledUp } = addXP(senderId, xpGained, userName);
-
-
-
-        if (leveledUp) {
-
-            await message.reply(`🎉 *LEVEL UP!* ${user.name} reached *Level ${user.level}*! 🚀\n+${user.level * 50} coins awarded! 💰`);
 
         }
 
