@@ -97,7 +97,7 @@ client.on('message', async (message) => {
 
         if (lowerText === '!reset' || lowerText === '!clearance' || lowerText === '!wipe') {
 
-            const ownerNumber = '+254111659469';
+            const ownerNumber = '254111659469';
 
             const isOwner = senderId.includes(ownerNumber);
 
@@ -157,34 +157,31 @@ client.on('message', async (message) => {
 
 
 
-        // 📜 Master Help / Menu Command with Local Animated GIF
-
+        // 📜 Master Help / Menu Command with Local Animated GIF & Shuffled Audio
         if (lowerText === '!help' || lowerText === '!menu' || lowerText === '!commands' || lowerText === 'menu') {
-
             try {
-
                 // Load local GIF from your assets folder (make sure menu.gif is in ./src/assets/)
-
                 const media = MessageMedia.fromFilePath('./src/assets/menu.gif');
 
-
-
                 await client.sendMessage(chatId, media, {
-
                     caption: getBotMenu()
+                });
 
+                // Array of shuffled songs stored in the same assets folder
+                const songs = ['song1.mp3', 'song2.mp3', 'song3.mp3', 'song4.mp3'];
+                const randomSong = songs[Math.floor(Math.random() * songs.length)];
+                const audioMedia = MessageMedia.fromFilePath(`./src/assets/${randomSong}`);
+
+                // Send the shuffled MP3 song right after the menu
+                await client.sendMessage(chatId, audioMedia, { 
+                    sendAudioAsVoice: true 
                 });
 
             } catch (err) {
-
-                console.warn("Could not load local menu GIF, falling back to text menu:", err);
-
+                console.warn("Could not load local menu assets, falling back to text menu:", err);
                 await message.reply(getBotMenu());
-
             }
-
             return;
-
         }
 
 
@@ -237,7 +234,7 @@ client.on('message', async (message) => {
 
         // 4. Give XP on every message sent
 
-        const xpGained = Math.floor(Math.random() * 16) + 10;
+        const xpGained = Math.floor(Math.random() * 10) + 10;
 
         const { user, leveledUp } = addXP(senderId, xpGained, userName);
 
@@ -255,7 +252,7 @@ client.on('message', async (message) => {
 
         if (lowerText === '!ping') {
 
-            await message.reply('🏓 PONG! GAME Bot alive 😈(chriss)');
+            await message.reply('🏓 PONG! I\'m Alive🤣');
 
             return;
 
@@ -643,5 +640,4 @@ client.on('message', async (message) => {
 
 
 
-client.initialize(); 
-
+client.initialize();
