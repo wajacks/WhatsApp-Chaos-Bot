@@ -156,11 +156,7 @@ client.on('message', async (message) => {
 
             aiCooldowns.set(senderId, now);
 
-            const chat = await message.getChat();
-
             try {
-                await chat.sendStateTyping();
-
                 if (!aiMemory.has(chatId)) {
                     aiMemory.set(chatId, []);
                 }
@@ -230,13 +226,14 @@ BEHAVIOR:
                     );
                 }
 
-                await chat.clearState();
-
                 const formattedResponse =
-                `☠️ *CHAOS AI SAYS*\n\n` +
-                `${aiReply}\n\n` +
-                `╰┈➤👤 @${senderId.split('@')[0]}  •  🟢 ONLINE\n` +
-                `   🔮 *..................................#wantam*`;
+                    `⚡ *[ C H A O S   N E U R A L   C O R E ]* ⚡\n\n` +
+                    `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n` +
+                    `${aiReply}\n` +
+                    `┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n` +
+                    `👤 *Operator:* @${senderId.split('@')[0]}\n` +
+                    `🟢 *Status:* Online\n` +
+                    `🔮 *Engine:* Gemini 2.5 Flash`;
 
                 await client.sendMessage(
                     chatId,
@@ -248,10 +245,6 @@ BEHAVIOR:
 
             } catch (err) {
                 console.error('❌ Chaos Neural Core Error:', err);
-
-                try {
-                    await chat.clearState();
-                } catch (_) {}
 
                 let errorMessage = `❌ *CHAOS NEURAL CORE ERROR*\n\n`;
                 const errorText = String(err.message || err).toLowerCase();
