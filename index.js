@@ -117,7 +117,7 @@ client.on('message', async (message) => {
         // 🤖 CHAOS NEURAL CORE — !ask COMMAND
         // ============================================================
 
-        if (lowerText.startsWith('!ask')) {
+        if (lowerText.startsWith('!ai')) {
 
             const prompt = text.slice(4).trim();
         
