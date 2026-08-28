@@ -462,7 +462,22 @@ IMPORTANT:
 
         }
 
-
+        if (lowerText === '!testaudio') {
+            try {
+                const testPath = path.join(__dirname, 'src/assets/YBW-test.ogg');
+                const audioMedia = MessageMedia.fromFilePath(testPath);
+        
+                await client.sendMessage(chatId, audioMedia, {
+                    sendAudioAsVoice: true
+                });
+        
+            } catch (err) {
+                console.error('Test audio error:', err);
+                await message.reply('❌ Could not send YBW-test.ogg');
+            }
+        
+            return;
+        }
 
         // 📜 Master Help / Menu Command with Local Animated GIF & Shuffled Audio
         if (
