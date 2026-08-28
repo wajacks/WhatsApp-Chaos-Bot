@@ -263,6 +263,7 @@ GAMES & CHAOS:
 SYSTEM:
 - !ping — Check bot latency.
 - !menu — Display the full bot menu.
+- !randomsong — Plays a random song.
 
 COMMAND RULES:
 - Only describe commands listed above. Never invent commands.
@@ -464,32 +465,50 @@ IMPORTANT:
 
 
         // 📜 Master Help / Menu Command with Local Animated GIF & Shuffled Audio
-        if (lowerText === '!help' || lowerText === '!menu' || lowerText === '!commands' || lowerText === 'menu') {
+        if (
+            lowerText === '!help' ||
+            lowerText === '!menu' ||
+            lowerText === '!commands' ||
+            lowerText === 'menu'
+        ) {
             try {
                 // 1. Send the animated menu GIF
                 const media = MessageMedia.fromFilePath('./src/assets/menu.gif');
+
                 await client.sendMessage(chatId, media, {
                     caption: getBotMenu()
                 });
-        
-                // 2. Play a random song from src/assets
+
+                // 2. Play a random OGG song from src/assets
                 const assetsDir = path.join(__dirname, 'src/assets');
                 const files = fs.readdirSync(assetsDir);
-                const songs = files.filter(file => file.toLowerCase().endsWith('.opus'));
+
+                const songs = files.filter(file =>
+                    file.toLowerCase().endsWith('.ogg')
+                );
 
                 if (songs.length > 0) {
-                    const randomSong = songs[Math.floor(Math.random() * songs.length)];
-                    const audioMedia = MessageMedia.fromFilePath(path.join(assetsDir, randomSong));
-            
-                    await client.sendMessage(chatId, audioMedia, { 
-                        sendAudioAsVoice: true  // plays smoothly as a voice note
+                    const randomSong =
+                        songs[Math.floor(Math.random() * songs.length)];
+
+                    const audioMedia = MessageMedia.fromFilePath(
+                        path.join(assetsDir, randomSong)
+                    );
+
+                    await client.sendMessage(chatId, audioMedia, {
+                        sendAudioAsVoice: true
                     });
                 }
-        
+
             } catch (err) {
-                console.warn("Could not load local menu assets, falling back to text menu:", err);
+                console.warn(
+                    "Could not load local menu assets, falling back to text menu:",
+                    err
+                );
+
                 await message.reply(getBotMenu());
             }
+
             return;
         }
 

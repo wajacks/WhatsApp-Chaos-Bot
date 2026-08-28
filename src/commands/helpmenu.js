@@ -23,11 +23,12 @@ function getBotMenu() {
 ┃╰┈➤*[ 𝓢𝓨𝓢𝓣𝓔𝓜 ]*
 ┃  • \`!ping\`  ➔ Check bot latency
 ┃  • \`!menu\`  ➔ Display this control panel
+┃  • \`!randomsong\`  ➔ Plays a song
 ╠══════════════════════════╣
 ┃┊ ┊*[ 𝓞𝓦𝓝𝓔𝓡 ]*┊ ┊
 ┃  ┌───────────────────────
 ┃  │ 🛡️ *Creator:* ⚘Chriss⚘
-┃  │ ⚡ *Contact:*      +254111659469
+┃  │ ⚡ *Contact:* +254111659469
 ┃  └───────────────────────
 ╰══════════════════════════╯
     \`Powered by\` ⚘Chriss⚘

@@ -7,42 +7,64 @@ let shuffledPlaylist = [];
 async function handleSongCommand(message) {
     try {
         const assetsDir = path.join(__dirname, '../assets');
-        
-        // Read all files in the assets folder and filter for .opus files
+
+        // Read all files in the assets folder and filter for .ogg files
         const files = fs.readdirSync(assetsDir);
-        const songs = files.filter(file => file.toLowerCase().endsWith('.opus'));
+        const songs = files.filter(file =>
+            file.toLowerCase().endsWith('.ogg')
+        );
 
         if (songs.length === 0) {
-            await message.reply("❌ No opus song files found in the assets folder!");
+            await message.reply(
+                '❌ No OGG song files found in the assets folder!'
+            );
             return;
         }
 
         // If our playlist is empty, shuffle all songs like a deck of cards
         if (shuffledPlaylist.length === 0) {
             shuffledPlaylist = [...songs];
+
             // Fisher-Yates shuffle algorithm
             for (let i = shuffledPlaylist.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
-                [shuffledPlaylist[i], shuffledPlaylist[j]] = [shuffledPlaylist[j], shuffledPlaylist[i]];
+                [shuffledPlaylist[i], shuffledPlaylist[j]] = [
+                    shuffledPlaylist[j],
+                    shuffledPlaylist[i]
+                ];
             }
         }
 
         // Pull the next song off the top of the shuffled deck
         const randomSong = shuffledPlaylist.pop();
+
         const songPath = path.join(assetsDir, randomSong);
         const audioMedia = MessageMedia.fromFilePath(songPath);
 
-        // Clean up the display name (remove .opus extension for the chat text)
-        const songDisplayName = randomSong.replace(/\.[^/.]+$/, "");
+        // Remove .ogg and YouTube-style [randomID] from the displayed name
+        const songDisplayName = randomSong
+            .replace(/\.[^/.]+$/, '')
+            .replace(/\s*\[[a-zA-Z0-9_-]{6,}\]\s*$/, '')
+            .trim();
 
-        await message.reply(`🎵 *Random Chaos Vibe:* Dropping *${songDisplayName}*...`);
+        await message.reply(
+            `🎵 *Random Chaos Vibe:* Dropping *${songDisplayName}*...`
+        );
 
-        await message.client.sendMessage(message.from, audioMedia, { 
-            sendAudioAsVoice: true 
-        });
+        await message.client.sendMessage(
+            message.from,
+            audioMedia,
+            {
+                sendAudioAsVoice: true
+            }
+        );
+
     } catch (err) {
         console.error('Error sending random song:', err);
-        await message.reply("❌ Oops! Couldn't load the audio files right now.");
+
+        await message.reply(
+            "❌ Oops! Couldn't load the audio files right now."
+        );
     }
 }
 
