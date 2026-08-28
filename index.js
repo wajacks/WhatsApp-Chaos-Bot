@@ -464,7 +464,7 @@ IMPORTANT:
 
         if (lowerText === '!testaudio') {
             try {
-                const testPath = path.join(__dirname, 'src/assets/Patoranking - Abule STEREO TEST.ogg');
+                const testPath = path.join(__dirname, 'src/assets/Patoranking STEREO 50K TEST.ogg');
                 const audioMedia = MessageMedia.fromFilePath(testPath);
         
                 await client.sendMessage(chatId, audioMedia, {
