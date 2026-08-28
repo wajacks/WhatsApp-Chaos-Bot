@@ -1,5 +1,8 @@
 require('dotenv').config();
 
+const fs = require('fs');
+const path = require('path');
+
 const { GoogleGenAI } = require('@google/genai');
 
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
@@ -23,6 +26,9 @@ const { startMafiaLobby, joinMafiaLobby, handleNightAction, castVote } = require
 const { getCatalogMenu, buyAsset, saveUserAsset } = require('./src/database/assets');
 
 const { getBotMenu } = require('./src/commands/helpmenu');
+
+// 🎵 Import the new Random Song command handler
+const { handleSongCommand } = require('./src/commands/song');
 
 // ============================================================
 // 🤖 CHAOS NEURAL CORE — GEMINI AI SETUP
@@ -461,19 +467,23 @@ IMPORTANT:
         if (lowerText === '!help' || lowerText === '!menu' || lowerText === '!commands' || lowerText === 'menu') {
             try {
                 const media = MessageMedia.fromFilePath('./src/assets/menu.gif');
-
                 await client.sendMessage(chatId, media, {
                     caption: getBotMenu()
                 });
+        
+                const assetsDir = path.join(__dirname, '../assets');
+                const files = fs.readdirSync(assetsDir);
+                const songs = files.filter(file => file.toLowerCase().endsWith('.opus'));
 
-                const songs = ['song1.mp3', 'song2.mp3', 'song3.mp3', 'song4.mp3'];
-                const randomSong = songs[Math.floor(Math.random() * songs.length)];
-                const audioMedia = MessageMedia.fromFilePath(`./src/assets/${randomSong}`);
-
-                await client.sendMessage(chatId, audioMedia, { 
-                    sendAudioAsVoice: true 
-                });
-
+                if (songs.length > 0) {
+                    const randomSong = songs[Math.floor(Math.random() * songs.length)];
+                    const audioMedia = MessageMedia.fromFilePath(path.join(assetsDir, randomSong));
+            
+                    await client.sendMessage(chatId, audioMedia, { 
+                        sendAudioAsVoice: true  // plays smoothly as a voice note
+                    });
+                }
+        
             } catch (err) {
                 console.warn("Could not load local menu assets, falling back to text menu:", err);
                 await message.reply(getBotMenu());
@@ -539,13 +549,21 @@ IMPORTANT:
 
         }
 
-       
+        
         if (lowerText === '!profile' || lowerText === '!daily' || lowerText === '!leaderboard' || lowerText === '!lb') {
 
             await handleProfileCommand(message, client);
 
             return;
 
+        }
+
+
+
+        // 🎵 Random Song Command
+        if (lowerText === '!song' || lowerText === '!randomsong' || lowerText === '!track') {
+            await handleSongCommand(message);
+            return;
         }
 
 
