@@ -466,12 +466,14 @@ IMPORTANT:
         // 📜 Master Help / Menu Command with Local Animated GIF & Shuffled Audio
         if (lowerText === '!help' || lowerText === '!menu' || lowerText === '!commands' || lowerText === 'menu') {
             try {
+                // 1. Send the animated menu GIF
                 const media = MessageMedia.fromFilePath('./src/assets/menu.gif');
                 await client.sendMessage(chatId, media, {
                     caption: getBotMenu()
                 });
         
-                const assetsDir = path.join(__dirname, '../assets');
+                // 2. Play a random song from src/assets
+                const assetsDir = path.join(__dirname, 'src/assets');
                 const files = fs.readdirSync(assetsDir);
                 const songs = files.filter(file => file.toLowerCase().endsWith('.opus'));
 
