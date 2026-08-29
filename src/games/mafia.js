@@ -1,310 +1,800 @@
-// mafia.js - Custom Case-Solving Mafia Game for Node.js Chat Bot
 const fs = require('fs');
+const {
+  getUser,
+  addCoins,
+  addXP,
+  readDB,
+  writeDB
+} = require('../database/db');
 
 class MafiaGame {
-    constructor(client, MessageMedia) {
-        this.client = client;
-        this.MessageMedia = MessageMedia;
-        this.inLobby = false;
-        this.gameStarted = false;
-        this.players = []; // Array of { id, username, letter, role, isAlive, strikes }
-        this.ghosts = [];
-        this.nightActions = { kill: null, save: null, investigate: null };
-        this.votes = new Map(); // voterId -> targetId
-        this.votingActive = false;
+  constructor(client, MessageMedia) {
+    this.client = client;
+    this.MessageMedia = MessageMedia;
+    this.inLobby = false;
+    this.gameStarted = false;
+    this.channelId = null;
+    this.players = [];
+    this.ghosts = [];
+    this.nightActions = {
+      kill: null,
+      save: null,
+      investigate: null
+    };
+    this.nightActionUsers = {
+      kill: null,
+      save: null,
+      investigate: null
+    };
+    this.votes = new Map();
+    this.votingActive = false;
+    this.nightActive = false;
+    this.lobbyTimer = null;
+    this.nightTimer = null;
+    this.voteTimer = null;
+    this.gameNumber = Math.floor(100000 + Math.random() * 900000);
+  }
+
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  getPlayerById(id) {
+    return this.players.find(p => p.id === id);
+  }
+
+  getAlivePlayers() {
+    return this.players.filter(p => p.isAlive);
+  }
+
+  getAliveNonMafiaPlayers() {
+    return this.players.filter(p => p.isAlive && p.role !== 'Mafia');
+  }
+
+  getMafia() {
+    return this.players.find(p => p.role === 'Mafia' && p.isAlive);
+  }
+
+  getPlayerByLetter(letter) {
+    if (!letter) return null;
+    return this.players.find(
+      p => p.letter === String(letter).trim().toUpperCase()
+    );
+  }
+
+  clearTimers() {
+    if (this.lobbyTimer) {
+      clearTimeout(this.lobbyTimer);
+      this.lobbyTimer = null;
+    }
+    if (this.nightTimer) {
+      clearTimeout(this.nightTimer);
+      this.nightTimer = null;
+    }
+    if (this.voteTimer) {
+      clearTimeout(this.voteTimer);
+      this.voteTimer = null;
+    }
+  }
+
+  resetGameState() {
+    this.clearTimers();
+    this.inLobby = false;
+    this.gameStarted = false;
+    this.votingActive = false;
+    this.nightActive = false;
+    this.channelId = null;
+    this.players = [];
+    this.ghosts = [];
+    this.nightActions = {
+      kill: null,
+      save: null,
+      investigate: null
+    };
+    this.nightActionUsers = {
+      kill: null,
+      save: null,
+      investigate: null
+    };
+    this.votes.clear();
+  }
+
+  async checkWinCondition(channelId) {
+    if (!this.gameStarted) {
+      return true;
     }
 
-    // 1. Start Lobby with 1-Minute Timer, PDF, and Voice Note
-    async startLobby(channelId) {
-        this.inLobby = true;
-        this.players = [];
-        this.ghosts = [];
-        this.gameStarted = false;
-        
-        await this.client.sendMessage(channelId, "🎮 **Mafia Case Game Started!** Type `!join` within **1 minute** to register for the investigation.");
+    const alivePlayers = this.getAlivePlayers();
+    const mafia = this.getMafia();
 
-        // Send Rules PDF if it exists in the project root
-        try {
-            if (fs.existsSync('./rules.pdf')) {
-                const pdfMedia = this.MessageMedia.fromFilePath('./rules.pdf');
-                await this.client.sendMessage(channelId, pdfMedia, {
-                    caption: "📄 **Case File & Official Rules:** Review how to play, use your letter codes, and survive the night."
-                });
-            }
-        } catch (err) {
-            console.error("Could not send rules.pdf:", err);
-        }
+    if (!mafia) {
+      await this.endGame(
+        channelId,
+        'town',
+        '*VICTORY!*\n\nThe Mafia has been eliminated. The city is finally safe!'
+      );
+      return true;
+    }
 
-        // Send Voice Note / Audio Briefing safely with a small async delay to prevent Puppeteer timeouts
-        try {
-          if (fs.existsSync('./briefing.mp3') || fs.existsSync('./briefing.ogg')) {
-              const audioPath = fs.existsSync('./briefing.mp3') ? './briefing.mp3' : './briefing.ogg';
-              
-              // Brief pause to let Puppeteer settle before pushing media bytes
-              await new Promise(resolve => setTimeout(resolve, 1000));
+    const nonMafiaAlive = this.getAliveNonMafiaPlayers();
+    if (alivePlayers.length <= 2 || (mafia && nonMafiaAlive.length <= 1)) {
+      await this.endGame(
+        channelId,
+        'mafia',
+        '*MAFIA VICTORY!*\n\nThe Mafia has gained control of the remaining city survivors.\n\nThe case is closed... and the Mafia walks free.'
+      );
+      return true;
+    }
 
-              const audioMedia = this.MessageMedia.fromFilePath(audioPath);
-              await this.client.sendMessage(channelId, audioMedia, { 
-                  caption: "🎙️ **Audio Dispatch:** Detective briefing incoming..."
-              });
-          }
-      } catch (err) {
-          console.error("Could not send audio briefing due to protocol/timeout limit, skipping audio:", err.message);
+    return false;
+  }
+
+  awardPlayer(player, result) {
+    try {
+      const user = getUser(player.id, player.username);
+      if (result === 'win') {
+        const coins = player.role === 'Mafia' ? 250 : 150;
+        const xp = player.role === 'Mafia' ? 200 : 175;
+        addCoins(player.id, coins);
+        addXP(player.id, xp, player.username);
+        user.wins = (user.wins || 0) + 1;
+      } else {
+        const coins = 25;
+        const xp = 50;
+        addCoins(player.id, coins);
+        addXP(player.id, xp, player.username);
+        user.losses = (user.losses || 0) + 1;
+      }
+      const db = readDB();
+      db[player.id] = getUser(player.id, player.username);
+      writeDB(db);
+    } catch (error) {
+      console.error(`Failed to award Mafia result to ${player.username}:`, error);
+    }
+  }
+
+  async endGame(channelId, winner, message) {
+    if (!this.gameStarted && !this.inLobby) {
+      return;
+    }
+
+    this.clearTimers();
+    this.votingActive = false;
+    this.nightActive = false;
+
+    for (const player of this.players) {
+      const isWinner =
+        (winner === 'mafia' && player.role === 'Mafia') ||
+        (winner === 'town' && player.role !== 'Mafia');
+      if (isWinner) {
+        this.awardPlayer(player, 'win');
+      } else {
+        this.awardPlayer(player, 'loss');
+      }
+    }
+
+    this.gameStarted = false;
+    this.inLobby = false;
+
+    await this.client.sendMessage(
+      channelId,
+      `${message}\n\n*PROJECT MAFIA CASE GAME OVER*`
+    );
+
+    let finalRoster = '*FINAL CASE FILE*\n\n';
+    for (const player of this.players) {
+      const status = player.isAlive ? 'Alive' : 'Ghost';
+      finalRoster += `[${player.letter}] ${player.username} - *${player.role}* (${status})\n`;
+    }
+    finalRoster += '\nRewards have been added to the players\' Chaos profiles.';
+
+    await this.client.sendMessage(channelId, finalRoster);
+    this.resetGameState();
+    
+    if (global.activeMafiaGame === this) {
+      global.activeMafiaGame = null;
+    }
+  }
+
+  async startLobby(channelId) {
+    if (this.inLobby || this.gameStarted) {
+      return this.client.sendMessage(
+        channelId,
+        'A Mafia Case is already active. Finish the current investigation first.'
+      );
+    }
+
+    this.inLobby = true;
+    this.gameStarted = false;
+    this.channelId = channelId;
+    this.players = [];
+    this.ghosts = [];
+    this.votes.clear();
+
+    await this.client.sendMessage(
+      channelId,
+      '*PROJECT MAFIA CASE*\n\n' +
+      'Welcome to the investigation. Take your time, talk, and prepare.\n\n' +
+      'Registration is open for *2 minutes*.\n' +
+      'Type `!joinmafia` to enter the case.\n\n' +
+      'Minimum players: *4*\n' +
+      'Mafia: *1*\n' +
+      'Doctor: *1*\n' +
+      'Detective: *1*\n' +
+      'Everyone else: *Villagers*\n\n' +
+      'Once registration closes, secret roles will be assigned privately.'
+    );
+
+    try {
+      const rulesPath = './rules.pdf';
+      if (fs.existsSync(rulesPath)) {
+        const pdfMedia = this.MessageMedia.fromFilePath(rulesPath);
+        await this.client.sendMessage(
+          channelId,
+          pdfMedia,
+          { caption: '*Case File & Official Rules*\nReview the investigation rules before the case begins.' }
+        );
+      }
+    } catch (error) {
+      console.error('Could not send rules.pdf:', error);
+    }
+
+    try {
+      const mp3Path = './briefing.mp3';
+      const oggPath = './briefing.ogg';
+      let audioPath = null;
+      if (fs.existsSync(mp3Path)) {
+        audioPath = mp3Path;
+      } else if (fs.existsSync(oggPath)) {
+        audioPath = oggPath;
       }
 
-        // Automatically close registration and start game after 1 minute (60,000 ms)
-        setTimeout(async () => {
-            if (this.inLobby) {
-                await this.startGame(channelId);
-            }
-        }, 60000);
+      if (audioPath) {
+        await this.sleep(1000);
+        const audioMedia = this.MessageMedia.fromFilePath(audioPath);
+        await this.client.sendMessage(
+          channelId,
+          audioMedia,
+          { caption: '*Audio Dispatch*\nDetective briefing incoming...' }
+        );
+      }
+    } catch (error) {
+      console.error('Could not send Mafia briefing:', error.message);
     }
 
-    // 2. Player Registration & Letter Assignment
-    joinGame(user, channelId) {
-        if (!this.inLobby) return "No active registration lobby right now. Wait for a new game.";
-        if (this.players.some(p => p.id === user.id)) return `${user.username}, you are already registered!`;
+    // 2 Minutes Lobby Timer (120,000 ms)
+    this.lobbyTimer = setTimeout(async () => {
+      if (!this.inLobby) {
+        return;
+      }
+      try {
+        await this.startGame(channelId);
+      } catch (error) {
+        console.error('Mafia lobby timer error:', error);
+      }
+    }, 120000);
+  }
 
-        const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        const assignedLetter = letters[this.players.length % letters.length];
-
-        this.players.push({
-            id: user.id,
-            username: user.username,
-            tag: user.tag, // e.g. @username
-            letter: assignedLetter,
-            role: 'Villager', // default
-            isAlive: true,
-            strikes: 0
-        });
-
-        return `✅ **${user.username}** has joined the case! Assigned identifier: **[${assignedLetter}]**`;
+  joinGame(user, channelId) {
+    if (!this.inLobby) {
+      return null;
+    }
+    
+    if (this.channelId !== channelId) {
+      return null;
     }
 
-    // 3. Assign Roles & Send Private Letters via WhatsApp DMs
-    async startGame(channelId) {
-        if (!this.inLobby) return;
-        this.inLobby = false;
-
-        if (this.players.length < 4) {
-            await this.client.sendMessage(channelId, "⚠️ Registration closed. You need at least 4 players to start the Mafia case game! Game canceled.");
-            return;
-        }
-
-        this.gameStarted = true;
-
-        // Shuffle players and assign roles
-        const shuffled = [...this.players].sort(() => 0.5 - Math.random());
-        shuffled[0].role = 'Mafia';
-        shuffled[1].role = 'Doctor';
-        shuffled[2].role = 'Detective';
-        // Rest remain 'Villager'
-
-        // Build the directory reference list
-        let roster = "📋 **Case Roster & Identifiers:**\n";
-        this.players.forEach(p => {
-            roster += `• **[${p.letter}]** - ${p.username}\n`;
-        });
-
-        // Notify each player privately with their role and the roster
-        for (const p of this.players) {
-            let roleMsg = `🕵️ **Your Mafia Case Role:** **${p.role}**\n\n${roster}\n`;
-            if (p.role === 'Mafia') roleMsg += "🌙 Night Action: Use `!kill [Letter]` in DM to eliminate someone.";
-            if (p.role === 'Doctor') roleMsg += "🌙 Night Action: Use `!save [Letter]` in DM to protect someone (Immune to Mafia, max 3 fails before demotion).";
-            if (p.role === 'Detective') roleMsg += "🌙 Night Action: Use `!investigate [Letter]` in DM to check if they are Mafia (max 3 fails before demotion).";
-            if (p.role === 'Villager') roleMsg += "🌙 You are a regular Villager. Sleep tight and help investigate during the day!";
-            
-            try {
-                await this.client.sendMessage(p.id, roleMsg);
-            } catch (err) {
-                console.error(`Failed to send DM to ${p.username}:`, err);
-            }
-        }
-
-        await this.client.sendMessage(channelId, "⏱️ **Registration closed!** 🌑 **Night falls over the city...** Secret roles have been assigned via DM. Special roles, check your private messages!");
-        this.startNightPhase(channelId);
+    if (this.players.some(p => p.id === user.id)) {
+      return `*${user.username}*, you are already registered for this case!`;
     }
 
-    startNightPhase(channelId) {
-        this.nightActions = { kill: null, save: null, investigate: null };
-        if (channelId) {
-            this.client.sendMessage(channelId, "🌙 **Night falls...** Special roles, submit your actions via private DM using your letter codes (`!kill`, `!save`, `!investigate`).");
-        }
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    if (this.players.length >= letters.length) {
+      return 'The case roster is full.';
     }
 
-    // 4. Handle Private Night Commands (Using Letters)
-    async handleNightAction(user, command, targetLetter) {
-        if (!this.gameStarted) return;
-        const player = this.players.find(p => p.id === user.id || p.id === user);
-        const userId = player ? player.id : user;
+    const assignedLetter = letters[this.players.length];
+    this.players.push({
+      id: user.id,
+      username: user.username || 'Unknown Player',
+      tag: user.tag || '',
+      letter: assignedLetter,
+      role: 'Villager',
+      isAlive: true,
+      strikes: 0
+    });
 
-        if (!player || !player.isAlive) {
-            await this.client.sendMessage(userId, "You cannot act right now.");
-            return;
-        }
+    return `*${user.username}* has joined the case!\nSecret identifier: *[${assignedLetter}]*`;
+  }
 
-        const target = this.players.find(p => p.letter === targetLetter.toUpperCase() && p.isAlive);
-        if (!target) {
-            await this.client.sendMessage(userId, "Invalid letter or player is already dead. Check your roster list.");
-            return;
-        }
-
-        if (command === 'kill' && player.role === 'Mafia') {
-            this.nightActions.kill = target;
-            await this.client.sendMessage(userId, `🎯 Target locked: [${target.letter}] ${target.username}.`);
-        } else if (command === 'save' && player.role === 'Doctor') {
-            this.nightActions.save = target;
-            await this.client.sendMessage(userId, `🛡️ You are attempting to protect: [${target.letter}] ${target.username}.`);
-        } else if (command === 'investigate' && player.role === 'Detective') {
-            this.nightActions.investigate = target;
-            
-            if (target.role === 'Mafia') {
-                await this.client.sendMessage(userId, `✅ **Investigation Successful!** [${target.letter}] ${target.username} is connected to the Mafia!`);
-            } else {
-                player.strikes++;
-                await this.client.sendMessage(userId, `❌ **Investigation Failed.** [${target.letter}] ${target.username} is innocent. (Strikes: ${player.strikes}/3)`);
-                if (player.strikes >= 3) {
-                    player.role = 'Villager';
-                    await this.client.sendMessage(userId, "⚠️ Your badge has been revoked due to too many failed leads! You are now a regular Villager.");
-                }
-            }
-        }
+  async startGame(channelId) {
+    if (!this.inLobby) {
+      return;
     }
 
-    // 5. Morning Resolution & Anonymous Public Feeds
-    async resolveNight(channelId) {
-        let killedPlayer = null;
-        let docSaved = false;
-
-        // Check Doctor Save vs Mafia Kill
-        if (this.nightActions.kill) {
-            if (this.nightActions.kill === this.nightActions.save) {
-                docSaved = true;
-            } else {
-                killedPlayer = this.nightActions.kill;
-                killedPlayer.isAlive = false;
-                this.ghosts.push(killedPlayer);
-                this.players = this.players.filter(p => p.id !== killedPlayer.id);
-            }
-        }
-
-        // Check Doctor Fired Logic
-        const doctor = this.players.find(p => p.role === 'Doctor');
-        if (doctor && this.nightActions.save && this.nightActions.save !== this.nightActions.kill) {
-            doctor.strikes++;
-            if (doctor.strikes >= 3) {
-                doctor.role = 'Villager';
-                await this.client.sendMessage(doctor.id, "⚠️ Your medical license has been suspended due to too many incorrect saves! You are now a regular Villager.");
-            }
-        }
-
-        // Public Announcements
-        let morningMsg = "☀️ **The Sun Rises...**\n";
-        if (killedPlayer) {
-            morningMsg += `💀 Tragic news: **${killedPlayer.username}** was found eliminated during the night!\n`;
-        } else {
-            morningMsg += `✨ Miraculously, no one died last night!\n`;
-        }
-
-        morningMsg += `🔍 *City Report:* Medical intervention was ${docSaved ? "successful" : "ineffective"} last night, and investigative efforts recorded updates.\n`;
-        await this.client.sendMessage(channelId, morningMsg);
-
-        // Start Day Voting Phase
-        this.startVotingPhase(channelId);
+    this.clearTimers();
+    if (this.players.length < 4) {
+      await this.client.sendMessage(
+        channelId,
+        '*Registration closed.*\n\n' +
+        `Only *${this.players.length}* player(s) registered.\n` +
+        'At least *4 players* are required.\n\n' +
+        'X The Mafia Case has been canceled.'
+      );
+      this.resetGameState();
+      return;
     }
 
-    // 6. Public Voting Phase (2 Minutes)
-    startVotingPhase(channelId) {
-        this.votes.clear();
-        this.votingActive = true;
-        this.client.sendMessage(channelId, "⚖️ **Day Phase Begins!** Debate amongst yourselves. Living players must cast your vote using `!vote @username` within **2 minutes**.");
+    this.inLobby = false;
+    this.gameStarted = true;
+    this.channelId = channelId;
 
-        setTimeout(() => {
-            this.endVotingPhase(channelId);
-        }, 120000); // 2 minutes
+    this.players.forEach(player => {
+      player.role = 'Villager';
+      player.isAlive = true;
+      player.strikes = 0;
+    });
+
+    const shuffled = [...this.players];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
 
-    castVote(user, targetUser, channelId) {
-        if (!this.votingActive) return "Voting is not active right now.";
-        const voter = this.players.find(p => p.id === user.id);
-        if (!voter) return "Ghosts cannot vote!";
+    shuffled[0].role = 'Mafia';
+    shuffled[1].role = 'Doctor';
+    shuffled[2].role = 'Detective';
 
-        const target = this.players.find(p => p.id === targetUser.id && p.isAlive);
-        if (!target) return "You can only vote for living players using a valid tag.";
+    let roster = '*CASE ROSTER & IDENTIFIERS*\n\n';
+    this.players.forEach(player => {
+      roster += `*[${player.letter}]* ${player.username}\n`;
+    });
 
-        this.votes.set(voter.id, target.id);
-        return `🗳️ **${user.username}** has cast their vote.`;
+    for (const player of this.players) {
+      let roleMessage =
+        '*PROJECT MAFIA CASE*\n\n' +
+        'Your secret role is:\n' +
+        `*${player.role}*\n\n` +
+        `${roster}\n`;
+
+      if (player.role === 'Mafia') {
+        roleMessage += '*NIGHT ACTION*\nUse:\n`!kill [Letter]`\n\nChoose one living player to eliminate silently.';
+      } else if (player.role === 'Doctor') {
+        roleMessage += '*NIGHT ACTION*\nUse:\n`!save [Letter]`\n\nTry to protect the Mafia\'s target.\nYou have *3 strikes* before your medical license is revoked.';
+      } else if (player.role === 'Detective') {
+        roleMessage += '*NIGHT ACTION*\nUse:\n`!investigate [Letter]`\n\nInvestigate one living player.\nYou have *3 strikes* before your badge is revoked.';
+      } else {
+        roleMessage += '*VILLAGER*\nYou have no night action.\nListen carefully, discuss clues, and vote wisely during the day.';
+      }
+
+      try {
+        await this.client.sendMessage(player.id, roleMessage);
+      } catch (error) {
+        console.error(`Failed to send Mafia role DM to ${player.username}:`, error);
+      }
     }
 
-    // 7. Tally Results & Win Check
-    async endVotingPhase(channelId) {
-        this.votingActive = false;
+    await this.client.sendMessage(
+      channelId,
+      '*REGISTRATION CLOSED*\n\n' +
+      'The roles have been assigned privately. Take your time to read your DMs.\n' +
+      'The city is going to sleep...\n\n' +
+      'Mafia: choose your target carefully.\n' +
+      'Doctor: choose who you think is under attack.\n' +
+      'Detective: investigate a suspect.\n\n' +
+      'Night actions must be submitted before the 5-minute night timer expires.'
+    );
 
-        const tally = {};
-        this.players.forEach(p => tally[p.id] = { username: p.username, role: p.role, count: 0 });
+    await this.startNightPhase(channelId);
+  }
 
-        this.votes.forEach(targetId => {
-            if (tally[targetId]) tally[targetId].count++;
-        });
+  async startNightPhase(channelId) {
+    if (!this.gameStarted) {
+      return;
+    }
 
-        let tallyMsg = "📊 **Voting Tally Results:**\n";
-        let maxVotes = 0;
-        let suspectToTest = null;
+    if (await this.checkWinCondition(channelId)) {
+      return;
+    }
 
-        Object.values(tally).forEach(item => {
-            tallyMsg += `• **${item.username}**: ${item.count} votes against them\n`;
-            if (item.count > maxVotes) {
-                maxVotes = item.count;
-                suspectToTest = item;
-            }
-        });
+    this.nightActive = true;
+    this.votingActive = false;
+    this.nightActions = {
+      kill: null,
+      save: null,
+      investigate: null
+    };
+    this.nightActionUsers = {
+      kill: null,
+      save: null,
+      investigate: null
+    };
+    this.votes.clear();
 
-        await this.client.sendMessage(channelId, tallyMsg);
+    await this.client.sendMessage(
+      channelId,
+      '*NIGHT FALLS*\n\n' +
+      'Shadows stretch across the city. Complete silence takes over...\n\n' +
+      'Mafia: execute your strike (`!kill [Letter]`).\n' +
+      'Doctor: protect someone (`!save [Letter]`).\n' +
+      'Detective: gather evidence (`!investigate [Letter]`).\n\n' +
+      'You have *5 minutes* of deep night to scheme in secret.'
+    );
 
-        if (suspectToTest && maxVotes > 0) {
-            // Check if the most voted person is actually the Mafia
-            if (suspectToTest.role === 'Mafia') {
-                await this.client.sendMessage(channelId, `⚖️ The village has accused **${suspectToTest.username}**... and it is **TRUE!** They are the Mafia!\n\n🎉 **VICTORY!** The village successfully solved the case and eliminated the Mafia! The town is safe.`);
-                this.gameStarted = false;
-            } else {
-                await this.client.sendMessage(channelId, `❌ The village accused **${suspectToTest.username}**, but they are **innocent**! No one is executed today, and the Mafia slips away deeper into the shadows.\n\n🌙 **Moving to the next night...**`);
-                // Loop back to the next night phase
-                this.startNightPhase(channelId);
-            }
-        } else {
-            await this.client.sendMessage(channelId, "⚠️ No votes were cast! Moving to the next night...");
-            this.startNightPhase(channelId);
+    // 5 Minutes Night Timer (300,000 ms)
+    this.nightTimer = setTimeout(async () => {
+      if (!this.gameStarted || !this.nightActive) {
+        return;
+      }
+      try {
+        await this.resolveNight(channelId);
+      } catch (error) {
+        console.error('Mafia night resolution error:', error);
+      }
+    }, 300000);
+  }
+
+  async handleNightAction(user, command, targetLetter) {
+    if (!this.gameStarted || !this.nightActive) {
+      return;
+    }
+
+    const userId = typeof user === 'string' ? user : user?.id;
+    if (!userId) {
+      return;
+    }
+
+    const player = this.getPlayerById(userId);
+    if (!player || !player.isAlive) {
+      await this.client.sendMessage(userId, 'You cannot perform night actions.');
+      return;
+    }
+
+    command = String(command || '').toLowerCase().replace(/^!/, '');
+    if (!['kill', 'save', 'investigate'].includes(command)) {
+      return;
+    }
+
+    const target = this.getPlayerByLetter(targetLetter);
+    if (!target || !target.isAlive) {
+      await this.client.sendMessage(
+        userId,
+        'Invalid letter or that player is already dead.\nCheck your case roster.'
+      );
+      return;
+    }
+
+    if (target.id === player.id) {
+      await this.client.sendMessage(userId, 'You cannot target yourself.');
+      return;
+    }
+
+    if (command === 'kill') {
+      if (player.role !== 'Mafia') {
+        await this.client.sendMessage(userId, 'X You are not the Mafia.');
+        return;
+      }
+      if (this.nightActions.kill) {
+        await this.client.sendMessage(userId, 'Your Mafia target has already been locked for this night.');
+        return;
+      }
+      this.nightActions.kill = target;
+      this.nightActionUsers.kill = player.id;
+      await this.client.sendMessage(
+        userId,
+        `*TARGET LOCKED*\n\n[${target.letter}] ${target.username} has been marked for elimination.`
+      );
+      return;
+    }
+
+    if (command === 'save') {
+      if (player.role !== 'Doctor') {
+        await this.client.sendMessage(userId, 'X You are not the Doctor.');
+        return;
+      }
+      if (this.nightActions.save) {
+        await this.client.sendMessage(userId, 'Your save has already been submitted for this night.');
+        return;
+      }
+      this.nightActions.save = target;
+      this.nightActionUsers.save = player.id;
+      await this.client.sendMessage(
+        userId,
+        `*PROTECTION ATTEMPT SUBMITTED*\n\nYou are protecting [${target.letter}] ${target.username}.\n\nThe result will be revealed at sunrise.`
+      );
+      return;
+    }
+
+    if (command === 'investigate') {
+      if (player.role !== 'Detective') {
+        await this.client.sendMessage(userId, 'X You are not the Detective.');
+        return;
+      }
+      if (this.nightActions.investigate) {
+        await this.client.sendMessage(userId, 'Your investigation has already been submitted for this night.');
+        return;
+      }
+      this.nightActions.investigate = target;
+      this.nightActionUsers.investigate = player.id;
+
+      if (target.role === 'Mafia') {
+        await this.client.sendMessage(
+          userId,
+          `*INVESTIGATION SUCCESSFUL*\n\n[${target.letter}] ${target.username} *IS CONNECTED TO THE MAFIA.*\n\nYou found the trail.`
+        );
+      } else {
+        player.strikes++;
+        await this.client.sendMessage(
+          userId,
+          `*INVESTIGATION FAILED*\n\n[${target.letter}] ${target.username} is innocent.\n\nDetective strikes: *${player.strikes}/3*`
+        );
+        if (player.strikes >= 3) {
+          player.role = 'Villager';
+          await this.client.sendMessage(
+            userId,
+            '*BADGE REVOKED*\n\nThree false leads have destroyed your credibility.\nYou are now a *Villager* for the remainder of the case.'
+          );
         }
+      }
+      return;
+    }
+  }
+
+  async resolveNight(channelId) {
+    if (!this.gameStarted || !this.nightActive) {
+      return;
     }
 
+    if (this.nightTimer) {
+      clearTimeout(this.nightTimer);
+      this.nightTimer = null;
+    }
+    this.nightActive = false;
+
+    const killTarget = this.nightActions.kill;
+    const saveTarget = this.nightActions.save;
+    let killedPlayer = null;
+    let doctorSaved = false;
+
+    if (killTarget) {
+      if (saveTarget && saveTarget.id === killTarget.id) {
+        doctorSaved = true;
+      } else {
+        killedPlayer = killTarget;
+        killedPlayer.isAlive = false;
+        this.ghosts.push(killedPlayer);
+      }
+    }
+
+    const doctor = this.players.find(p => p.role === 'Doctor' && p.isAlive);
+    if (doctor && saveTarget) {
+      if (!killTarget || saveTarget.id !== killTarget.id) {
+        doctor.strikes++;
+        await this.client.sendMessage(
+          doctor.id,
+          `*MISSED SAVE*\n\nYour protection target was not the Mafia's target.\nDoctor strikes: *${doctor.strikes}/3*`
+        );
+        if (doctor.strikes >= 3) {
+          doctor.role = 'Villager';
+          await this.client.sendMessage(
+            doctor.id,
+            '*MEDICAL LICENSE REVOKED*\n\nThree failed saves have exhausted your authority.\nYou are now a *Villager*.'
+          );
+        }
+      }
+    }
+
+    let morningMessage = '*THE SUN RISES...*\n\n';
+    if (killedPlayer) {
+      morningMessage += `*Tragic news:* ${killedPlayer.username} was found eliminated during the night.\n\n`;
+    } else if (doctorSaved) {
+      morningMessage += '***Miraculous survival!*\n\nSomeone was attacked during the night, but the victim survived thanks to medical attention.\n\n';
+    } else {
+      morningMessage += '*No one was eliminated last night.*\n\n';
+    }
+
+    let medicalReport;
+    if (!killTarget) {
+      medicalReport = 'Medical intervention: *No confirmed attack was recorded.*';
+    } else if (doctorSaved) {
+      medicalReport = 'Medical intervention: *SUCCESSFUL.*';
+    } else {
+      medicalReport = 'Medical intervention: *FAILED TO PREVENT THE ATTACK.*';
+    }
+
+    const detectiveReport = this.nightActions.investigate
+      ? 'Investigative efforts: *A lead was pursued during the night.*'
+      : 'Investigative efforts: *No confirmed investigative activity was recorded.*';
+
+    morningMessage += `${medicalReport}\n${detectiveReport}`;
+
+    await this.client.sendMessage(channelId, morningMessage);
+
+    if (await this.checkWinCondition(channelId)) {
+      return;
+    }
+
+    await this.startVotingPhase(channelId);
+  }
+
+  async startVotingPhase(channelId) {
+    if (!this.gameStarted) {
+      return;
+    }
+
+    this.votingActive = true;
+    this.nightActive = false;
+    this.votes.clear();
+
+    await this.client.sendMessage(
+      channelId,
+      '*DAY PHASE BEGINS*\n\n' +
+      'The survivors gather to analyze the clues and debate who can be trusted.\n\n' +
+      'Vote using:\n' +
+      '`!vote @username`\n\n' +
+      'Ghosts cannot vote.\n' +
+      'You have *5 minutes* of open floor discussion and deliberation.'
+    );
+
+    // 5 Minutes Voting Timer (300,000 ms)
+    this.voteTimer = setTimeout(async () => {
+      if (!this.gameStarted || !this.votingActive) {
+        return;
+      }
+      try {
+        await this.endVotingPhase(channelId);
+      } catch (error) {
+        console.error('Mafia voting error:', error);
+      }
+    }, 300000);
+  }
+
+  castVote(user, targetUser, channelId) {
+    if (!this.gameStarted) {
+      return 'X There is no active Mafia Case.';
+    }
+    if (!this.votingActive) {
+      return 'Voting is not active right now.';
+    }
+    if (channelId !== this.channelId) {
+      return 'This is not the active Mafia Case chat.';
+    }
+
+    const voter = this.getPlayerById(user.id);
+    if (!voter || !voter.isAlive) {
+      return 'Ghosts cannot vote!';
+    }
+
+    const target = this.getPlayerById(targetUser.id);
+    if (!target || !target.isAlive) {
+      return 'You can only vote for a living player.';
+    }
+
+    if (target.id === voter.id) {
+      return 'You cannot vote for yourself.';
+    }
+
+    this.votes.set(voter.id, target.id);
+    return `*${voter.username}* has cast their vote.`;
+  }
+
+  async endVotingPhase(channelId) {
+    if (!this.gameStarted || !this.votingActive) {
+      return;
+    }
+
+    if (this.voteTimer) {
+      clearTimeout(this.voteTimer);
+      this.voteTimer = null;
+    }
+    this.votingActive = false;
+
+    const tally = new Map();
+    for (const player of this.getAlivePlayers()) {
+      tally.set(player.id, 0);
+    }
+
+    for (const [voterId, targetId] of this.votes.entries()) {
+      const voter = this.getPlayerById(voterId);
+      const target = this.getPlayerById(targetId);
+      if (voter && voter.isAlive && target && target.isAlive) {
+        tally.set(target.id, (tally.get(target.id) || 0) + 1);
+      }
+    }
+
+    let tallyMessage = '*VOTING TALLY*\n\n';
+    for (const player of this.getAlivePlayers()) {
+      const votes = tally.get(player.id) || 0;
+      tallyMessage += `${player.username}: *${votes}*\n`;
+    }
+
+    await this.client.sendMessage(channelId, tallyMessage);
+
+    if (this.votes.size === 0) {
+      await this.client.sendMessage(
+        channelId,
+        '*NO VOTES WERE CAST.*\n\n' +
+        'Indecision paralyzes the town. Nobody is executed today.\n' +
+        'The Mafia remains hidden.\n\n' +
+        'Night is falling again....'
+      );
+      await this.startNightPhase(channelId);
+      return;
+    }
+
+    const highestVotes = Math.max(...Array.from(tally.values()));
+    const candidates = this.getAlivePlayers().filter(
+      player => (tally.get(player.id) || 0) === highestVotes
+    );
+
+    if (candidates.length > 1) {
+      const names = candidates.map(p => p.username).join(', ');
+      await this.client.sendMessage(
+        channelId,
+        `*DEADLOCK!*\n\nThe vote resulted in a tie between:\n*${names}*\n\nNo one can agree on a consensus, so no one is executed today.\nThe city enters another night.`
+      );
+      await this.startNightPhase(channelId);
+      return;
+    }
+
+    const suspect = candidates[0];
+
+    if (suspect.role === 'Mafia') {
+      suspect.isAlive = false;
+      this.ghosts.push(suspect);
+      await this.client.sendMessage(
+        channelId,
+        `*THE VERDICT*\n\nThe village accused *${suspect.username}*...\n\nThe evidence held true.\n*${suspect.username} was the MAFIA.*\n\n*THE TOWN WINS!*`
+      );
+      await this.checkWinCondition(channelId);
+      return;
+    }
+
+    await this.client.sendMessage(
+      channelId,
+      `*THE VERDICT*\n\nThe village accused *${suspect.username}*...\n\nX *INNOCENT.*\n\nA tragic mistake! An innocent citizen was cast out.\nThe Mafia slips deeper into the shadows.\n\nNight falls once again...`
+    );
+
+    if (await this.checkWinCondition(channelId)) {
+      return;
+    }
+
+    await this.startNightPhase(channelId);
+  }
 }
 
 module.exports = {
-  startMafiaLobby: (chatId, client, MessageMedia) => {
-      global.activeMafiaGame = new MafiaGame(client, MessageMedia);
-      return global.activeMafiaGame.startLobby(chatId);
+  startMafiaLobby: async (chatId, client, MessageMedia) => {
+    if (global.activeMafiaGame && (global.activeMafiaGame.inLobby || global.activeMafiaGame.gameStarted)) {
+      await client.sendMessage(chatId, 'A Mafia Case is already running.');
+      return;
+    }
+    global.activeMafiaGame = new MafiaGame(client, MessageMedia);
+    return global.activeMafiaGame.startLobby(chatId);
   },
   joinMafiaLobby: (chatId, senderId, userName) => {
-      if (global.activeMafiaGame) {
-          // Pass an object matching what joinGame(user, channelId) expects
-          return global.activeMafiaGame.joinGame({ id: senderId, username: userName }, chatId);
-      }
+    if (!global.activeMafiaGame || !global.activeMafiaGame.inLobby) {
       return null;
+    }
+    return global.activeMafiaGame.joinGame({
+      id: senderId,
+      username: userName
+    }, chatId);
   },
   handleNightAction: async (senderId, command, targetLetter) => {
-      if (global.activeMafiaGame) {
-          return await global.activeMafiaGame.handleNightAction(senderId, command, targetLetter);
-      }
+    if (!global.activeMafiaGame) {
+      return;
+    }
+    return global.activeMafiaGame.handleNightAction(senderId, command, targetLetter);
   },
   castVote: (chatId, senderId, targetJid, targetName) => {
-      if (global.activeMafiaGame) {
-          // Pass objects matching what castVote(user, targetUser, channelId) expects
-          return global.activeMafiaGame.castVote(
-              { id: senderId }, 
-              { id: targetJid, username: targetName || 'Target' }, 
-              chatId
-          );
-      }
-      return "No active Mafia game voting session.";
+    if (!global.activeMafiaGame) {
+      return 'X No active Mafia Case.';
+    }
+    return global.activeMafiaGame.castVote(
+      { id: senderId },
+      { id: targetJid, username: targetName || 'Target' },
+      chatId
+    );
   }
 };
