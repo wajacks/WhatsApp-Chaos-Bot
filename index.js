@@ -52,7 +52,8 @@ const {
   startMafiaLobby,
   joinMafiaLobby,
   handleNightAction,
-  castVote
+  castVote,
+  endMafiaGame
 } = require('./src/games/mafia');
 const {
   getCatalogMenu,
@@ -370,21 +371,6 @@ client.on('message', async message => {
     }
 
     // ============================================================
-    // TEST AUDIO
-    // ============================================================
-    if (lowerText === '!testaudio') {
-      try {
-        const testPath = path.join(__dirname, 'src/assets/Patoranking STEREO 50K TEST.ogg');
-        const audioMedia = MessageMedia.fromFilePath(testPath);
-        await client.sendMessage(chatId, audioMedia, { sendAudioAsVoice: true });
-      } catch (err) {
-        console.error('Test audio error:', err);
-        await message.reply('X Could not send test audio');
-      }
-      return;
-    }
-
-    // ============================================================
     // MENU
     // ============================================================
     if (lowerText === '!help' || lowerText === '!menu' || lowerText === '!commands' || lowerText === 'menu') {
@@ -575,7 +561,7 @@ client.on('message', async message => {
       const user = getUser(senderId, userName);
       const currentCoins = user.coins || 0;
 
-      if (currentCoins > 50) {
+      if (currentCoins > 10000) {
         await message.reply(
           'You aren\'t even poor!\n' +
           'Go grind mini-games or use `!daily`.'
@@ -583,7 +569,7 @@ client.on('message', async message => {
         return;
       }
 
-      const handout = 25;
+      const handout = 2000;
       user.coins = currentCoins + handout;
       const db = readDB();
       db[senderId] = user;
@@ -626,6 +612,17 @@ client.on('message', async message => {
         const mafiaResponse = joinMafiaLobby(chatId, senderId, userName);
         if (mafiaResponse) {
           await message.reply(mafiaResponse);
+        }
+        return;
+      }
+
+    // ============================================================
+    // MAFIA END / STOP
+    // ============================================================
+    if (lowerText === '!endmafia' || lowerText === '!stopmafia') {
+        const endResponse = await endMafiaGame(chatId);
+        if (endResponse) {
+          await message.reply(endResponse);
         }
         return;
       }

@@ -8,11 +8,11 @@ function getGamesList() {
 
 🟩 **2. Wordle**
 • Work together to guess the secret 5-letter word!
-• Commands: \`!wordle\`, \`!join\`
+• Commands: \`!wordle\`, \`!join\`, \`!stopwordle\`
 
 🕵️ **3. Mafia (Case Game)**
 • Social deduction chaos! Unmask the killer or survive the night.
-• Commands: \`!mafia\` (or \`!startmafia\`), \`!join\`, \`!vote @user\`
+• Commands: \`!mafia\` (or \`!startmafia\`), \`!joinmafia\`, \`stopmafia\`, \`!vote @user\`
 • *(Night actions are handled via private message DM to the bot: \`!kill\`, \`!save\`, \`!investigate\`)*
 
 ━━━━━━━━━━━━━━━━━━━━━━━

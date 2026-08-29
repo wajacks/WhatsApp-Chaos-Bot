@@ -99,6 +99,31 @@ class MafiaGame {
     this.votes.clear();
   }
 
+  async forceEndGame(channelId) {
+    if (!this.gameStarted && !this.inLobby) {
+      return '❌ There is no active Mafia game or lobby running right now.';
+    }
+
+    this.clearTimers();
+    this.votingActive = false;
+    this.nightActive = false;
+    this.gameStarted = false;
+    this.inLobby = false;
+
+    await this.client.sendMessage(
+      channelId,
+      '🛑 **MAFIA GAME TERMINATED.** The current match has been forcefully stopped.'
+    );
+
+    this.resetGameState();
+
+    if (global.activeMafiaGame === this) {
+      global.activeMafiaGame = null;
+    }
+
+    return null;
+  }
+
   async checkWinCondition(channelId) {
     if (!this.gameStarted) {
       return true;
@@ -780,6 +805,12 @@ module.exports = {
       id: senderId,
       username: userName
     }, chatId);
+  },
+  endMafiaGame: async (chatId) => {
+    if (!global.activeMafiaGame) {
+      return '❌ There is no active Mafia game or lobby running right now.';
+    }
+    return global.activeMafiaGame.forceEndGame(chatId);
   },
   handleNightAction: async (senderId, command, targetLetter) => {
     if (!global.activeMafiaGame) {

@@ -18,7 +18,8 @@ function getBotMenu() {
 ┃  3 \`!rebus\` ➔ Launch Country Rebus
 ┃  4 \`!steal\` ➔ Rob cash in Rebus(\`!steal @user\`)
 ┃  5 \`!mafia\` ➔ Start Mafia deduction match
-┃  6 \`!join\`  ➔ Join active lobby
+┃  6 \`!joinmafia\` ➔ Join active Mafia case
+┃  7 \`!endmafia\` ➔ Forcefully stop active match
 ╣══════●○●●○●○●○●○●○●══════╣
 ┃╰┈➤*[ 𝓢𝓨𝓢𝓣𝓔𝓜 ]*
 ┃  • \`!ping\`  ➔ Check bot latency
