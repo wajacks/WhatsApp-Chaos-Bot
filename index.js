@@ -8,7 +8,7 @@ const qrcode = require('qrcode-terminal');
 
 const { addXP, getUserBalance, deductBalance, transferCoins, getUser, readDB, writeDB, resetEconomy } = require('./src/database/db');
 const { handleProfileCommand } = require('./src/commands/profile');
-const { startWordleLobby, joinLobby, processGuess } = require('./src/games/wordle');
+const { startWordleLobby, joinLobby, processGuess, stopGame } = require('./src/games/wordle');
 const { startRebusLobby, joinRebusLobby, processRebusGuess, processRebusHint, handleStealCommand } = require('./src/games/rebuscountry');
 const { getGamesList } = require('./src/commands/gameslist');
 const { handleBalanceCommand } = require('./src/commands/balance');
@@ -508,6 +508,11 @@ IMPORTANT:
         if (wordleResponse) {
             await message.reply(wordleResponse);
             return;
+        }
+
+        if (command === '!end' || command === '!stopwordle') {
+            const resultMessage = stopGame(chatId);
+            client.sendMessage(chatId, resultMessage);
         }
 
         // ...........................[[ Rebus ]]...................................

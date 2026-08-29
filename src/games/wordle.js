@@ -46,12 +46,12 @@ const GENERAL_WORD_BANK = [
 
 const activeGames = new Map();
 
-const LOBBY_TIME_MS = 60 * 1000;              // 1 Minute to join lobby
-const ROUND_TIME_MS = 6 * 60 * 1000;          // 6 Minutes per word round
-const WARNING_TIME_MS = 4 * 60 * 1000;        // Send warning at 4 mins (2 mins remaining)
-const MAX_ROUNDS = 5;                         // 5 rounds = 30 minutes total session
-const PER_PLAYER_ATTEMPTS = 15;               // 15 guesses max per player per word
-const HINT_THRESHOLD_WRONG = 3;               // Group hint unlocks after 3 wrong guesses
+const LOBBY_TIME_MS = 80 * 1000;                  // 1 Minute to join lobby
+const ROUND_TIME_MS = 4 * 60 * 1000;              // 4 Minutes per word round (20 min total session)
+const WARNING_TIME_MS = 2 * 60 * 1000;            // Send warning at 2 mins (2 mins remaining)
+const MAX_ROUNDS = 5;                             // 5 rounds = 20 minutes total session
+const PER_PLAYER_ATTEMPTS = 15;                   // 15 guesses max per player per word
+const HINT_THRESHOLD_WRONG = 5;                   // Group hint unlocks after 5 wrong guesses
 
 function shuffleArray(array) {
     const arr = [...array];
@@ -137,7 +137,7 @@ function startWordleLobby(chatId, client) {
 `━━━━━━━━━━━━━━━━━━━━━\n` +
 `🎮 *HOW TO JOIN:* Type *!join* to enter the match!\n\n` +
 `📖 *MATCH RULES:* \n` +
-`• Total Match Duration: *30 Minutes* (5 Rounds, 6 Mins per Round)\n` +
+`• Total Match Duration: *20 Minutes* (5 Rounds, 4 Mins per Round)\n` +
 `• Each Player gets *15 Max Attempts* per word.\n` +
 `• Running out of attempts makes you spectate until the next round!\n` +
 `• Bot reveals *1 correct letter* at the start of each word.\n` +
@@ -167,7 +167,7 @@ function startNextRound(chatId, client) {
     game.currentRound += 1;
 
     if (game.currentRound > MAX_ROUNDS) {
-        endGameSession(chatId, client, '🏁 *30-MINUTE MATCH COMPLETED! (5/5 Rounds Finished)*');
+        endGameSession(chatId, client, '🏁 *20-MINUTE MATCH COMPLETED! (5/5 Rounds Finished)*');
         return;
     }
 
@@ -191,7 +191,7 @@ function startNextRound(chatId, client) {
         }
     }, WARNING_TIME_MS);
 
-    // Set 6-Minute Round Expiration Timer
+    // Set 4-Minute Round Expiration Timer
     game.roundTimer = setTimeout(() => {
         if (activeGames.has(chatId) && game.status === 'ACTIVE') {
             client.sendMessage(
@@ -209,7 +209,7 @@ function startNextRound(chatId, client) {
 `🔥 *ROUND ${game.currentRound} OF ${MAX_ROUNDS} STARTED!* 🔥\n` +
 `━━━━━━━━━━━━━━━━━━━━━\n` +
 `👥 Active Players: ${game.players.size}\n` +
-`⏱️ Round Duration: 6 Minutes\n` +
+`⏱️ Round Duration: 4 Minutes\n` +
 `🎯 Attempts per player: 15\n` +
 `🔍 *FREE LETTER HINT:* \` ${game.revealedLetter.display} \` (Letter *${game.revealedLetter.char}* is in position ${game.revealedLetter.index + 1})\n\n` +
 `💬 *Registered players: Type your 5-letter guess directly in chat!*`
@@ -307,11 +307,11 @@ function processGuess(chatId, rawText, senderId, userName, client) {
     }
 
     return `👤 *${userName}* guessed *${guess}*:\n` +
-           `🔤 ${formattedGuess}\n` +
-           `🎨 ${feedbackGrid}\n` +
-           `⏳ Guesses remaining: *${player.attemptsLeft}/${PER_PLAYER_ATTEMPTS}*` +
-           `${lockoutNotice}` +
-           `${hintNotice}`;
+            `🔤 ${formattedGuess}\n` +
+            `🎨 ${feedbackGrid}\n` +
+            `⏳ Guesses remaining: *${player.attemptsLeft}/${PER_PLAYER_ATTEMPTS}*` +
+            `${lockoutNotice}` +
+            `${hintNotice}`;
 }
 
 function formatRoundWinBoard(game, oldWord, solverName, coins, xp) {
@@ -359,9 +359,23 @@ function endGameSession(chatId, client, reason) {
     client.sendMessage(chatId, summary);
 }
 
+function stopGame(chatId) {
+    if (!activeGames.has(chatId)) {
+        return '❌ There is no active Wordle match to end in this chat.';
+    }
+    
+    const game = activeGames.get(chatId);
+    if (game.roundTimer) clearTimeout(game.roundTimer);
+    if (game.warningTimer) clearTimeout(game.warningTimer);
+    
+    activeGames.delete(chatId);
+    return '🛑 *The Wordle match has been manually ended by a player.*';
+}
+
 module.exports = {
     startWordleLobby,
     joinLobby,
     processGuess,
-    endGameSession
+    endGameSession,
+    stopGame
 };
