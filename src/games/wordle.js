@@ -46,10 +46,10 @@ const GENERAL_WORD_BANK = [
 
 const activeGames = new Map();
 
-const LOBBY_TIME_MS = 80 * 1000;                  // 1 Minute to join lobby
-const ROUND_TIME_MS = 4 * 60 * 1000;              // 4 Minutes per word round (20 min total session)
-const WARNING_TIME_MS = 2 * 60 * 1000;            // Send warning at 2 mins (2 mins remaining)
-const MAX_ROUNDS = 10;                             // 5 rounds = 20 minutes total session
+const LOBBY_TIME_MS = 80 * 1000;                  // 80 Seconds to join lobby
+const ROUND_TIME_MS = 4 * 60 * 1000;              // 4 Minutes per word round
+const WARNING_TIME_MS = 2 * 60 * 1000;            // Send warning at 2 mins remaining
+const MAX_ROUNDS = 10;                            // Total rounds per match
 const PER_PLAYER_ATTEMPTS = 15;                   // 15 guesses max per player per word
 const HINT_THRESHOLD_WRONG = 5;                   // Group hint unlocks after 5 wrong guesses
 
@@ -64,7 +64,14 @@ function shuffleArray(array) {
 
 function getNextWord(game) {
     if (game.wordPool.length === 0) {
-        game.wordPool = shuffleArray(GENERAL_WORD_BANK);
+        // Filter out already used words to avoid repeats
+        const availableWords = GENERAL_WORD_BANK.filter(item => !game.usedWords.has(item.word));
+        if (availableWords.length === 0) {
+            game.usedWords.clear(); // Reset history if all words have been exhausted
+            game.wordPool = shuffleArray(GENERAL_WORD_BANK);
+        } else {
+            game.wordPool = shuffleArray(availableWords);
+        }
     }
     const nextPick = game.wordPool.pop();
     game.usedWords.add(nextPick.word);
@@ -75,7 +82,6 @@ function getNextWord(game) {
 function generateInitialRevealedMask(targetWord) {
     const wordLen = targetWord.length;
     const randomIndex = Math.floor(Math.random() * wordLen);
-    const mask = new Array(wordLen).fill('🟩');
     
     let displayStr = '';
     for (let i = 0; i < wordLen; i++) {
@@ -137,9 +143,8 @@ function startWordleLobby(chatId, client) {
 `━━━━━━━━━━━━━━━━━━━━━\n` +
 `🎮 *HOW TO JOIN:* Type *!join* to enter the match!\n\n` +
 `📖 *MATCH RULES:* \n` +
-`• Total Match Duration: *20 Minutes* (5 Rounds, 4 Mins per Round)\n` +
+`• Total Match Duration: *Rounds based* (Up to 10 Rounds, 4 Mins per Round)\n` +
 `• Each Player gets *15 Max Attempts* per word.\n` +
-`• Running out of attempts makes you spectate until the next round!\n` +
 `• Bot reveals *1 correct letter* at the start of each word.\n` +
 `• Simply type your 5-letter guess directly in chat!\n\n` +
 `⏱️ Lobby closing soon... Register now with *!join*!`;
@@ -164,10 +169,16 @@ function joinLobby(chatId, senderId, userName) {
 
 function startNextRound(chatId, client) {
     const game = activeGames.get(chatId);
+    if (!game) return;
+
+    // Clear any dangling timers from previous state
+    if (game.roundTimer) clearTimeout(game.roundTimer);
+    if (game.warningTimer) clearTimeout(game.warningTimer);
+
     game.currentRound += 1;
 
     if (game.currentRound > MAX_ROUNDS) {
-        endGameSession(chatId, client, '🏁 *20-MINUTE MATCH COMPLETED! (5/5 Rounds Finished)*');
+        endGameSession(chatId, client, `🏁 *MATCH COMPLETED! (${MAX_ROUNDS}/${MAX_ROUNDS} Rounds Finished)*`);
         return;
     }
 
@@ -200,7 +211,6 @@ function startNextRound(chatId, client) {
                 `💡 The secret word was: *${game.targetWord}*\n\n` +
                 `⏩ *Preparing next round...*`
             );
-            clearTimeout(game.warningTimer);
             startNextRound(chatId, client);
         }
     }, ROUND_TIME_MS);
@@ -227,7 +237,7 @@ function processGuess(chatId, rawText, senderId, userName, client) {
 
     // Check if player exhausted their attempts for this word
     if (player.attemptsLeft <= 0) {
-        return null; // Ignore silently or let them spectate
+        return null; 
     }
 
     const guess = rawText.trim().toUpperCase();
@@ -266,6 +276,7 @@ function processGuess(chatId, rawText, senderId, userName, client) {
 
     // --- CASE 1: WINNER ---
     if (guess === game.targetWord) {
+        // 🛑 Clear active timers immediately so they don't fire midway
         if (game.roundTimer) clearTimeout(game.roundTimer);
         if (game.warningTimer) clearTimeout(game.warningTimer);
 
@@ -288,8 +299,8 @@ function processGuess(chatId, rawText, senderId, userName, client) {
 
         const winMessage = formatRoundWinBoard(game, oldWord, userName, bonusCoins, xpReward);
 
-        // Schedule next round after brief pause
-        setTimeout(() => startNextRound(chatId, client), 4000);
+        // Increased pause from 4s to 7s for better pacing between rounds
+        setTimeout(() => startNextRound(chatId, client), 7000);
         return winMessage;
     }
 
