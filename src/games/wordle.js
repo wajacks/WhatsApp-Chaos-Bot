@@ -49,7 +49,7 @@ const activeGames = new Map();
 const LOBBY_TIME_MS = 80 * 1000;                  // 1 Minute to join lobby
 const ROUND_TIME_MS = 4 * 60 * 1000;              // 4 Minutes per word round (20 min total session)
 const WARNING_TIME_MS = 2 * 60 * 1000;            // Send warning at 2 mins (2 mins remaining)
-const MAX_ROUNDS = 5;                             // 5 rounds = 20 minutes total session
+const MAX_ROUNDS = 10;                             // 5 rounds = 20 minutes total session
 const PER_PLAYER_ATTEMPTS = 15;                   // 15 guesses max per player per word
 const HINT_THRESHOLD_WRONG = 5;                   // Group hint unlocks after 5 wrong guesses
 

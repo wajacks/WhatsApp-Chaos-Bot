@@ -493,6 +493,13 @@ IMPORTANT:
             return;
         }
 
+        // 🛑 Stop / End active Wordle game manually
+        if (lowerText === '!end' || lowerText === '!stopwordle') {
+            const resultMessage = stopGame(chatId);
+            await message.reply(resultMessage);
+            return;
+        }
+
         if (lowerText === '!join') {
             const response = joinMafiaLobby(chatId, senderId, userName);
             if (response) {
@@ -510,10 +517,6 @@ IMPORTANT:
             return;
         }
 
-        if (command === '!end' || command === '!stopwordle') {
-            const resultMessage = stopGame(chatId);
-            client.sendMessage(chatId, resultMessage);
-        }
 
         // ...........................[[ Rebus ]]...................................
         if (lowerText === '!rebus' || lowerText === '!wordplay') {
