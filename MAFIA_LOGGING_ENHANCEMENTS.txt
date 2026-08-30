@@ -1,0 +1,175 @@
+﻿=============================================================================
+MAFIA GAME - COMPREHENSIVE IDENTITY LOGGING ENHANCEMENTS
+=============================================================================
+Added: 2026-08-30T22:55:54.909Z
+
+OBJECTIVE: Ensure the mafia game works perfectly by tracking identity 
+matching between group chat (where players join) and DMs (where they send 
+night actions), regardless of WhatsApp's various ID formats.
+
+=============================================================================
+LOGGING ADDED TO index.js
+=============================================================================
+
+1. [IDENTITY] - Universal Identity Tracking
+   Location: After senderId extraction in message handler
+   Tracks:
+   - Context (GROUP vs DM)
+   - message.from
+   - message.author
+   - senderId (canonical)
+   - contactNumber
+   - contactId
+
+2. [MAFIA JOIN] - Join Command Tracking
+   Location: Before joinMafiaLobby call
+   Tracks:
+   - chatId
+   - senderId
+   - userName
+   - contactNumber
+   - contactId
+
+3. [MAFIA DM] - Night Action DM Tracking
+   Location: When !kill, !save, !investigate commands are received
+   Tracks:
+   - rawFrom
+   - rawAuthor
+   - canonicalSender
+   - contactNumber
+   - command + targetLetter
+
+=============================================================================
+LOGGING ADDED TO src/games/mafia.js
+=============================================================================
+
+1. [MAFIA JOIN] - Join Request Processing
+   Location: Start of joinGame() method
+   Tracks:
+   - raw_user (full user object)
+   - user.id
+   - user.number
+   - channelId
+
+2. [MAFIA JOIN] - Player Storage Confirmation
+   Location: After player is added to this.players array
+   Tracks:
+   - username
+   - letter assignment
+   - stored ID
+   - role
+   - total_players count
+
+3. [CANONICALIZE] - ID Normalization Tracking
+   Location: canonicalizeIdentity() method
+   Tracks:
+   - Original identity (before normalization)
+   - Result (after normalization)
+   Purpose: See how different ID formats get normalized
+
+4. [GET PLAYER] - Player Lookup Tracking
+   Location: getPlayerById() method
+   Tracks:
+   - Input ID
+   - Normalized ID
+   - Total players in game
+   - Each comparison attempt (shows mismatches)
+   - ✓ MATCH FOUND (when player is found)
+   - ❌ NO PLAYER FOUND (when lookup fails)
+
+5. [NIGHT PHASE] - Phase Start Tracking
+   Location: startNightPhase() method
+   Tracks:
+   - Game number
+   - Alive players count
+
+6. [ROSTER] - Complete Player Roster
+   Location: Start of each night phase
+   Tracks (for each player):
+   - username
+   - letter
+   - role
+   - alive status
+   - stored ID
+   Purpose: See all stored IDs at once for debugging
+
+7. [NIGHT ACTION] - Night Action Receipt
+   Location: Start of handleNightAction() method
+   Tracks:
+   - command (kill/save/investigate)
+   - targetLetter
+   - raw_user (full user object from DM)
+
+8. [MAFIA NIGHT] - Night Action Identity Resolution
+   Location: After user ID extraction in handleNightAction()
+   Tracks:
+   - Incoming identity (raw vs canonical)
+   - Sender resolution (username, letter, role)
+   - Failed identity determination
+
+9. [VOTE] - Voting Tracking
+   Location: Start of castVote() method
+   Tracks:
+   - voter_id
+   - target_id
+   - target_name
+   - channelId
+
+=============================================================================
+HOW TO DEBUG IDENTITY MATCHING ISSUES
+=============================================================================
+
+When a player reports night actions not working:
+
+1. CHECK JOIN PROCESS:
+   Look for: [MAFIA JOIN] logs when they joined
+   Verify: Their ID was stored correctly
+
+2. CHECK ROSTER:
+   Look for: [ROSTER] logs at night phase start
+   Verify: Their ID appears in the roster
+
+3. CHECK DM RECEIPT:
+   Look for: [IDENTITY] log showing Context: DM
+   Verify: Their senderId is being extracted
+
+4. CHECK NIGHT ACTION:
+   Look for: [NIGHT ACTION] log showing their command
+   Verify: raw_user contains correct ID
+
+5. CHECK PLAYER LOOKUP:
+   Look for: [GET PLAYER] logs during night action processing
+   Verify: 
+   - input_id matches what was stored
+   - normalized IDs match
+   - If "No match" appears, compare stored vs looking_for IDs
+
+6. CHECK CANONICALIZATION:
+   Look for: [CANONICALIZE] logs
+   Verify: Same user gets same normalized ID in both contexts
+
+=============================================================================
+COMMON ID FORMATS HANDLED
+=============================================================================
+
+1. Standard WhatsApp: 254712345678@c.us
+2. WhatsApp LID: some_lid_value@lid
+3. Device suffix: 254712345678_12345@c.us (stripped to base)
+4. Group context: message.author contains user ID
+5. DM context: message.from contains user ID
+
+All formats are normalized to consistent format for matching.
+
+=============================================================================
+NEXT STEPS IF ISSUES PERSIST
+=============================================================================
+
+If identity matching still fails after reviewing logs:
+
+1. Share the console logs showing the full flow
+2. Look for differences in normalized IDs between join and DM
+3. Check if WhatsApp is using LID vs standard format
+4. Verify contact object is being loaded correctly
+5. May need to add fallback matching strategies
+
+=============================================================================

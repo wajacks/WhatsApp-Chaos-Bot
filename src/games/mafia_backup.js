@@ -1,4 +1,4 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const { getUser, addCoins, addXP, readDB, writeDB } = require('../database/db');
 
 class MafiaGame {
@@ -55,10 +55,6 @@ class MafiaGame {
     canonicalizeIdentity(identity) {
         if (!identity) return null;
 
-        const originalIdentity = typeof identity === 'object' 
-            ? JSON.stringify(identity).substring(0, 100) 
-            : identity;
-
         // Contact object
         if (typeof identity === 'object') {
             if (identity.number) {
@@ -97,13 +93,7 @@ class MafiaGame {
 
         // Raw phone number
         const number = this.normalizePhoneNumber(clean);
-        if (number) {
-            const result = `${number}@c.us`;
-            console.log(
-                `[CANONICALIZE] ${originalIdentity} -> ${result}`
-            );
-            return result;
-        }
+        if (number) return `${number}@c.us`;
 
         return clean;
     }
@@ -114,50 +104,12 @@ class MafiaGame {
 
     getPlayerById(id) {
         const normalizedId = this.canonicalizeIdentity(id);
-        
-        console.log(
-            `[GET PLAYER] Looking up player | ` +
-            `input_id=${typeof id === 'object' ? JSON.stringify(id).substring(0, 80) : id} | ` +
-            `normalized=${normalizedId} | ` +
-            `total_players=${this.players.length}`
-        );
-        
-        if (!normalizedId) {
-            console.log(`[GET PLAYER] Failed to normalize ID`);
-            return null;
-        }
+        if (!normalizedId) return null;
 
-        const found = this.players.find(player => {
+        return this.players.find(player => {
             const playerId = this.canonicalizeIdentity(player.id);
-            const matches = playerId === normalizedId;
-            
-            if (!matches) {
-                console.log(
-                    `[GET PLAYER] No match | ` +
-                    `player=${player.username} [${player.letter}] | ` +
-                    `stored_id=${player.id} | ` +
-                    `normalized_stored=${playerId} | ` +
-                    `looking_for=${normalizedId}`
-                );
-            } else {
-                console.log(
-                    `[GET PLAYER] ✓ MATCH FOUND | ` +
-                    `player=${player.username} [${player.letter}] | ` +
-                    `stored_id=${player.id} | ` +
-                    `normalized=${playerId}`
-                );
-            }
-            
-            return matches;
-        });
-
-        if (!found) {
-            console.log(
-                `[GET PLAYER] ❌ NO PLAYER FOUND for ${normalizedId}`
-            );
-        }
-
-        return found || null;
+            return playerId === normalizedId;
+        }) || null;
     }
 
     getPlayerByLetter(letter) {
@@ -248,7 +200,7 @@ class MafiaGame {
 
     async forceEndGame(channelId) {
         if (!this.gameStarted && !this.inLobby) {
-            return 'âŒ There is no active Mafia game or lobby running right now.';
+            return '❌ There is no active Mafia game or lobby running right now.';
         }
 
         this.clearTimers();
@@ -259,7 +211,7 @@ class MafiaGame {
 
         await this.client.sendMessage(
             channelId,
-            'ðŸ›‘ *MAFIA GAME TERMINATED.*\n\n' +
+            '🛑 *MAFIA GAME TERMINATED.*\n\n' +
             'The current match has been forcefully stopped.'
         );
 
@@ -520,19 +472,11 @@ class MafiaGame {
         if (!this.inLobby) return null;
         if (this.channelId !== channelId) return null;
 
-        console.log(
-            `[MAFIA JOIN] Received join request | ` +
-            `raw_user=${JSON.stringify(user)} | ` +
-            `user.id=${user?.id} | ` +
-            `user.number=${user?.number} | ` +
-            `channelId=${channelId}`
-        );
-
         const permanentJid =
             this.canonicalizeIdentity(user);
 
         if (!permanentJid) {
-            return 'âŒ Could not identify your WhatsApp account.';
+            return '❌ Could not identify your WhatsApp account.';
         }
 
         console.log(
@@ -576,12 +520,8 @@ class MafiaGame {
         this.players.push(player);
 
         console.log(
-            `[MAFIA JOIN] ✓ Player stored successfully | ` +
-            `username=${player.username} | ` +
-            `letter=[${player.letter}] | ` +
-            `id=${player.id} | ` +
-            `role=${player.role} | ` +
-            `total_players=${this.players.length}`
+            `[MAFIA JOIN] ${player.username} registered as ` +
+            `[${player.letter}] -> ${player.id}`
         );
 
         return (
@@ -605,7 +545,7 @@ class MafiaGame {
                 '*REGISTRATION CLOSED.*\n\n' +
                 `Only *${this.players.length}* player(s) registered.\n` +
                 'At least *4 players* are required.\n\n' +
-                'âŒ The Mafia Case has been canceled.'
+                '❌ The Mafia Case has been canceled.'
             );
 
             this.resetGameState();
@@ -729,22 +669,6 @@ class MafiaGame {
             return;
         }
 
-        console.log(
-            `[NIGHT PHASE] Starting night phase | ` +
-            `game=${this.gameNumber} | ` +
-            `alive_players=${this.getAlivePlayers().length}`
-        );
-
-        // Log complete roster for debugging identity matching
-        this.players.forEach(player => {
-            console.log(
-                `[ROSTER] ${player.username} [${player.letter}] | ` +
-                `role=${player.role} | ` +
-                `alive=${player.isAlive} | ` +
-                `id=${player.id}`
-            );
-        });
-
         this.nightActive = true;
         this.votingActive = false;
 
@@ -793,14 +717,10 @@ class MafiaGame {
     // ============================================================
 
     async handleNightAction(user, command, targetLetter) {
-        console.log(
-            `[NIGHT ACTION] Received | ` +
-            `command=${command} | ` +
-            `targetLetter=${targetLetter} | ` +
-            `raw_user=${typeof user === 'object' ? JSON.stringify(user).substring(0, 150) : user}`
-        );
+        if (!this.gameStarted || !this.nightActive) {
+            return;
+        }
 
-        // Extract user ID first so we can send error messages
         const userId =
             typeof user === 'string'
                 ? user
@@ -808,18 +728,6 @@ class MafiaGame {
 
         const cleanUserId =
             this.canonicalizeIdentity(user);
-
-        // Now check game state and send proper error message if needed
-        if (!this.gameStarted || !this.nightActive) {
-            if (cleanUserId) {
-                await this.client.sendMessage(
-                    cleanUserId,
-                    '❌ *Night actions are not available right now.*\n\n' +
-                    'Night actions can only be used during the Night phase of an active game.'
-                );
-            }
-            return;
-        }
 
         console.log(
             `[MAFIA NIGHT] Incoming identity: raw=${userId} canonical=${cleanUserId}`
@@ -845,7 +753,7 @@ class MafiaGame {
         if (!player) {
             await this.client.sendMessage(
                 cleanUserId,
-                'âŒ You are not registered in the current Mafia Case.'
+                '❌ You are not registered in the current Mafia Case.'
             );
             return;
         }
@@ -853,7 +761,7 @@ class MafiaGame {
         if (!player.isAlive) {
             await this.client.sendMessage(
                 cleanUserId,
-                'ðŸ‘» You are dead and cannot perform night actions.'
+                '👻 You are dead and cannot perform night actions.'
             );
             return;
         }
@@ -878,7 +786,7 @@ class MafiaGame {
         if (!target) {
             await this.client.sendMessage(
                 cleanUserId,
-                'âŒ Invalid player letter.\n\n' +
+                '❌ Invalid player letter.\n\n' +
                 'Check your case roster and use a valid identifier such as `!kill C`.'
             );
             return;
@@ -887,7 +795,7 @@ class MafiaGame {
         if (!target.isAlive) {
             await this.client.sendMessage(
                 cleanUserId,
-                `âŒ *[${target.letter}] ${target.username}* is already dead.\n\n` +
+                `❌ *[${target.letter}] ${target.username}* is already dead.\n\n` +
                 'You can only target living players.'
             );
             return;
@@ -898,7 +806,7 @@ class MafiaGame {
         ) {
             await this.client.sendMessage(
                 cleanUserId,
-                'âŒ You cannot target yourself.'
+                '❌ You cannot target yourself.'
             );
             return;
         }
@@ -917,7 +825,7 @@ class MafiaGame {
             if (player.role !== 'Mafia') {
                 await this.client.sendMessage(
                     cleanUserId,
-                    'âŒ You are not the Mafia.'
+                    '❌ You are not the Mafia.'
                 );
                 return;
             }
@@ -950,7 +858,7 @@ class MafiaGame {
             if (player.role !== 'Doctor') {
                 await this.client.sendMessage(
                     cleanUserId,
-                    'âŒ You are not the Doctor.'
+                    '❌ You are not the Doctor.'
                 );
                 return;
             }
@@ -984,7 +892,7 @@ class MafiaGame {
             if (player.role !== 'Detective') {
                 await this.client.sendMessage(
                     cleanUserId,
-                    'âŒ You are not the Detective.'
+                    '❌ You are not the Detective.'
                 );
                 return;
             }
@@ -1211,16 +1119,8 @@ class MafiaGame {
     // ============================================================
 
     castVote(user, targetUser, channelId) {
-        console.log(
-            `[VOTE] Received vote | ` +
-            `voter_id=${user?.id} | ` +
-            `target_id=${targetUser?.id} | ` +
-            `target_name=${targetUser?.username} | ` +
-            `channelId=${channelId}`
-        );
-
         if (!this.gameStarted) {
-            return 'âŒ There is no active Mafia Case.';
+            return '❌ There is no active Mafia Case.';
         }
 
         if (!this.votingActive) {
@@ -1228,36 +1128,36 @@ class MafiaGame {
         }
 
         if (channelId !== this.channelId) {
-            return 'âŒ This is not the active Mafia Case chat.';
+            return '❌ This is not the active Mafia Case chat.';
         }
 
         const voter =
             this.getPlayerById(user.id);
 
         if (!voter) {
-            return 'âŒ You are not registered in this Mafia Case.';
+            return '❌ You are not registered in this Mafia Case.';
         }
 
         if (!voter.isAlive) {
-            return 'ðŸ‘» Ghosts cannot vote!';
+            return '👻 Ghosts cannot vote!';
         }
 
         const target =
             this.getPlayerById(targetUser.id);
 
         if (!target) {
-            return 'âŒ That player is not registered in this Mafia Case.';
+            return '❌ That player is not registered in this Mafia Case.';
         }
 
         if (!target.isAlive) {
-            return 'âŒ You can only vote for a living player.';
+            return '❌ You can only vote for a living player.';
         }
 
         if (
             this.canonicalizeIdentity(target.id) ===
             this.canonicalizeIdentity(voter.id)
         ) {
-            return 'âŒ You cannot vote for yourself.';
+            return '❌ You cannot vote for yourself.';
         }
 
         this.votes.set(
@@ -1402,7 +1302,7 @@ class MafiaGame {
             channelId,
             `*THE VERDICT*\n\n` +
             `The village accused *${suspect.username}*...\n\n` +
-            'âŒ *INNOCENT.*\n\n' +
+            '❌ *INNOCENT.*\n\n' +
             'A tragic mistake! An innocent citizen was cast out.\n' +
             'The Mafia slips deeper into the shadows.\n\n' +
             'Night falls once again...'
@@ -1505,7 +1405,7 @@ module.exports = {
         targetContact
     ) => {
         if (!global.activeMafiaGame) {
-            return 'âŒ No active Mafia Case.';
+            return '❌ No active Mafia Case.';
         }
 
         return global.activeMafiaGame.castVote(
@@ -1527,18 +1427,9 @@ module.exports = {
 
     endMafiaGame: async (chatId) => {
         if (!global.activeMafiaGame) {
-            return 'âŒ There is no active Mafia game or lobby running right now.';
+            return '❌ There is no active Mafia game or lobby running right now.';
         }
 
         return global.activeMafiaGame.forceEndGame(chatId);
     }
 };
-
-
-
-
-
-
-
-
-

@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { GoogleGenAI } = require('@google/genai');
@@ -57,7 +57,7 @@ const { handleSongCommand } = require('./src/commands/song');
 // CHAOS NEURAL CORE GEMINI
 // ============================================================
 if (!process.env.GEMINI_API_KEY) {
-    console.warn('⚠️ A GEMINI_API_KEY is missing from .env');
+    console.warn('âš ï¸ A GEMINI_API_KEY is missing from .env');
 }
 
 const ai = new GoogleGenAI({
@@ -246,6 +246,20 @@ client.on('message', async message => {
             senderContact
         );
 
+        // ============================================================
+        // IDENTITY LOGGING
+        // ============================================================
+        const isGroup = message.from.endsWith('@g.us');
+        console.log(
+            `[IDENTITY] ` +
+            `Context: ${isGroup ? 'GROUP' : 'DM'} | ` +
+            `from=${message.from} | ` +
+            `author=${message.author || 'none'} | ` +
+            `senderId=${senderId} | ` +
+            `contactNumber=${senderContact?.number || 'none'} | ` +
+            `contactId=${senderContact?.id?._serialized || 'none'}`
+        );
+
         const text = message.body
             ? message.body.trim()
             : '';
@@ -431,34 +445,34 @@ client.on('message', async message => {
                             '- Match the user tone.\n' +
                             '- Light teasing is allowed between friends. Do not overuse emojis.\n\n' +
                             'BOT COMMANDS:\n' +
-                            '- !profile — View stats and assets.\n' +
-                            '- !daily — Claim the 24-hour bonus.\n' +
-                            '- !bal — Check wallet balance.\n' +
-                            '- !store — Browse the car and house market.\n' +
-                            '- !beg — Ask for street handouts.\n' +
-                            '- !buy <item> — Purchase vehicles or homes.\n' +
-                            '- !pay <amount> — Pay another player.\n' +
-                            '- !games — View available game modes.\n' +
-                            '- !wordle — Launch Wordle.\n' +
-                            '- !rebus — Launch Country Rebus.\n' +
-                            '- !hint — Get a hint for active Rebus game.\n' +
-                            '- !steal @user — Attempt to rob cash during Rebus.\n' +
-                            '- !mafia or !startmafia — Start Mafia.\n' +
-                            '- !joinmafia — Join Mafia.\n' +
-                            '- !join — Join Wordle.\n' +
-                            '- !ping — Check bot latency.\n' +
-                            '- !menu — Display the full bot menu.\n' +
-                            '- !randomsong — Play a random song.\n\n' +
+                            '- !profile â€” View stats and assets.\n' +
+                            '- !daily â€” Claim the 24-hour bonus.\n' +
+                            '- !bal â€” Check wallet balance.\n' +
+                            '- !store â€” Browse the car and house market.\n' +
+                            '- !beg â€” Ask for street handouts.\n' +
+                            '- !buy <item> â€” Purchase vehicles or homes.\n' +
+                            '- !pay <amount> â€” Pay another player.\n' +
+                            '- !games â€” View available game modes.\n' +
+                            '- !wordle â€” Launch Wordle.\n' +
+                            '- !rebus â€” Launch Country Rebus.\n' +
+                            '- !hint â€” Get a hint for active Rebus game.\n' +
+                            '- !steal @user â€” Attempt to rob cash during Rebus.\n' +
+                            '- !mafia or !startmafia â€” Start Mafia.\n' +
+                            '- !joinmafia â€” Join Mafia.\n' +
+                            '- !join â€” Join Wordle.\n' +
+                            '- !ping â€” Check bot latency.\n' +
+                            '- !menu â€” Display the full bot menu.\n' +
+                            '- !randomsong â€” Play a random song.\n\n' +
                             'MAFIA:\n' +
                             '- Players register using !joinmafia.\n' +
                             '- Each player receives a letter alias.\n' +
                             '- Phases are Lobby, Night, and Day.\n' +
                             '- Night actions happen privately through DM.\n' +
                             '- Day voting happens in the group.\n' +
-                            '- !kill <letter> — Mafia action.\n' +
-                            '- !save <letter> — Doctor action.\n' +
-                            '- !investigate <letter> — Detective action.\n' +
-                            '- !vote @username — Vote for a living player.\n\n' +
+                            '- !kill <letter> â€” Mafia action.\n' +
+                            '- !save <letter> â€” Doctor action.\n' +
+                            '- !investigate <letter> â€” Detective action.\n' +
+                            '- !vote @username â€” Vote for a living player.\n\n' +
                             'COMMAND RULES:\n' +
                             '- Only describe commands listed above.\n' +
                             '- Never invent commands.\n' +
@@ -503,7 +517,7 @@ client.on('message', async message => {
                 const formattedResponse =
                     `*CHAOS AI SAYS*\n\n` +
                     `*${aiReply}*\n\n` +
-                    `@${senderId.split('@')[0]} • ONLINE\n` +
+                    `@${senderId.split('@')[0]} â€¢ ONLINE\n` +
                     '`wantam`';
 
                 await client.sendMessage(
@@ -514,9 +528,9 @@ client.on('message', async message => {
                     }
                 );
             } catch (err) {
-                console.error('❌ Chaos Neural Core Error:', err);
+                console.error('âŒ Chaos Neural Core Error:', err);
 
-                let errorMessage = '❌ *CHAOS NEURAL CORE ERROR*\n\n';
+                let errorMessage = 'âŒ *CHAOS NEURAL CORE ERROR*\n\n';
                 const errorText = String(err.message || err).toLowerCase();
 
                 if (
@@ -561,7 +575,7 @@ client.on('message', async message => {
 
             if (!isOwner) {
                 await message.reply(
-                    '❌ *Access Denied:*\n' +
+                    'âŒ *Access Denied:*\n' +
                     'Only the master owner can execute a system reset!'
                 );
                 return;
@@ -576,7 +590,7 @@ client.on('message', async message => {
                 );
             } catch (err) {
                 console.error('System reset error:', err);
-                await message.reply('❌ Failed to execute system reset.');
+                await message.reply('âŒ Failed to execute system reset.');
             }
 
             return;
@@ -752,7 +766,7 @@ client.on('message', async message => {
 
             if (currentBalance < item.price) {
                 await message.reply(
-                    `❌ You cannot afford the *${item.name}*!\n` +
+                    `âŒ You cannot afford the *${item.name}*!\n` +
                     `Cost: *${item.price.toLocaleString()}*\n` +
                     `Balance: *${currentBalance.toLocaleString()}*`
                 );
@@ -769,7 +783,7 @@ client.on('message', async message => {
                     'Check `!profile`.'
                 );
             } else {
-                await message.reply('❌ Transaction failed. Please try again.');
+                await message.reply('âŒ Transaction failed. Please try again.');
             }
 
             return;
@@ -828,7 +842,7 @@ client.on('message', async message => {
             }
 
             if (recipientId === senderId) {
-                await message.reply('❌ You can\'t send coins to yourself!');
+                await message.reply('âŒ You can\'t send coins to yourself!');
                 return;
             }
 
@@ -922,6 +936,14 @@ client.on('message', async message => {
         // MAFIA JOIN
         // ====================================================
         if (lowerText === '!joinmafia') {
+            console.log(
+                `[MAFIA JOIN] Attempting join | ` +
+                `chatId=${chatId} | ` +
+                `senderId=${senderId} | ` +
+                `userName=${userName} | ` +
+                `contactNumber=${senderContact?.number || 'none'} | ` +
+                `contactId=${senderContact?.id?._serialized || 'none'}`
+            );
             const mafiaResponse = joinMafiaLobby(
                 chatId,
                 senderId,
@@ -1043,7 +1065,7 @@ client.on('message', async message => {
 
             if (!targetVoteJid) {
                 await message.reply(
-                    '❌ *Invalid Vote*\n\n' +
+                    'âŒ *Invalid Vote*\n\n' +
                     'Please tag the player you want to vote out during the Day phase.\n' +
                     'Example: `!vote @user`'
                 );
@@ -1058,7 +1080,7 @@ client.on('message', async message => {
         }
 
     } catch (err) {
-        console.error('❌ General Message Handling Error:', err);
+        console.error('âŒ General Message Handling Error:', err);
     }
 });
 
@@ -1066,3 +1088,4 @@ client.on('message', async message => {
 // INITIALIZE WHATSAPP CLIENT
 // ============================================================
 client.initialize();
+

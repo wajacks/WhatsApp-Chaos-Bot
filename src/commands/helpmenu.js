@@ -1,37 +1,65 @@
-function getBotMenu() {
-  return `╭══[𝓒𝓗𝓐𝓞𝓢 𝓑𝓞𝓣]══╮
+﻿function getBotMenu() {
+  return `╭━━[ℭ𝔥𝔞𝔬𝔰 ℭ𝔬𝔪𝔪𝔞𝔫𝔡 ℭ𝔢𝔫𝔱𝔢𝔯]━━╮
 ┃ 
 ┃✄┈┈┈┈YOU CALLED ME 😎┈┈┈┈
-╣══════●○●●○●○●○●○●○●══════╣
-┃╰┈➤*[ 𝓔𝓒𝓞𝓝𝓞𝓜𝓨 & 𝓢𝓣𝓞𝓡𝓔 ]*
-┃  1 \`!profile\`➔ View stats & assets
-┃  2 \`!daily\`  ➔ Claim 24h bonus
-┃  3 \`!bal\`    ➔ Check wallet balance
-┃  4 \`!store\`  ➔ Browse car & house market
-┃  5 \`!beg\`    ➔ Ask for street handouts
-┃  6 \`!buy <item>\`➔ Purchase vehicles/homes
-┃  7 \`!pay <amt>\` ➔ Reply to \`!beg\` to fund a player
-╣══════●○●●○●○●○●○●○●══════╣
-┃╰┈➤*[ 𝓖𝓐𝓜𝓔𝓢 & 𝓒𝓗𝓐𝓞𝓢 ]*
-┃  1 \`!games\` ➔ View game modes
-┃  2 \`!wordle\`➔ Launch Wordle lobby
-┃  3 \`!rebus\` ➔ Launch Country Rebus
-┃  4 \`!steal\` ➔ Rob cash in Rebus(\`!steal @user\`)
-┃  5 \`!mafia\` ➔ Start Mafia deduction match
-┃  6 \`!joinmafia\` ➔ Join active Mafia case
-┃  7 \`!endmafia\` ➔ Forcefully stop active match
-╣══════●○●●○●○●○●○●○●══════╣
-┃╰┈➤*[ 𝓢𝓨𝓢𝓣𝓔𝓜 ]*
-┃  • \`!ping\`  ➔ Check bot latency
-┃  • \`!menu\`  ➔ Display this control panel
-┃  • \`!randomsong\`  ➔ Plays a song
-╠══════════════════════════╣
-┃┊ ┊*[ 𝓞𝓦𝓝𝓔𝓡 ]*┊ ┊
+╣━━━━━━◉○◉◉○◉○◉○◉○◉○◉━━━━━━╣
+┃╰┈➤*[ 𝔈ℭ𝔒ℕ𝔒𝔐𝔜 & 𝔓ℝ𝔒𝔉ℑ𝔏𝔈 ]*
+┃  • \`!profile\` → View stats & assets
+┃  • \`!daily\` → Claim 24h bonus
+┃  • \`!bal\` → Check wallet balance
+┃  • \`!store\` → Browse car & house market
+┃  • \`!buy <item>\` → Purchase vehicles/homes
+┃  • \`!beg\` → Ask for street handouts
+┃  • \`!pay <amt>\` → Reply to \`!beg\` to fund a player
+╣━━━━━━◉○◉◉○◉○◉○◉○◉○◉━━━━━━╣
+┃╰┈➤*[ 𝔚𝔒ℝ𝔇𝔏𝔈 𝔊𝔄𝔐𝔈 ]*
+┃  • \`!wordle\` → Start Wordle lobby (80s join time)
+┃  • \`!join\` → Join active Wordle game
+┃  📊 10 rounds max, 4 mins per round
+┃  🎯 15 guesses per player per word
+┃  💰 Rewards: Up to 40 coins × attempts left
+┃  ⚡ XP: Up to 25 XP × attempts left
+┃  💡 1 letter revealed at round start
+╣━━━━━━◉○◉◉○◉○◉○◉○◉○◉━━━━━━╣
+┃╰┈➤*[ ℝ𝔈𝔅𝔘𝔖 ℭ𝔒𝔘ℕ𝔗ℝ𝔜 𝔊𝔄𝔐𝔈 ]*
+┃  • \`!rebus\` → Start Rebus lobby
+┃  • \`!joinrebus\` → Join active Rebus game
+┃  • \`!rguess <answer>\` → Submit your guess
+┃  • \`!country <answer>\` → Alternative guess cmd
+┃  • \`!hint\` → Get hint (-10 coins)
+┃  • \`!steal @user\` → Winner steals 12.5% wallet
+┃  ⏱️ 5 minute game, 50 sec per round
+┃  🎯 100 points per correct answer
+┃  🏆 Top scorer can steal from losers (60s window)
+╣━━━━━━◉○◉◉○◉○◉○◉○◉○◉━━━━━━╣
+┃╰┈➤*[ 𝔐𝔄𝔉ℑ𝔄 𝔇𝔈𝔇𝔘ℭ𝔗ℑ𝔒ℕ 𝔊𝔄𝔐𝔈 ]*
+┃  • \`!mafia\` or \`!startmafia\` → Start lobby
+┃  • \`!joinmafia\` → Join active case
+┃  • \`!endmafia\` → Force stop game
+┃  🎭 Roles: Mafia, Doctor, Detective, Villagers
+┃  🌙 Night phase: DM bot with actions
+┃     - \`!kill <letter>\` → Mafia eliminates target
+┃     - \`!save <letter>\` → Doctor protects target
+┃     - \`!investigate <letter>\` → Detective checks role
+┃  ☀️ Day phase: Vote in group
+┃     - \`!vote @user\` → Vote to eliminate
+┃  📝 Each player gets a letter alias (A, B, C...)
+┃  🎯 Town wins if Mafia eliminated
+┃  🎯 Mafia wins if equals/outnumbers town
+╣━━━━━━◉○◉◉○◉○◉○◉○◉○◉━━━━━━╣
+┃╰┈➤*[ 𝔊𝔈ℕ𝔈ℝ𝔄𝔏 ℭ𝔒𝔐𝔐𝔄ℕ𝔇𝔖 ]*
+┃  • \`!games\` → View all game modes
+┃  • \`!ping\` → Check bot latency
+┃  • \`!menu\` → Display this control panel
+┃  • \`!randomsong\` → Play a random song
+┃  • \`!ai <prompt>\` → Chat with Gemini AI
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+┃┊ ┊*[ 𝔒𝔚ℕ𝔈ℝ ]*┊ ┊
 ┃  ┌───────────────────────
 ┃  │ 🛡️ *Creator:* ⚘Chriss⚘
 ┃  │ ⚡ *Contact:* +254111659469
 ┃  └───────────────────────
-╰══════════════════════════╯
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
     \`Powered by\` ⚘Chriss⚘
      \`©️ Copyright 2026\``;
 }
