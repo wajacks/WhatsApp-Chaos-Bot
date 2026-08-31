@@ -52,6 +52,7 @@ const {
 } = require('./src/database/assets');
 const { getBotMenu } = require('./src/commands/helpmenu');
 const { handleSongCommand } = require('./src/commands/song');
+const { handlePlayCommand } = require('./src/commands/play');
 
 // ============================================================
 // CHAOS NEURAL CORE GEMINI
@@ -1094,6 +1095,7 @@ client.on('message', async message => {
 // INITIALIZE WHATSAPP CLIENT
 // ============================================================
 client.initialize();
+
 
 
 
