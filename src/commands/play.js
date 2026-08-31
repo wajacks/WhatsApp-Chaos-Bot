@@ -12,8 +12,8 @@ async function handlePlayCommand(message) {
         }
 
         // Use ytdlp to download and convert to audio
-        // cookies.txt should be in the same directory as the bot
-        const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
+        // cookies.txt should be in the project root directory
+        const cookiesPath = path.join(__dirname, '..', '..', 'cookies.txt');
         
         const ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" -x --audio-format m4a --no-playlist "${text}"`;
         
