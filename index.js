@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { GoogleGenAI } = require('@google/genai');
@@ -396,12 +396,32 @@ client.on('message', async message => {
                         nickname: 'Filipino Girl',
                         role: 'Group member from Philippines'
                     },
-                    '639289305708@c.us': {
+                    '254797295755@c.us': {
+                        name: 'Chaka',
+                        nickname: 'Samuel Chaka',
+                        role: 'Mtwapa, Learn\`t in Kenyatta, Canteen Leader'
+                    },'639289305708@c.us': {
                         name: 'Nicole',
                         nickname: 'Filipino Girl',
                         role: 'Group member from Philippines'
+                    },'27822336734@c.us': {
+                        name: 'Lori',
+                        nickname: 'New Girl',
+                        role: 'Just joined the group, needs guidance, should probably be asking Chriss'
+                    },'2349037933622@c.us': {
+                        name: 'Gift',
+                        nickname: 'Gift Chi',
+                        role: 'Group member from Nigeria'
+                    },'254112955350@c.us': {
+                        name: 'Righa',
+                        nickname: 'Righa',
+                        role: 'same school mates with Chaka and Chriss back in higschool, Singer and humble guy'
+                    },'27838434250@c.us': {
+                        name: 'S.A guy',
+                        nickname: 'zzzz',
+                        role: 'Group member from South Africa'
                     }
-                };
+            };
 
                 const currentUserInfo = knownUsers[senderId];
                 const speakerLabel = currentUserInfo
@@ -464,6 +484,7 @@ client.on('message', async message => {
                             '- !ping — Check bot latency.\n' +
                             '- !menu — Display the full bot menu.\n' +
                             '- !randomsong — Play a random song.\n\n' +
+                            '- !play — Search song name or link from youtube\n\n' +
                             'MAFIA:\n' +
                             '- Players register using !joinmafia.\n' +
                             '- Each player receives a letter alias.\n' +
@@ -484,6 +505,8 @@ client.on('message', async message => {
                             '- Grace (Gracie): Wundanyi baddie, group admin.\n' +
                             '- Lydia (Gods daughter): Voi queen, group admin.\n' +
                             '- Joya and Nicole: Filipino group members.\n' +
+                            '- Gift Chi: Nigerian member. Use a little Nigerian Pidgin naturally when appropriate.\n' +
+                            '- Gift Chi: Nigerian member. Use a little Nigerian Pidgin naturally when appropriate.\n' +
                             '- Gift Chi: Nigerian member. Use a little Nigerian Pidgin naturally when appropriate.\n' +
                             '- Other users are generally Kenyan group members. Mix in some Swahili/Sheng naturally when appropriate.\n\n' +
                             'RESPONSE STYLE:\n' +

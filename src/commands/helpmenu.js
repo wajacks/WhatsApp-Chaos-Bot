@@ -52,12 +52,13 @@
 ┃  • \`!ping\` → Check bot latency
 ┃  • \`!menu\` → Display this control panel
 ┃  • \`!randomsong\` → Play a random song
+┃  • \`!play\` → !play <song name/link>
 ┃  • \`!ai <prompt>\` → Chat with Gemini AI
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 ┃┊ ┊*[ 𝔒𝔚ℕ𝔈ℝ ]*┊ ┊
 ┃  ┌───────────────────────
-┃  │ 🛡️ *Creator:* ⚘Chriss⚘
-┃  │ ⚡ *Contact:* +254111659469
+┃  │ 🛡️ *Creator:* \`⚘Chriss⚘\`
+┃  │ ⚡ *Contact:* 0111659469 | *[\`⚘Chriss⚘\`]*
 ┃  └───────────────────────
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
     \`Powered by\` ⚘Chriss⚘
