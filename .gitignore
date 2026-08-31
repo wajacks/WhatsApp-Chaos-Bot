@@ -7,3 +7,4 @@ session/
 auth/
 *.log
 data/
+cookies.txt
