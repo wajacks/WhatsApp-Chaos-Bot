@@ -1,20 +1,41 @@
 const { getUserProfile } = require('../database/db');
 
-async function handleBalanceCommand(senderId, senderName, mentionedJid, client) {
-    const targetId = mentionedJid || senderId;
-    let displayName = senderName;
+async function handleBalanceCommand(
+    senderId,
+    senderName,
+    mentionedJid,
+    client
+) {
+    const targetId =
+        mentionedJid || senderId;
+
+    let displayName =
+        senderName;
 
     if (mentionedJid && client) {
         try {
-            const contact = await client.getContactById(mentionedJid);
-            displayName = contact.pushname || contact.name || 'Player';
+            const contact =
+                await client.getContactById(
+                    mentionedJid
+                );
+
+            displayName =
+                contact.pushname ||
+                contact.name ||
+                'Player';
         } catch (e) {
             displayName = 'Player';
         }
     }
 
-    const profile = getUserProfile(targetId, displayName);
-    const tagFormatted = targetId.split('@')[0];
+    const profile =
+        getUserProfile(
+            targetId,
+            displayName
+        );
+
+    const tagFormatted =
+        targetId.split('@')[0];
 
     return `💰 *WALLET BALANCE* 💰\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -24,4 +45,6 @@ async function handleBalanceCommand(senderId, senderName, mentionedJid, client) 
         `━━━━━━━━━━━━━━━━━━━━━`;
 }
 
-module.exports = { handleBalanceCommand };
+module.exports = {
+    handleBalanceCommand
+};

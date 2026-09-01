@@ -444,6 +444,9 @@ client.on(
                     senderContact
                 );
 
+            const economyUserId =
+                message.author || message.from;
+
             // ==================================================
             // IDENTITY LOGGING
             // ==================================================
@@ -1210,7 +1213,7 @@ client.on(
 
                 const balanceResponse =
                     await handleBalanceCommand(
-                        senderId,
+                        economyUserId,
                         userName,
                         mentionedJid,
                         client
@@ -1343,7 +1346,7 @@ client.on(
 
                 const assetResult =
                     buyAsset(
-                        senderId,
+                        economyUserId,
                         itemId
                     );
 
@@ -1363,7 +1366,7 @@ client.on(
 
                 const currentBalance =
                     getUserBalance(
-                        senderId
+                        economyUserId
                     );
 
                 if (
@@ -1382,14 +1385,14 @@ client.on(
 
                 const deducted =
                     deductBalance(
-                        senderId,
+                        economyUserId,
                         item.price
                     );
 
                 if (deducted) {
 
                     saveUserAsset(
-                        senderId,
+                        economyUserId,
                         item
                     );
 
@@ -1416,147 +1419,147 @@ client.on(
             if (
                 lowerText.startsWith('!pay')
             ) {
-
+            
                 const parts =
                     text.split(/\s+/);
-
+            
                 const amount =
                     parseInt(
                         parts[1]
                     );
-
+            
                 if (
                     isNaN(amount) ||
                     amount <= 0
                 ) {
-
+            
                     await message.reply(
                         'Usage: `!pay 500 @username`'
                     );
-
+            
                     return;
                 }
-
+            
                 let recipientId =
                     null;
-
+            
                 let recipientName =
                     'Friend';
-
+            
                 let recipientContact =
                     null;
-
+            
                 const mentions =
                     await message.getMentions();
-
+            
                 if (
                     mentions.length > 0
                 ) {
-
+            
                     recipientContact =
                         mentions[0];
-
+            
                     recipientId =
                         getContactJid(
                             recipientContact
                         );
-
+            
                     recipientName =
                         recipientContact.pushname ||
                         recipientContact.name ||
                         'Friend';
-
+            
                 } else {
-
+            
                     try {
-
+            
                         const quotedMessage =
                             await message.getQuotedMessage();
-
+            
                         if (
                             quotedMessage
                         ) {
-
+            
                             const quotedContact =
                                 await quotedMessage.getContact();
-
+            
                             recipientContact =
                                 quotedContact;
-
+            
                             recipientId =
                                 getContactJid(
                                     quotedContact
                                 );
-
+            
                             recipientName =
                                 quotedContact.pushname ||
                                 quotedContact.name ||
                                 'Friend';
                         }
-
+            
                     } catch (quoteErr) {
-
+            
                         console.warn(
                             'Could not retrieve quoted message for payment.'
                         );
                     }
                 }
-
+            
                 if (!recipientId) {
-
+            
                     await message.reply(
                         'You must either *reply* to someone\'s message or *tag* them.'
                     );
-
+            
                     return;
                 }
-
+            
                 if (
                     recipientId ===
-                    senderId
+                    economyUserId
                 ) {
-
+            
                     await message.reply(
                         '❌ You can\'t send coins to yourself!'
                     );
-
+            
                     return;
                 }
-
+            
                 const result =
                     transferCoins(
-                        senderId,
+                        economyUserId,
                         recipientId,
                         amount
                     );
-
+            
                 if (
                     !result.success
                 ) {
-
+            
                     await message.reply(
                         result.message
                     );
-
+            
                     return;
                 }
-
+            
                 await message.reply(
                     '*TRANSFER SUCCESSFUL!*\n\n' +
                     `You sent *${amount.toLocaleString()}* to *${recipientName}*.\n` +
                     `New balance: *${result.senderBalance.toLocaleString()}*`
                 );
-
+            
                 try {
-
+            
                     await client.sendMessage(
                         recipientId,
                         `*${userName} just sent you ${amount.toLocaleString()} coins*!\n\n` +
                         'Check your balance with `!profile`.'
                     );
-
+            
                 } catch (e) {}
-
+            
                 return;
             }
 
@@ -1571,7 +1574,7 @@ client.on(
 
                 const user =
                     getUser(
-                        senderId,
+                        economyUserId,
                         userName
                     );
 
@@ -1600,7 +1603,7 @@ client.on(
                 const db =
                     readDB();
 
-                db[senderId] =
+                db[economyUserId] =
                     user;
 
                 writeDB(db);
