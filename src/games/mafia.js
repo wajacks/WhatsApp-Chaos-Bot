@@ -1214,11 +1214,19 @@ class MafiaGame {
             );
         }
 
+        // Register player to state first before checking DM resolution
+        this.players.push(
+            player
+        );
+
         // ========================================================
         // DM ACCESS CHECK (GUARDRAIL)
         // ========================================================
         const canDm = await this.resolvePrivateChat(player);
         if (!canDm) {
+            // Remove player if DM resolution fails
+            this.players.pop();
+
             const botNumber = this.client.info?.wid?.user || '';
             const botDmLink = botNumber ? `https://wa.me/${botNumber}` : 'the bot\'s private chat';
 
@@ -1228,10 +1236,6 @@ class MafiaGame {
                 'Send a quick message (like `hi` or `!ping`), then try `!joinmafia` again.'
             );
         }
-
-        this.players.push(
-            player
-        );
 
         console.log(
             `[MAFIA JOIN] ✓ Player registered | ` +
@@ -1280,6 +1284,11 @@ class MafiaGame {
                 candidates.push(
                     identity
                 );
+
+                const num = this.normalizePhoneNumber(identity);
+                if (num) {
+                    candidates.push(`${num}@c.us`);
+                }
             }
         }
 
@@ -1393,49 +1402,53 @@ class MafiaGame {
         roleMessage
     ) {
 
-        const resolved =
-            await this.resolvePrivateChat(
-                player
-            );
+        const candidateSet = new Set();
 
-        if (!resolved) {
-
-            console.error(
-                `[MAFIA DM] ❌ Could not resolve private chat for ` +
-                `${player.username} [${player.letter}]`
-            );
-
-            return false;
+        if (player.id) {
+            candidateSet.add(player.id);
+            const num = this.normalizePhoneNumber(player.id);
+            if (num) candidateSet.add(`${num}@c.us`);
         }
 
-        try {
-
-            const destination =
-                resolved.chatId;
-
-            await this.client.sendMessage(
-                destination,
-                roleMessage
-            );
-
-            console.log(
-                `[MAFIA DM] ✓ ROLE DM SENT | ` +
-                `${player.username} [${player.letter}] | ` +
-                `destination=${resolved.chatId}`
-            );
-
-            return true;
-
-        } catch (error) {
-
-            console.error(
-                `[MAFIA DM] ❌ ROLE DM FAILED | ` +
-                `${player.username} [${player.letter}]`,
-                error
-            );
-
-            return false;
+        if (player.identities) {
+            for (const identity of player.identities) {
+                candidateSet.add(identity);
+                const num = this.normalizePhoneNumber(identity);
+                if (num) candidateSet.add(`${num}@c.us`);
+            }
         }
+
+        const uniqueCandidates = [...candidateSet].filter(Boolean);
+
+        for (const destination of uniqueCandidates) {
+            try {
+                await this.client.sendMessage(
+                    destination,
+                    roleMessage
+                );
+
+                console.log(
+                    `[MAFIA DM] ✓ ROLE DM SENT | ` +
+                    `${player.username} [${player.letter}] | ` +
+                    `destination=${destination}`
+                );
+
+                return true;
+
+            } catch (error) {
+                console.warn(
+                    `[MAFIA DM] Delivery attempt failed to ${destination} for ${player.username}:`,
+                    error.message
+                );
+            }
+        }
+
+        console.error(
+            `[MAFIA DM] ❌ ALL ROLE DM ATTEMPTS FAILED | ` +
+            `${player.username} [${player.letter}]`
+        );
+
+        return false;
     }
 
     // ============================================================
