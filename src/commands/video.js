@@ -45,26 +45,25 @@ async function handleVideoCommand(message) {
                     seconds = parts[0];
                 }
 
-                // Video is considered long if 10 minutes (600s) or more
                 if (seconds >= 600) {
                     isLongVideo = true;
                 }
             }
 
-            // 2. Select format rule based on duration
-            // Short: Cap at 720p for inline video playback
-            // Long: Max 1080p high quality sent as document
+            // 2. Select format rule based on duration and FORCE mp4 container merge
             const formatRule = isLongVideo
-                ? 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]'
-                : 'bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]';
+                ? 'bv*[height<=1080]+ba/b[height<=1080]/b'
+                : 'bv*[height<=720]+ba/b[height<=720]/b';
 
             const outputTemplate = path.join(downloadDir, '%(id)s.%(ext)s');
-            const ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" -f "${formatRule}" --no-playlist -o "${outputTemplate}" "${targetQuery}"`;
+            
+            // Added --merge-output-format mp4 to force merged files into .mp4
+            const ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" -f "${formatRule}" --merge-output-format mp4 --no-playlist -o "${outputTemplate}" "${targetQuery}"`;
 
             await message.reply(
                 isLongVideo
                     ? '📹 *Long video detected.* Downloading high quality... sending as document.'
-                    : '📹 *Downloading video (720p HD)...*'
+                    : '📹 *Downloading video (720p HD)...*\n'+'\`©chriss\`'
             );
 
             // 3. Download video file
@@ -76,21 +75,22 @@ async function handleVideoCommand(message) {
                         return;
                     }
 
+                    // Fallback scanner checks for mp4, mkv, or webm just in case
                     const files = fs.readdirSync(downloadDir);
-                    const mp4Files = files
-                        .filter(file => file.endsWith('.mp4'))
+                    const validFiles = files
+                        .filter(file => file.endsWith('.mp4') || file.endsWith('.mkv') || file.endsWith('.webm'))
                         .map(file => ({
                             name: file,
                             time: fs.statSync(path.join(downloadDir, file)).mtimeMs
                         }))
                         .sort((a, b) => b.time - a.time);
 
-                    if (mp4Files.length === 0) {
+                    if (validFiles.length === 0) {
                         await message.reply('Download completed but could not find the video file.');
                         return;
                     }
 
-                    const videoFile = path.join(downloadDir, mp4Files[0].name);
+                    const videoFile = path.join(downloadDir, validFiles[0].name);
 
                     console.log('[VIDEO] Sending:', videoFile, '| isDocument:', isLongVideo);
 
