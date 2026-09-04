@@ -216,18 +216,49 @@ class MafiaGame {
 
             let canonical = null;
 
-            if (identity.number) {
+            // 1. Prefer serialized real phone JID if present
+            if (identity.id) {
+
+                const rawId =
+                    typeof identity.id === 'object'
+                        ? identity.id._serialized
+                        : identity.id;
+
+                if (
+                    typeof rawId === 'string' &&
+                    rawId.endsWith('@c.us')
+                ) {
+                    canonical = rawId;
+                }
+            }
+
+            if (
+                !canonical &&
+                typeof identity._serialized === 'string' &&
+                identity._serialized.endsWith('@c.us')
+            ) {
+                canonical = identity._serialized;
+            }
+
+            // 2. Fall back to phone number only if valid and not an LID prefix
+            if (!canonical && identity.number) {
 
                 const number =
                     this.normalizePhoneNumber(
                         identity.number
                     );
 
-                if (number) {
+                if (
+                    number &&
+                    !number.startsWith('749') &&
+                    number.length <= 13
+                ) {
                     canonical =
                         `${number}@c.us`;
                 }
             }
+
+            // 3. Fallback contact ID resolution
 
             if (!canonical && identity._serialized) {
 
@@ -327,7 +358,11 @@ class MafiaGame {
                 clean
             );
 
-        if (number) {
+        if (
+            number &&
+            !number.startsWith('749') &&
+            number.length <= 13
+        ) {
 
             const canonical =
                 `${number}@c.us`;

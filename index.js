@@ -175,6 +175,30 @@ function getCanonicalJid(value) {
 
     if (typeof value === 'object') {
 
+        // 1. Check direct serialized JID first to prefer real phone (@c.us) over LID numbers
+        if (value.id) {
+
+            const rawId =
+                typeof value.id === 'object'
+                    ? value.id._serialized
+                    : value.id;
+
+            if (
+                typeof rawId === 'string' &&
+                rawId.endsWith('@c.us')
+            ) {
+                return rawId;
+            }
+        }
+
+        if (
+            typeof value._serialized === 'string' &&
+            value._serialized.endsWith('@c.us')
+        ) {
+            return value._serialized;
+        }
+
+        // 2. Process phone number only if present and not an LID digit sequence
         if (value.number) {
 
             const number =
@@ -182,13 +206,17 @@ function getCanonicalJid(value) {
                     value.number
                 );
 
-            if (number) {
-
+            // Filter out internal WhatsApp LID number prefixes (like 749... or long 14+ digit IDs)
+            if (
+                number &&
+                !number.startsWith('749') &&
+                number.length <= 13
+            ) {
                 return `${number}@c.us`;
             }
         }
 
-        // Contact ID object
+        // 3. Fallback contact ID resolution
 
         if (value.id) {
 
@@ -207,7 +235,7 @@ function getCanonicalJid(value) {
             );
         }
 
-        // Serialized contact
+        // Serialized contact fallback
 
         if (value._serialized) {
 
@@ -262,7 +290,11 @@ function getCanonicalJid(value) {
             clean
         );
 
-    if (number) {
+    if (
+        number &&
+        !number.startsWith('749') &&
+        number.length <= 13
+    ) {
 
         return `${number}@c.us`;
     }
