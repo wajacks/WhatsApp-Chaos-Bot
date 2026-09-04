@@ -81,6 +81,8 @@ const { handleSongCommand } = require('./src/commands/song');
 
 const { handlePlayCommand } = require('./src/commands/play');
 
+const { handleVideoCommand } = require('./src/commands/video');
+
 // ============================================================
 // CHAOS NEURAL CORE GEMINI
 // ============================================================
@@ -1272,6 +1274,21 @@ client.on(
             ) {
 
                 await handlePlayCommand(
+                    message
+                );
+
+                return;
+            }
+
+            // ====================================================
+            // VIDEO (yt-dlp)
+            // ====================================================
+
+            if (
+                lowerText.startsWith('!video ')
+            ) {
+
+                await handleVideoCommand(
                     message
                 );
 
