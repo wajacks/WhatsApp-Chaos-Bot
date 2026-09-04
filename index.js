@@ -175,11 +175,6 @@ function getCanonicalJid(value) {
 
     if (typeof value === 'object') {
 
-        // WhatsApp contact number is preferred.
-        // This is important because group messages can
-        // sometimes expose an @lid identity instead of
-        // the user's normal @c.us identity.
-
         if (value.number) {
 
             const number =
@@ -305,11 +300,6 @@ async function getSenderJid(
     contact = null
 ) {
 
-    // Contact object is the preferred source.
-    // This allows group messages to resolve the
-    // real phone identity instead of relying only
-    // on message.author.
-
     if (contact) {
 
         const canonical =
@@ -321,12 +311,6 @@ async function getSenderJid(
             return canonical;
         }
     }
-
-    // In a group:
-    // message.author = sender
-    //
-    // In a private chat:
-    // message.from = sender
 
     const rawSender =
         message.author ||
@@ -499,15 +483,6 @@ client.on(
             // MAFIA PRIVATE NIGHT COMMANDS
             // ====================================================
 
-            // These commands MUST be handled before the rest
-            // of the normal command system.
-            //
-            // They are only valid in a private DM.
-            //
-            // The contact object is passed into Mafia so that
-            // mafia.js can match the DM identity to the player
-            // who registered inside the group.
-
             if (
                 lowerText.startsWith('!kill') ||
                 lowerText.startsWith('!save') ||
@@ -529,10 +504,6 @@ client.on(
 
                     const targetLetter =
                         parts[1];
-
-                    // ==================================================
-                    // MAFIA DM DEBUG LOG
-                    // ==================================================
 
                     console.log(
                         '\n============================================================'
@@ -587,10 +558,6 @@ client.on(
                         '============================================================\n'
                     );
 
-                    // ==================================================
-                    // MISSING TARGET
-                    // ==================================================
-
                     if (!targetLetter) {
 
                         await message.reply(
@@ -601,15 +568,21 @@ client.on(
                         return;
                     }
 
-                    // ==================================================
-                    // PASS CONTACT TO MAFIA
-                    // ==================================================
-
                     await handleNightAction(
                         senderId,
                         command,
                         targetLetter,
                         senderContact
+                    );
+
+                    return;
+
+                } else {
+
+                    // UPDATED: Notify user if night action was attempted in a group
+                    await message.reply(
+                        '❌ *Night actions are top secret!*\n\n' +
+                        'Please send `!kill`, `!save`, or `!investigate` to me in a *private DM*.'
                     );
 
                     return;
@@ -635,7 +608,7 @@ client.on(
                         '*CHAOS NEURAL CORE*\n\n' +
                         'You forgot to ask something.\n\n' +
                         'Example:\n' +
-                        '`!ai How do I connect Java to MySQL?`'
+                        '`!ai How to be smart like Chriss?`'
                     );
 
                     return;
@@ -1419,147 +1392,147 @@ client.on(
             if (
                 lowerText.startsWith('!pay')
             ) {
-            
+
                 const parts =
                     text.split(/\s+/);
-            
+
                 const amount =
                     parseInt(
                         parts[1]
                     );
-            
+
                 if (
                     isNaN(amount) ||
                     amount <= 0
                 ) {
-            
+
                     await message.reply(
                         'Usage: `!pay 500 @username`'
                     );
-            
+
                     return;
                 }
-            
+
                 let recipientId =
                     null;
-            
+
                 let recipientName =
                     'Friend';
-            
+
                 let recipientContact =
                     null;
-            
+
                 const mentions =
                     await message.getMentions();
-            
+
                 if (
                     mentions.length > 0
                 ) {
-            
+
                     recipientContact =
                         mentions[0];
-            
+
                     recipientId =
                         getContactJid(
                             recipientContact
                         );
-            
+
                     recipientName =
                         recipientContact.pushname ||
                         recipientContact.name ||
                         'Friend';
-            
+
                 } else {
-            
+
                     try {
-            
+
                         const quotedMessage =
                             await message.getQuotedMessage();
-            
+
                         if (
                             quotedMessage
                         ) {
-            
+
                             const quotedContact =
                                 await quotedMessage.getContact();
-            
+
                             recipientContact =
                                 quotedContact;
-            
+
                             recipientId =
                                 getContactJid(
                                     quotedContact
                                 );
-            
+
                             recipientName =
                                 quotedContact.pushname ||
                                 quotedContact.name ||
                                 'Friend';
                         }
-            
+
                     } catch (quoteErr) {
-            
+
                         console.warn(
                             'Could not retrieve quoted message for payment.'
                         );
                     }
                 }
-            
+
                 if (!recipientId) {
-            
+
                     await message.reply(
                         'You must either *reply* to someone\'s message or *tag* them.'
                     );
-            
+
                     return;
                 }
-            
+
                 if (
                     recipientId ===
                     economyUserId
                 ) {
-            
+
                     await message.reply(
                         '❌ You can\'t send coins to yourself!'
                     );
-            
+
                     return;
                 }
-            
+
                 const result =
                     transferCoins(
                         economyUserId,
                         recipientId,
                         amount
                     );
-            
+
                 if (
                     !result.success
                 ) {
-            
+
                     await message.reply(
                         result.message
                     );
-            
+
                     return;
                 }
-            
+
                 await message.reply(
                     '*TRANSFER SUCCESSFUL!*\n\n' +
                     `You sent *${amount.toLocaleString()}* to *${recipientName}*.\n` +
                     `New balance: *${result.senderBalance.toLocaleString()}*`
                 );
-            
+
                 try {
-            
+
                     await client.sendMessage(
                         recipientId,
                         `*${userName} just sent you ${amount.toLocaleString()} coins*!\n\n` +
                         'Check your balance with `!profile`.'
                     );
-            
+
                 } catch (e) {}
-            
+
                 return;
             }
 
@@ -1730,19 +1703,11 @@ client.on(
                 lowerText === '!joinmafia'
             ) {
 
-                // ==================================================
-                // GET FRESH CONTACT
-                // ==================================================
-
                 const mafiaContact =
                     senderContact ||
                     await getSenderContact(
                         message
                     );
-
-                // ==================================================
-                // GET CANONICAL ID
-                // ==================================================
 
                 const mafiaSenderId =
                     getCanonicalJid(
@@ -1800,27 +1765,17 @@ client.on(
                     '============================================================\n'
                 );
 
-                // ==================================================
-                // PASS BOTH CANONICAL ID + CONTACT
-                // ==================================================
-
-                const mafiaResponse =
-                    joinMafiaLobby(
-                        chatId,
-                        mafiaSenderId,
-                        userName,
-                        mafiaContact
-                    );
-
-                if (
-                    mafiaResponse
-                ) {
-
-                    await message.reply(
-                        mafiaResponse
-                    );
+                const mafiaResponse = await joinMafiaLobby(
+                    chatId,
+                    mafiaSenderId,
+                    userName,
+                    mafiaContact
+                );
+                
+                if (mafiaResponse) {
+                    await message.reply(mafiaResponse);
                 }
-
+                
                 return;
             }
 
@@ -2069,10 +2024,6 @@ client.on(
                 lowerText.startsWith('!vote')
             ) {
 
-                // ==================================================
-                // GET ACTUAL MENTIONED CONTACT
-                // ==================================================
-
                 const mentions =
                     await message.getMentions();
 
@@ -2088,10 +2039,6 @@ client.on(
 
                     return;
                 }
-
-                // ==================================================
-                // TARGET CONTACT
-                // ==================================================
 
                 const targetContact =
                     mentions[0];
@@ -2120,10 +2067,6 @@ client.on(
                         'unknown'
                     }`
                 );
-
-                // ==================================================
-                // PASS TARGET CONTACT TOO
-                // ==================================================
 
                 const voteResult =
                     castVote(

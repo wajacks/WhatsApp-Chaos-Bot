@@ -216,10 +216,6 @@ class MafiaGame {
 
             let canonical = null;
 
-            // WhatsApp contact number is usually
-            // the strongest way to connect a group
-            // contact to their private chat.
-
             if (identity.number) {
 
                 const number =
@@ -233,7 +229,6 @@ class MafiaGame {
                 }
             }
 
-            // Serialized contact ID
             if (!canonical && identity._serialized) {
 
                 canonical =
@@ -242,7 +237,6 @@ class MafiaGame {
                     );
             }
 
-            // Contact ID object
             if (
                 !canonical &&
                 identity.id
@@ -289,9 +283,6 @@ class MafiaGame {
             return null;
         }
 
-        // If we have already seen this identity,
-        // resolve it through the alias table.
-
         if (
             this.identityAliases.has(clean)
         ) {
@@ -299,8 +290,6 @@ class MafiaGame {
                 clean
             );
         }
-
-        // Normal phone JID
 
         if (
             clean.endsWith('@c.us')
@@ -327,15 +316,11 @@ class MafiaGame {
             return clean;
         }
 
-        // LID
-
         if (
             clean.endsWith('@lid')
         ) {
             return clean;
         }
-
-        // Raw phone number
 
         const number =
             this.normalizePhoneNumber(
@@ -730,11 +715,6 @@ class MafiaGame {
                     (user.losses || 0) + 1;
             }
 
-            // IMPORTANT:
-            // Save the SAME user object after modifying
-            // wins/losses. The old code modified one object
-            // and then replaced it with another getUser() call.
-
             const db =
                 readDB();
 
@@ -788,10 +768,6 @@ class MafiaGame {
         this.votingActive = false;
         this.nightActive = false;
 
-        // ========================================================
-        // REWARDS
-        // ========================================================
-
         for (
             const player of this.players
         ) {
@@ -817,10 +793,6 @@ class MafiaGame {
         this.gameStarted = false;
         this.inLobby = false;
 
-        // ========================================================
-        // PUBLIC GAME OVER MESSAGE
-        // ========================================================
-
         try {
 
             await this.client.sendMessage(
@@ -837,10 +809,6 @@ class MafiaGame {
             );
         }
 
-        // ========================================================
-        // FINAL CASE FILE
-        // ========================================================
-
         let finalRoster =
             '*FINAL CASE FILE*\n\n';
 
@@ -852,10 +820,6 @@ class MafiaGame {
                 player.isAlive
                     ? 'Alive'
                     : 'Ghost';
-
-            // originalRole is used here so that a Detective
-            // or Doctor whose ability was revoked still has
-            // their true original role revealed.
 
             finalRoster +=
                 `[${player.letter}] ` +
@@ -921,13 +885,20 @@ class MafiaGame {
 
         this.identityAliases.clear();
 
+        // Extract bot's own phone number for the wa.me link
+        const botNumber = this.client.info?.wid?.user || '';
+        const botDmLink = botNumber ? `https://wa.me/${botNumber}` : 'the bot\'s private chat';
+
         await this.client.sendMessage(
             channelId,
             '*PROJECT MAFIA CASE*\n\n' +
             'Welcome to the investigation. ' +
             'Take your time, talk, and prepare.\n\n' +
-            'Registration is open for *2 minutes*.\n' +
-            'Type `!joinmafia` to enter the case.\n\n' +
+            '⚠️ *REQUIRED BEFORE JOINING:* ⚠️\n' +
+            `1. Click here to send a DM to the bot first: ${botDmLink}\n` +
+            '2. Send any message (e.g., `hi` or `!ping`) to activate private role delivery.\n' +
+            '3. Return here and type `!joinmafia` to enter the case!\n\n' +
+            'Registration is open for *2 minutes*.\n\n' +
             'Minimum players: *4*\n' +
             'Mafia: *1*\n' +
             'Doctor: *1*\n' +
@@ -935,10 +906,6 @@ class MafiaGame {
             'Everyone else: *Villagers*\n\n' +
             'Once registration closes, secret roles will be assigned privately.'
         );
-
-        // ========================================================
-        // RULES PDF
-        // ========================================================
 
         try {
 
@@ -974,10 +941,6 @@ class MafiaGame {
                 error
             );
         }
-
-        // ========================================================
-        // BRIEFING AUDIO
-        // ========================================================
 
         try {
 
@@ -1034,10 +997,6 @@ class MafiaGame {
             );
         }
 
-        // ========================================================
-        // TWO-MINUTE LOBBY
-        // ========================================================
-
         this.lobbyTimer =
             setTimeout(
                 async () => {
@@ -1069,7 +1028,7 @@ class MafiaGame {
     // JOIN MAFIA
     // ============================================================
 
-    joinGame(
+    async joinGame(
         user,
         channelId
     ) {
@@ -1093,10 +1052,6 @@ class MafiaGame {
             )
         );
 
-        // ========================================================
-        // CAPTURE ALL AVAILABLE IDENTITIES
-        // ========================================================
-
         const permanentJid =
             this.canonicalizeIdentity(
                 user
@@ -1108,10 +1063,6 @@ class MafiaGame {
                 '❌ Could not identify your WhatsApp account.'
             );
         }
-
-        // ========================================================
-        // CHECK DUPLICATE
-        // ========================================================
 
         const existingPlayer =
             this.getPlayerById(
@@ -1144,10 +1095,6 @@ class MafiaGame {
             letters[
                 this.players.length
             ];
-
-        // ========================================================
-        // COLLECT IDENTITY ALIASES
-        // ========================================================
 
         const identities =
             new Set();
@@ -1257,13 +1204,6 @@ class MafiaGame {
             identities
         };
 
-        this.players.push(
-            player
-        );
-
-        // Register every known identity as an alias
-        // for the canonical player ID.
-
         for (
             const identity of identities
         ) {
@@ -1273,6 +1213,25 @@ class MafiaGame {
                 permanentJid
             );
         }
+
+        // ========================================================
+        // DM ACCESS CHECK (GUARDRAIL)
+        // ========================================================
+        const canDm = await this.resolvePrivateChat(player);
+        if (!canDm) {
+            const botNumber = this.client.info?.wid?.user || '';
+            const botDmLink = botNumber ? `https://wa.me/${botNumber}` : 'the bot\'s private chat';
+
+            return (
+                `❌ *${player.username}*, I cannot send you private messages!\n\n` +
+                `Please open a direct chat with the bot first: ${botDmLink}\n` +
+                'Send a quick message (like `hi` or `!ping`), then try `!joinmafia` again.'
+            );
+        }
+
+        this.players.push(
+            player
+        );
 
         console.log(
             `[MAFIA JOIN] ✓ Player registered | ` +
@@ -1303,15 +1262,11 @@ class MafiaGame {
         const candidates =
             [];
 
-        // Canonical player ID
-
         if (player.id) {
             candidates.push(
                 player.id
             );
         }
-
-        // Every stored identity
 
         if (
             player.identities
@@ -1327,8 +1282,6 @@ class MafiaGame {
                 );
             }
         }
-
-        // Remove duplicates
 
         const uniqueCandidates =
             [
@@ -1411,9 +1364,6 @@ class MafiaGame {
                             chatError.message
                         );
 
-                        // We still have a valid contact.
-                        // Try sending to its serialized ID.
-
                         return {
                             contact,
                             chat: null,
@@ -1462,56 +1412,28 @@ class MafiaGame {
 
             const destination =
                 resolved.chatId;
-        
+
             await this.client.sendMessage(
                 destination,
                 roleMessage
             );
-        
+
             console.log(
                 `[MAFIA DM] ✓ ROLE DM SENT | ` +
                 `${player.username} [${player.letter}] | ` +
                 `destination=${resolved.chatId}`
             );
-        
+
             return true;
-        
+
         } catch (error) {
-        
+
             console.error(
                 `[MAFIA DM] ❌ ROLE DM FAILED | ` +
                 `${player.username} [${player.letter}]`,
                 error
             );
-        
-            if (
-                resolved.chatId
-            ) {
-        
-                try {
-        
-                    await this.client.sendMessage(
-                        resolved.chatId,
-                        roleMessage
-                    );
-        
-                    console.log(
-                        `[MAFIA DM] ✓ ROLE DM SENT ON RETRY | ` +
-                        `${player.username} [${player.letter}]`
-                    );
-        
-                    return true;
-        
-                } catch (retryError) {
-        
-                    console.error(
-                        `[MAFIA DM] ❌ RETRY FAILED | ` +
-                        `${player.username} [${player.letter}]`,
-                        retryError
-                    );
-                }
-            }
-        
+
             return false;
         }
     }
@@ -1560,10 +1482,6 @@ class MafiaGame {
 
         this.endingGame = false;
 
-        // ========================================================
-        // RESET PLAYER STATE
-        // ========================================================
-
         this.players.forEach(
             player => {
 
@@ -1582,52 +1500,25 @@ class MafiaGame {
         );
 
         // ========================================================
-        // ASSIGN ROLES
+        // DYNAMIC ROLE ASSIGNMENT
         // ========================================================
 
-        const shuffled =
-            [...this.players];
-
-        for (
-            let i =
-                shuffled.length - 1;
-            i > 0;
-            i--
-        ) {
-
-            const j =
-                Math.floor(
-                    Math.random() *
-                    (i + 1)
-                );
-
-            [
-                shuffled[i],
-                shuffled[j]
-            ] =
-            [
-                shuffled[j],
-                shuffled[i]
-            ];
+        const rolePool = ['Mafia', 'Doctor', 'Detective'];
+        while (rolePool.length < this.players.length) {
+            rolePool.push('Villager');
         }
 
-        shuffled[0].role =
-            'Mafia';
+        // Shuffle roles
+        for (let i = rolePool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [rolePool[i], rolePool[j]] = [rolePool[j], rolePool[i]];
+        }
 
-        shuffled[0].originalRole =
-            'Mafia';
-
-        shuffled[1].role =
-            'Doctor';
-
-        shuffled[1].originalRole =
-            'Doctor';
-
-        shuffled[2].role =
-            'Detective';
-
-        shuffled[2].originalRole =
-            'Detective';
+        // Assign shuffled roles to players
+        this.players.forEach((player, index) => {
+            player.role = rolePool[index];
+            player.originalRole = rolePool[index];
+        });
 
         // ========================================================
         // CASE ROSTER
@@ -1718,11 +1609,10 @@ class MafiaGame {
                     player
                 );
             }
-        }
 
-        // ========================================================
-        // DM DELIVERY CHECK
-        // ========================================================
+            // Small delay to prevent socket timeouts or spam flag triggers during batch DMs
+            await this.sleep(500);
+        }
 
         if (
             failedDMs.length > 0
@@ -1762,10 +1652,6 @@ class MafiaGame {
                 '[MAFIA DM] ✓ All role DMs delivered successfully.'
             );
         }
-
-        // ========================================================
-        // PUBLIC START MESSAGE
-        // ========================================================
 
         await this.client.sendMessage(
             channelId,
@@ -1890,6 +1776,36 @@ class MafiaGame {
     }
 
     // ============================================================
+    // EARLY NIGHT RESOLUTION CHECK
+    // ============================================================
+
+    checkAutoResolveNight() {
+
+        if (!this.gameStarted || !this.nightActive) {
+            return;
+        }
+
+        const aliveMafia = this.getMafia();
+        const aliveDoctor = this.players.find(
+            p => p.role === 'Doctor' && p.isAlive
+        );
+        const aliveDetective = this.players.find(
+            p => p.role === 'Detective' && p.isAlive
+        );
+
+        const mafiaDone = !aliveMafia || !!this.nightActions.kill;
+        const doctorDone = !aliveDoctor || !!this.nightActions.save;
+        const detectiveDone = !aliveDetective || !!this.nightActions.investigate;
+
+        if (mafiaDone && doctorDone && detectiveDone) {
+
+            console.log('[MAFIA NIGHT] All actions submitted early. Resolving night...');
+
+            this.resolveNight(this.channelId);
+        }
+    }
+
+    // ============================================================
     // NIGHT ACTION HANDLER
     // ============================================================
 
@@ -1906,17 +1822,10 @@ class MafiaGame {
             `user=${JSON.stringify(user)}`
         );
 
-        // ========================================================
-        // RESOLVE SENDER
-        // ========================================================
-
         let cleanUserId =
             this.canonicalizeIdentity(
                 user
             );
-
-        // If we received a contact object,
-        // remember all of its identities.
 
         if (
             user &&
@@ -1942,10 +1851,6 @@ class MafiaGame {
             `[MAFIA NIGHT] Sender canonical ID: ${cleanUserId}`
         );
 
-        // ========================================================
-        // GAME STATE
-        // ========================================================
-
         if (
             !this.gameStarted ||
             !this.nightActive
@@ -1969,10 +1874,6 @@ class MafiaGame {
 
             return;
         }
-
-        // ========================================================
-        // FIND PLAYER
-        // ========================================================
 
         const player =
             this.getPlayerById(
@@ -2022,10 +1923,6 @@ class MafiaGame {
             return;
         }
 
-        // ========================================================
-        // ROLE PERMISSION
-        // ========================================================
-
         const requiredRole =
             command === 'kill'
                 ? 'Mafia'
@@ -2044,10 +1941,6 @@ class MafiaGame {
 
             return;
         }
-
-        // ========================================================
-        // LETTER -> PLAYER
-        // ========================================================
 
         const target =
             this.getPlayerByLetter(
@@ -2097,10 +1990,6 @@ class MafiaGame {
             `[${target.letter}] ${target.username}`
         );
 
-        // ========================================================
-        // MAFIA KILL
-        // ========================================================
-
         if (
             command === 'kill'
         ) {
@@ -2130,12 +2019,10 @@ class MafiaGame {
                 'has been marked for elimination silently.'
             );
 
+            this.checkAutoResolveNight();
+
             return;
         }
-
-        // ========================================================
-        // DOCTOR SAVE
-        // ========================================================
 
         if (
             command === 'save'
@@ -2166,12 +2053,10 @@ class MafiaGame {
                 'The result will be revealed at sunrise.'
             );
 
+            this.checkAutoResolveNight();
+
             return;
         }
-
-        // ========================================================
-        // DETECTIVE INVESTIGATION
-        // ========================================================
 
         if (
             command === 'investigate'
@@ -2234,6 +2119,8 @@ class MafiaGame {
                 }
             }
 
+            this.checkAutoResolveNight();
+
             return;
         }
     }
@@ -2280,10 +2167,6 @@ class MafiaGame {
         let doctorSaved =
             false;
 
-        // ========================================================
-        // PROCESS KILL
-        // ========================================================
-
         if (killTarget) {
 
             if (
@@ -2318,10 +2201,6 @@ class MafiaGame {
                 );
             }
         }
-
-        // ========================================================
-        // DOCTOR STRIKE
-        // ========================================================
 
         const doctor =
             this.players.find(
@@ -2373,10 +2252,6 @@ class MafiaGame {
                 }
             }
         }
-
-        // ========================================================
-        // MORNING MESSAGE
-        // ========================================================
 
         let morningMessage =
             '*THE SUN RISES...*\n\n';
@@ -2668,10 +2543,6 @@ class MafiaGame {
         const tally =
             new Map();
 
-        // ========================================================
-        // INITIALIZE TALLY
-        // ========================================================
-
         for (
             const player of
             this.getAlivePlayers()
@@ -2684,10 +2555,6 @@ class MafiaGame {
                 0
             );
         }
-
-        // ========================================================
-        // COUNT ONLY VALID VOTES
-        // ========================================================
 
         let validVoteCount =
             0;
@@ -2735,10 +2602,6 @@ class MafiaGame {
             }
         }
 
-        // ========================================================
-        // DISPLAY TALLY
-        // ========================================================
-
         let tallyMessage =
             '*VOTING TALLY*\n\n';
 
@@ -2763,10 +2626,6 @@ class MafiaGame {
             tallyMessage
         );
 
-        // ========================================================
-        // NO VALID VOTES
-        // ========================================================
-
         if (
             validVoteCount === 0
         ) {
@@ -2787,10 +2646,6 @@ class MafiaGame {
             return;
         }
 
-        // ========================================================
-        // FIND HIGHEST VOTE
-        // ========================================================
-
         const highestVotes =
             Math.max(
                 ...Array.from(
@@ -2809,10 +2664,6 @@ class MafiaGame {
                         ) || 0
                     ) === highestVotes
             );
-
-        // ========================================================
-        // TIE
-        // ========================================================
 
         if (
             candidates.length > 1
@@ -2842,10 +2693,6 @@ class MafiaGame {
 
             return;
         }
-
-        // ========================================================
-        // EXECUTION
-        // ========================================================
 
         const suspect =
             candidates[0];
@@ -2947,7 +2794,7 @@ module.exports = {
     // ============================================================
 
     joinMafiaLobby:
-        (
+        async (
             chatId,
             senderId,
             userName,
@@ -2961,7 +2808,7 @@ module.exports = {
                 return null;
             }
 
-            return global.activeMafiaGame.joinGame(
+            return await global.activeMafiaGame.joinGame(
                 {
                     id:
                         senderId,
