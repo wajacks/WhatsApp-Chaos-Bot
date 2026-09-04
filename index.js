@@ -579,7 +579,6 @@ client.on(
 
                 } else {
 
-                    // UPDATED: Notify user if night action was attempted in a group
                     await message.reply(
                         '❌ *Night actions are top secret!*\n\n' +
                         'Please send `!kill`, `!save`, or `!investigate` to me in a *private DM*.'
@@ -1771,11 +1770,11 @@ client.on(
                     userName,
                     mafiaContact
                 );
-                
+
                 if (mafiaResponse) {
                     await message.reply(mafiaResponse);
                 }
-                
+
                 return;
             }
 
@@ -1896,7 +1895,8 @@ client.on(
             }
 
             if (
-                lowerText === '!joinrebus'
+                lowerText === '!joinrebus' ||
+                lowerText === '!rjoin'
             ) {
 
                 const joinRes =
@@ -1914,49 +1914,14 @@ client.on(
             }
 
             if (
-                lowerText.startsWith('!rguess') ||
-                lowerText.startsWith('!country')
-            ) {
-
-                const guessQuery =
-                    text
-                        .split(/\s+/)
-                        .slice(1)
-                        .join(' ')
-                        .trim();
-
-                if (!guessQuery) {
-                    return;
-                }
-
-                const rebusGuessRes =
-                    processRebusGuess(
-                        chatId,
-                        senderId,
-                        userName,
-                        guessQuery
-                    );
-
-                if (
-                    rebusGuessRes
-                ) {
-
-                    await message.reply(
-                        rebusGuessRes
-                    );
-                }
-
-                return;
-            }
-
-            if (
                 lowerText === '!hint'
             ) {
 
                 const hintRes =
                     processRebusHint(
                         chatId,
-                        senderId
+                        senderId,
+                        client
                     );
 
                 if (
@@ -1989,7 +1954,8 @@ client.on(
                     handleStealCommand(
                         chatId,
                         senderId,
-                        targetMention
+                        targetMention,
+                        client
                     );
 
                 if (
@@ -2014,6 +1980,21 @@ client.on(
                 }
 
                 return;
+            }
+
+            // ====================================================
+            // REBUS DIRECT CHAT GUESS LISTENER (NO PREFIX NEEDED)
+            // ====================================================
+            if (text && !text.startsWith('!')) {
+                const handled = processRebusGuess(
+                    chatId,
+                    text,
+                    senderId,
+                    userName,
+                    client
+                );
+
+                if (handled) return;
             }
 
             // ====================================================
