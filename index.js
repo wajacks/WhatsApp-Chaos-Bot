@@ -512,91 +512,56 @@ client.on(
                 text.toLowerCase();
 
             // ====================================================
-            // MAFIA PRIVATE NIGHT COMMANDS
+            // MAFIA PRIVATE NIGHT COMMANDS & REPLIES
             // ====================================================
 
-            if (
-                lowerText.startsWith('!kill') ||
-                lowerText.startsWith('!save') ||
-                lowerText.startsWith('!investigate')
-            ) {
+            if (!isGroup) {
 
-                if (!isGroup) {
+                // Handle users using "Reply Privately" on a Mafia message
+                if (message.hasQuotedMsg) {
+                    try {
+                        const quotedMsg = await message.getQuotedMessage();
 
-                    const parts =
-                        text.split(/\s+/);
-
-                    const command =
-                        parts[0]
-                            .toLowerCase()
-                            .replace(
-                                /^!/,
-                                ''
+                        if (
+                            quotedMsg &&
+                            quotedMsg.body &&
+                            quotedMsg.body.includes('PROJECT MAFIA CASE')
+                        ) {
+                            await message.reply(
+                                '✅ *Private channel established!*\n\n' +
+                                'Your direct chat session with the bot is now active.\n' +
+                                'Head back to the group and type `!joinmafia` to complete your registration!'
                             );
+                            return;
+                        }
+                    } catch (quotedErr) {
+                        console.warn('[MAFIA DM] Could not check quoted message:', quotedErr.message);
+                    }
+                }
 
-                    const targetLetter =
-                        parts[1];
+                // Handle secret night action commands in DM
+                if (
+                    lowerText.startsWith('!kill') ||
+                    lowerText.startsWith('!save') ||
+                    lowerText.startsWith('!investigate')
+                ) {
+                    const parts = text.split(/\s+/);
+                    const command = parts[0].toLowerCase().replace(/^!/, '');
+                    const targetLetter = parts[1];
 
-                    console.log(
-                        '\n============================================================'
-                    );
-
-                    console.log(
-                        '[MAFIA DM] PRIVATE ACTION RECEIVED'
-                    );
-
-                    console.log(
-                        `[MAFIA DM] from=${message.from}`
-                    );
-
-                    console.log(
-                        `[MAFIA DM] author=${
-                            message.author ||
-                            'undefined'
-                        }`
-                    );
-
-                    console.log(
-                        `[MAFIA DM] canonicalSender=${senderId}`
-                    );
-
-                    console.log(
-                        `[MAFIA DM] contactNumber=${
-                            senderContact?.number ||
-                            'unknown'
-                        }`
-                    );
-
-                    console.log(
-                        `[MAFIA DM] contactId=${
-                            senderContact?.id?._serialized ||
-                            senderContact?._serialized ||
-                            'unknown'
-                        }`
-                    );
-
-                    console.log(
-                        `[MAFIA DM] command=!${command}`
-                    );
-
-                    console.log(
-                        `[MAFIA DM] target=${
-                            targetLetter ||
-                            'none'
-                        }`
-                    );
-
-                    console.log(
-                        '============================================================\n'
-                    );
+                    console.log('\n============================================================');
+                    console.log('[MAFIA DM] PRIVATE ACTION RECEIVED');
+                    console.log(`[MAFIA DM] from=${message.from}`);
+                    console.log(`[MAFIA DM] canonicalSender=${senderId}`);
+                    console.log(`[MAFIA DM] command=!${command}`);
+                    console.log(`[MAFIA DM] target=${targetLetter || 'none'}`);
+                    console.log('============================================================\n');
 
                     if (!targetLetter) {
-
                         await message.reply(
                             `Specify a player letter.\n\n` +
                             `Example: \`!${command} C\``
                         );
-
                         return;
                     }
 
@@ -608,14 +573,20 @@ client.on(
                     );
 
                     return;
+                }
 
-                } else {
+            } else {
 
+                // Block players from accidentally posting secret actions in group chat
+                if (
+                    lowerText.startsWith('!kill') ||
+                    lowerText.startsWith('!save') ||
+                    lowerText.startsWith('!investigate')
+                ) {
                     await message.reply(
                         '❌ *Night actions are top secret!*\n\n' +
-                        'Please send `!kill`, `!save`, or `!investigate` to me in a *private DM*.'
+                        'Long-press my message, select *Reply Privately*, and send `!kill`, `!save`, or `!investigate` to me in secret.'
                     );
-
                     return;
                 }
             }

@@ -196,11 +196,11 @@ const pendingSteals = new Map();   // winnerId -> { groupId, playerIds: Set<id> 
 // ⏱️ TIMERS & COSTS
 // ============================================================
 
-const LOBBY_TIME_MS = 40 * 1000;        // 40 seconds
-const GAME_DURATION_MS = 5 * 60 * 1000; // 5 minutes
-const ROUND_DURATION_MS = 50 * 1000;    // 50 seconds
-const STEAL_WINDOW_MS = 60 * 1000;      // 1 minute
-const HINT_COST = 10;                   // Coins deducted to use !hint
+const LOBBY_TIME_MS = 120 * 1000;        // 2 minute
+const GAME_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+const ROUND_DURATION_MS = 80 * 1000;    // 50 seconds
+const STEAL_WINDOW_MS = 120 * 1000;      // 2 minute
+const HINT_COST = 1000;                   // Coins deducted to use !hint
 
 // ============================================================
 // 🚪 START LOBBY
@@ -309,7 +309,7 @@ function startActiveGame(groupId, client) {
         groupId,
 `🚀 *REBUS GAME STARTED!* 🚀
 
-You have *5 minutes* to score as many points as possible!
+You have *10 minutes* to score as many points as possible!
 
 💯 Correct answer = *+100 points*
 💡 Need a hint? Type \`!hint\` (-${HINT_COST} coins).
@@ -326,7 +326,7 @@ You have *5 minutes* to score as many points as possible!
 
         client.sendMessage(
             groupId,
-            `⏳ *5 MINUTES IS UP!*\n\nThe Rebus game has officially ended!`
+            `⏳ *10 MINUTES IS UP!*\n\nThe Rebus game has officially ended!`
         ).catch(() => {});
 
         endGame(groupId, client);
@@ -365,7 +365,7 @@ function nextRound(groupId, client) {
 
 ━━━━━━━━━━━━━━━━━━━━━
 
-⏱️ *50 seconds!*
+⏱️ *80 seconds!*
 💡 Need a hint? Type \`!hint\` (-${HINT_COST} coins)
 
 🎯 Registered players, type your guess below!`
@@ -574,7 +574,7 @@ function endGame(groupId, client) {
 `\n🎉 *CONGRATULATIONS ${winner.name}! YOU WIN! 👑*
 
 💰 *WINNER PRIVILEGE:*
-You have \`60 seconds\` to steal \`12.5%\` of any losing player's wallet savings!
+You have \`120 seconds\` to steal \`12.5%\` of any losing player's wallet savings!
 
 👉 *${winner.name}*, tag a player now:
 \`!steal @User\``;

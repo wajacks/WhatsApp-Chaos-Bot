@@ -149,12 +149,12 @@ const GENERAL_WORD_BANK = [
 
 const activeGames = new Map();
 
-const LOBBY_TIME_MS = 80 * 1000;                  // 80 Seconds to join lobby
-const ROUND_TIME_MS = 4 * 60 * 1000;              // 4 Minutes per word round
+const LOBBY_TIME_MS = 160 * 1000;                  // 80 Seconds to join lobby
+const ROUND_TIME_MS = 5 * 60 * 1000;              // 4 Minutes per word round
 const WARNING_TIME_MS = 2 * 60 * 1000;            // Send warning at 2 mins remaining
-const MAX_ROUNDS = 10;                            // Total rounds per match
+const MAX_ROUNDS = 15;                            // Total rounds per match
 const PER_PLAYER_ATTEMPTS = 15;                   // 15 guesses max per player per word
-const HINT_THRESHOLD_WRONG = 5;                   // Group hint unlocks after 5 wrong guesses
+const HINT_THRESHOLD_WRONG = 10;                   // Group hint unlocks after 5 wrong guesses
 
 function shuffleArray(array) {
     const arr = [...array];
@@ -246,7 +246,7 @@ function startWordleLobby(chatId, client) {
 `━━━━━━━━━━━━━━━━━━━━━\n` +
 `🎮 *HOW TO JOIN:* Type *!join* to enter the match!\n\n` +
 `📖 *MATCH RULES:* \n` +
-`• Total Match Duration: *Rounds based* (Up to 10 Rounds, 4 Mins per Round)\n` +
+`• Total Match Duration: *Rounds based* (Up to 15 Rounds, 5 Mins per Round)\n` +
 `• Each Player gets *15 Max Attempts* per word.\n` +
 `• Bot reveals *1 correct letter* at the start of each word.\n` +
 `• Simply type your 5-letter guess directly in chat!\n\n` +
@@ -322,7 +322,7 @@ function startNextRound(chatId, client) {
 `🔥 *ROUND ${game.currentRound} OF ${MAX_ROUNDS} STARTED!* 🔥\n` +
 `━━━━━━━━━━━━━━━━━━━━━\n` +
 `👥 Active Players: ${game.players.size}\n` +
-`⏱️ Round Duration: 4 Minutes\n` +
+`⏱️ Round Duration: 5 Minutes\n` +
 `🎯 Attempts per player: 15\n` +
 `🔍 *FREE LETTER HINT:* \` ${game.revealedLetter.display} \` (Letter *${game.revealedLetter.char}* is in position ${game.revealedLetter.index + 1})\n\n` +
 `💬 *Registered players: Type your 5-letter guess directly in chat!*`

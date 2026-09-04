@@ -930,10 +930,10 @@ class MafiaGame {
             'Welcome to the investigation. ' +
             'Take your time, talk, and prepare.\n\n' +
             '⚠️ *REQUIRED BEFORE JOINING:* ⚠️\n' +
-            `1. Click here to send a DM to the bot first: ${botDmLink}\n` +
-            '2. Send any message (e.g., `hi` or `!ping`) to activate private role delivery.\n' +
-            '3. Return here and type `!joinmafia` to enter the case!\n\n' +
-            'Registration is open for *2 minutes*.\n\n' +
+            '*NB* :\`LONG PRESS THIS MESSAGE, THEN CHOOSE REPLY PRIVATELY\`\n' +
+            'SEND THIS COMMAND \`!ping\`'+
+            'Return to group then \`!joinmafia\` to enter the case!\n\n' +
+            'Registration is open for *3 minutes*.\n\n' +
             'Minimum players: *4*\n' +
             'Mafia: *1*\n' +
             'Doctor: *1*\n' +
@@ -1055,7 +1055,7 @@ class MafiaGame {
                     }
 
                 },
-                120000
+                180000
             );
     }
 
