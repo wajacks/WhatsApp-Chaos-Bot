@@ -100,7 +100,7 @@ function processVideoInBackground(message, targetQuery, cookiesPath, downloadDir
                 const fileSizeInMB = stats.size / (1024 * 1024);
 
                 // If file is under 16 MB, send as playable video; if over 16 MB or long video, send as document
-                const sendAsDocument = isLongVideo || fileSizeInMB > 30;
+                const sendAsDocument = isLongVideo || fileSizeInMB > 60;
 
                 console.log(`[VIDEO] Sending: ${downloadedFilePath} | Size: ${fileSizeInMB.toFixed(2)} MB | Document Mode: ${sendAsDocument}`);
 
