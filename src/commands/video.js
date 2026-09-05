@@ -24,7 +24,7 @@ async function handleVideoCommand(message) {
         const searchPrefix = isUrl ? '' : 'ytsearch1:';
         const targetQuery = `${searchPrefix}${text}`;
 
-        await message.reply('🎬 *Request received!* Processing your 360p video in the background...');
+        await message.reply('🎬 *Request received!* Processing your 360p video in the background...' +'\`©chriss\`');
 
         setImmediate(() => {
             processVideoInBackground(message, targetQuery, cookiesPath, downloadDir);
