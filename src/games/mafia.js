@@ -383,25 +383,33 @@ class MafiaGame {
     // ============================================================
 
     rememberContact(contact) {
-
-        if (!contact) {
-            return null;
+        if (!contact) return null;
+    
+        const canonical = this.canonicalizeIdentity(contact);
+        if (!canonical) return null;
+    
+        // 1. Register full serialized IDs (handles both @c.us and @lid formats)
+        if (contact.id?._serialized) {
+            this.registerIdentityAlias(contact.id._serialized, canonical);
         }
-
-        const canonical =
-            this.canonicalizeIdentity(
-                contact
-            );
-
-        if (!canonical) {
-            return null;
+        if (contact._serialized) {
+            this.registerIdentityAlias(contact._serialized, canonical);
         }
-
-        this.registerIdentityAlias(
-            contact,
-            canonical
-        );
-
+    
+        // 2. Register underlying user ID (e.g. '254111659469' or '74917685010441')
+        if (contact.id?.user) {
+            this.registerIdentityAlias(contact.id.user, canonical);
+        }
+    
+        // 3. Normalize & register phone number aliases
+        if (contact.number) {
+            const num = this.normalizePhoneNumber(contact.number);
+            if (num) {
+                this.registerIdentityAlias(`${num}@c.us`, canonical);
+                this.registerIdentityAlias(num, canonical);
+            }
+        }
+    
         return canonical;
     }
 
@@ -1248,6 +1256,14 @@ class MafiaGame {
                 permanentJid
             );
         }
+        
+        // Try to proactively resolve the private chat and capture ALL possible identities
+        const privateChat = await this.resolvePrivateChat(player);
+
+            if (privateChat && privateChat.contact) {
+                // This will populate identityAliases with all contact variations
+                this.rememberContact(privateChat.contact);
+            }
 
         // Register player to state first before checking DM resolution
         this.players.push(
