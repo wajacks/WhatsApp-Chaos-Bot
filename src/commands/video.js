@@ -50,20 +50,22 @@ async function handleVideoCommand(message) {
                 }
             }
 
-            // 2. Select format rule based on duration and FORCE mp4 container merge
+            // 2. Select format rule based on duration
+            // Long videos: High quality (1080p) sent as document
+            // Short videos: Standard 720p HD for fast delivery
             const formatRule = isLongVideo
                 ? 'bv*[height<=1080]+ba/b[height<=1080]/b'
                 : 'bv*[height<=720]+ba/b[height<=720]/b';
 
             const outputTemplate = path.join(downloadDir, '%(id)s.%(ext)s');
             
-            // Added --merge-output-format mp4 to force merged files into .mp4
+            // Force merged output to .mp4 container
             const ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" -f "${formatRule}" --merge-output-format mp4 --no-playlist -o "${outputTemplate}" "${targetQuery}"`;
 
             await message.reply(
                 isLongVideo
-                    ? '📹 *Long video detected.* Downloading high quality... sending as document.'
-                    : '📹 *Downloading video (720p HD)...*\n'+'\`©chriss\`'
+                    ? '📹 *Long video detected.* Downloading high quality... sending as document.\n`©chriss`'
+                    : '📹 *Downloading video (720p HD)...*\n`©chriss`'
             );
 
             // 3. Download video file
@@ -75,7 +77,7 @@ async function handleVideoCommand(message) {
                         return;
                     }
 
-                    // Fallback scanner checks for mp4, mkv, or webm just in case
+                    // Fallback scanner checks for mp4, mkv, or webm
                     const files = fs.readdirSync(downloadDir);
                     const validFiles = files
                         .filter(file => file.endsWith('.mp4') || file.endsWith('.mkv') || file.endsWith('.webm'))
@@ -92,12 +94,19 @@ async function handleVideoCommand(message) {
 
                     const videoFile = path.join(downloadDir, validFiles[0].name);
 
-                    console.log('[VIDEO] Sending:', videoFile, '| isDocument:', isLongVideo);
+                    // Calculate file size in MB
+                    const stats = fs.statSync(videoFile);
+                    const fileSizeInMB = stats.size / (1024 * 1024);
+
+                    // Determine if it must be sent as a document (if >= 10 mins OR file size > 15 MB)
+                    const sendAsDocument = isLongVideo || fileSizeInMB > 15;
+
+                    console.log(`[VIDEO] Sending: ${videoFile} | Size: ${fileSizeInMB.toFixed(2)} MB | Document Mode: ${sendAsDocument}`);
 
                     const videoMedia = MessageMedia.fromFilePath(videoFile);
 
-                    // 4. Send as document if >= 10 mins, otherwise standard inline video
-                    if (isLongVideo) {
+                    // 4. Send payload to chat
+                    if (sendAsDocument) {
                         await message.client.sendMessage(message.from, videoMedia, {
                             sendMediaAsDocument: true
                         });

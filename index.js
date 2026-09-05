@@ -850,6 +850,7 @@ client.on(
                                     '- !menu — Display the full bot menu.\n' +
                                     '- !randomsong — Play a random song.\n' +
                                     '- !play — Search song name or link from YouTube.\n\n' +
+                                    '- !video — Search video, music video or link from youtube' +
 
                                     'WORD CHAIN:\n' +
 

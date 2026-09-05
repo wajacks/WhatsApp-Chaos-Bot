@@ -53,6 +53,7 @@
 ┃  • \`!menu\` → Display this control panel
 ┃  • \`!randomsong\` → Play a random song
 ┃  • \`!play\` → !play <song name/link>
+┃  • \`!video\` → !video <name/link>
 ┃  • \`!ai <prompt>\` → Chat with Gemini AI
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 ┃┊ ┊*[ 𝔒𝔚ℕ𝔈ℝ ]*┊ ┊
