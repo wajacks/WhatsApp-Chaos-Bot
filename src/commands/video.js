@@ -26,7 +26,7 @@ async function handleVideoCommand(message) {
 
         await message.reply('Checking video details... please wait.');
 
-        // 1. Fetch metadata first to get duration in seconds
+        // 1. Fetch duration
         const infoCmd = `yt-dlp --cookies "${cookiesPath}" --get-duration --no-playlist "${targetQuery}"`;
 
         exec(infoCmd, async (infoErr, stdout) => {
@@ -50,17 +50,15 @@ async function handleVideoCommand(message) {
                 }
             }
 
-            // 2. Select format rule based on duration
-            // Long videos: High quality (1080p) sent as document
-            // Short videos: Standard 720p HD for fast delivery
+            // 2. Format selector targeting H.264 video + AAC audio for iPhone/PC compatibility
             const formatRule = isLongVideo
-                ? 'bv*[height<=1080]+ba/b[height<=1080]/b'
-                : 'bv*[height<=720]+ba/b[height<=720]/b';
+                ? 'bv*[height<=1080][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=1080]+ba/b[height<=1080]/b'
+                : 'bv*[height<=720][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=720]+ba/b[height<=720]/b';
 
             const outputTemplate = path.join(downloadDir, '%(id)s.%(ext)s');
-            
-            // Force merged output to .mp4 container
-            const ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" -f "${formatRule}" --merge-output-format mp4 --no-playlist -o "${outputTemplate}" "${targetQuery}"`;
+
+            // Convert audio to standard AAC to ensure sound on iOS and PC players
+            const ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" -f "${formatRule}" --merge-output-format mp4 --postprocessor-args "ffmpeg:-c:a aac -b:a 192k" --no-playlist -o "${outputTemplate}" "${targetQuery}"`;
 
             await message.reply(
                 isLongVideo
@@ -68,8 +66,10 @@ async function handleVideoCommand(message) {
                     : '📹 *Downloading video (720p HD)...*\n`©chriss`'
             );
 
-            // 3. Download video file
+            // 3. Execute download
             exec(ytDlpCmd, { maxBuffer: 50 * 1024 * 1024 }, async (error, stdout, stderr) => {
+                let downloadedFilePath = null;
+
                 try {
                     if (error) {
                         console.error('ytdlp video error:', error.message);
@@ -77,7 +77,6 @@ async function handleVideoCommand(message) {
                         return;
                     }
 
-                    // Fallback scanner checks for mp4, mkv, or webm
                     const files = fs.readdirSync(downloadDir);
                     const validFiles = files
                         .filter(file => file.endsWith('.mp4') || file.endsWith('.mkv') || file.endsWith('.webm'))
@@ -92,20 +91,16 @@ async function handleVideoCommand(message) {
                         return;
                     }
 
-                    const videoFile = path.join(downloadDir, validFiles[0].name);
+                    downloadedFilePath = path.join(downloadDir, validFiles[0].name);
 
-                    // Calculate file size in MB
-                    const stats = fs.statSync(videoFile);
+                    const stats = fs.statSync(downloadedFilePath);
                     const fileSizeInMB = stats.size / (1024 * 1024);
-
-                    // Determine if it must be sent as a document (if >= 10 mins OR file size > 15 MB)
                     const sendAsDocument = isLongVideo || fileSizeInMB > 15;
 
-                    console.log(`[VIDEO] Sending: ${videoFile} | Size: ${fileSizeInMB.toFixed(2)} MB | Document Mode: ${sendAsDocument}`);
+                    console.log(`[VIDEO] Sending: ${downloadedFilePath} | Size: ${fileSizeInMB.toFixed(2)} MB | Document Mode: ${sendAsDocument}`);
 
-                    const videoMedia = MessageMedia.fromFilePath(videoFile);
+                    const videoMedia = MessageMedia.fromFilePath(downloadedFilePath);
 
-                    // 4. Send payload to chat
                     if (sendAsDocument) {
                         await message.client.sendMessage(message.from, videoMedia, {
                             sendMediaAsDocument: true
@@ -114,16 +109,21 @@ async function handleVideoCommand(message) {
                         await message.client.sendMessage(message.from, videoMedia);
                     }
 
-                    fs.unlink(videoFile, err => {
-                        if (err) {
-                            console.error('[VIDEO] Failed to delete:', err.message);
-                        } else {
-                            console.log('[VIDEO] Deleted:', videoFile);
-                        }
-                    });
                 } catch (err) {
                     console.error('Error processing downloaded video:', err);
                     await message.reply('The video downloaded, but I could not send it over WhatsApp.');
+
+                } finally {
+                    // GUARANTEED CLEANUP: Always deletes temp file from VPS regardless of success or error
+                    if (downloadedFilePath && fs.existsSync(downloadedFilePath)) {
+                        fs.unlink(downloadedFilePath, err => {
+                            if (err) {
+                                console.error('[VIDEO] Failed to delete:', err.message);
+                            } else {
+                                console.log('[VIDEO] Cleaned up temp file:', downloadedFilePath);
+                            }
+                        });
+                    }
                 }
             });
         });
