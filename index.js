@@ -61,6 +61,8 @@ const { getGamesList } = require('./src/commands/gameslist');
 
 const { handleBalanceCommand } = require('./src/commands/balance');
 
+const { getWeather } = require('./src/tools/weather');
+
 const {
     startMafiaLobby,
     joinMafiaLobby,
@@ -616,6 +618,36 @@ client.on(
                     );
 
                     return;
+                }
+                // Check if the prompt includes a weather query
+                if (prompt.toLowerCase().includes('weather in')) {
+                    const city = prompt.split('weather in ')[1]?.trim(); // Extract city name
+                    if (!city) {
+                        await message.reply("Please specify a city, e.g., 'What's the weather in Nairobi?'");
+                        return;
+                    }
+
+                    const weatherData = await getWeather({ city });
+
+                    if (weatherData.error) {
+                        await message.reply(weatherData.error);
+                    } else {
+                        const response = `🌤️ *WEATHER UPDATE*
+
+                    📍 *${weatherData.city}, ${weatherData.country}*
+
+                    🌡️ Temperature: *${weatherData.temp}°C*
+                    🤚 Feels like: *${weatherData.feelsLike}°C*
+                    ☁️ Conditions: *${weatherData.condition}*
+                    💧 Humidity: *${weatherData.humidity}%*
+
+                    ━━━━━━━━━━━━━━` +
+                    `@${senderId.split('@')[0]} • ONLINE\n` +
+                        '`wantam`';;
+                        await message.reply(response);
+                    }
+
+                    return; // Exit after handling the weather query
                 }
 
                 if (
