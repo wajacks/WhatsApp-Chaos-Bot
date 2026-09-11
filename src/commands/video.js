@@ -49,9 +49,9 @@ async function handleVideoCommand(message) {
             `2️⃣ *480p* (Balanced quality)\n` +
             `3️⃣ *720p* (High Quality)\n` +
             `4️⃣ *1080p* (Full HD - Usually sent as Document)\n` +
-            `5️⃣ *Audio Only* (MP3 / Voice Note Options)\n` +
+            `5️⃣ *Audio Only* (MP3 / Voice Note Options)\n\n` +
             `\t\t‧₊˚🖇️✩ ₊˚🎧⊹♡\n` +
-            `_Reply with 1, 2, 3, 4, or 5_\n\n` +
+            `_Reply with \`1\`, \`2\`, \`3\`, \`4\`, or \`5\`_\n\n` +
             `\`wantam\`\t\t` + `👆😅`;
 
         await message.reply(promptText);
@@ -130,9 +130,9 @@ async function handleVideoQualityReply(message) {
             `🎵 *Select Audio Quality*\n\n` +
             `1️⃣ *High Quality* (320 kbps)\n` +
             `2️⃣ *Medium Quality* (192 kbps)\n` +
-            `3️⃣ *Low / Fast* (128 kbps)\n` +
+            `3️⃣ *Low / Fast* (128 kbps)\n\n` +
             `\t\t‧₊˚🖇️✩ ₊˚🎧⊹♡\n` +
-            `_Reply with 1, 2, or 3_\n\n` + 
+            `_Reply with \`1\`, \`2\`, or \`3\`_\n\n` + 
             `\`wantam\`\t\t` + `👆😅`;
 
         await message.reply(qualityPrompt);
@@ -207,9 +207,9 @@ async function handleVideoQualityReply(message) {
         const formatPrompt = 
             `🎙️ *Select Audio Output Format*\n\n` +
             `1️⃣ *Voice Note* (Playable waveform message)\n` +
-            `2️⃣ *MP3 Audio* (Downloadable music file)\n` +
+            `2️⃣ *MP3 Audio* (Downloadable music file)\n\n` +
             `\t\t‧₊˚🖇️✩ ₊˚🎧⊹♡\n` +
-            `_Reply with 1 or 2_\n\n` +
+            `_Reply with \`1\` or \`2\`_\n\n` +
             `\`wantam\`\t\t` + `👆😅`;
 
         await message.reply(formatPrompt);
@@ -325,10 +325,16 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
 
             if (chosenOption.audioOnly) {
                 if (chosenOption.isVoiceNote) {
-                    // Sends directly as an audio track (matches line 52 of play.js for perfect iPhone playback)
+                    // Option 1: Native M4A audio message (matches your working play.js)
                     await message.client.sendMessage(message.from, media);
                 } else {
-                    await message.client.sendMessage(message.from, media, {
+                    // Option 2: Standard playable MP3 document with explicit MIME type for iOS
+                    const mp3Media = new MessageMedia(
+                        'audio/mp3', 
+                        fs.readFileSync(downloadedFilePath).toString('base64'), 
+                        path.basename(downloadedFilePath)
+                    );
+                    await message.client.sendMessage(message.from, mp3Media, {
                         sendMediaAsDocument: true
                     });
                 }
