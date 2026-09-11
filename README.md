@@ -369,9 +369,9 @@ and saves the PM2 process list.
 
 This allows the services to be restored after a server reboot.
 
-## License
+## 📜 License
 
-Add your project's license information here.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ```
 ```
