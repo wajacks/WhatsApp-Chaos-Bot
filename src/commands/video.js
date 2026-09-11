@@ -261,6 +261,7 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
             if (error) {
                 console.error('ytdlp execution error:', error.message);
                 await message.reply('❌ Failed to download the requested media.');
+                cleanupFilePath(requestDir);
                 return;
             }
 
@@ -269,6 +270,7 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
 
             if (validFiles.length === 0) {
                 await message.reply('❌ Media downloaded, but the output file could not be found.');
+                cleanupFilePath(requestDir);
                 return;
             }
 
@@ -320,16 +322,16 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
                         sendMediaAsDocument: true
                     });
                 }
-                cleanupFilePath(downloadedFilePath);
             } else {
                 await message.client.sendMessage(message.from, media);
-                cleanupFilePath(downloadedFilePath);
             }
 
         } catch (err) {
             console.error('Error processing or sending media:', err);
             await message.reply('❌ Media downloaded, but failed to send it over WhatsApp.');
-            if (downloadedFilePath) cleanupFilePath(downloadedFilePath);
+        } finally {
+            // Guaranteed folder deletion whether send succeeded or failed
+            cleanupFilePath(downloadedFilePath || requestDir);
         }
     });
 }
@@ -353,15 +355,23 @@ function clearUserPendingStates(chatId) {
 }
 
 /**
- * Safely removes temporary file or directory
+ * Synchronously and safely removes temporary file or directory
  */
-function cleanupFilePath(filePath) {
-    if (!filePath || !fs.existsSync(filePath)) return;
+function cleanupFilePath(targetPath) {
+    if (!targetPath) return;
 
-    const parentDir = path.dirname(filePath);
-    fs.rm(parentDir, { recursive: true, force: true }, (err) => {
-        if (err) console.error('[CLEANUP] Failed to delete temp directory:', err.message);
-    });
+    try {
+        const dirToDelete = fs.existsSync(targetPath) && fs.statSync(targetPath).isFile() 
+            ? path.dirname(targetPath) 
+            : targetPath;
+
+        if (fs.existsSync(dirToDelete)) {
+            fs.rmSync(dirToDelete, { recursive: true, force: true });
+            console.log(`[CLEANUP] Successfully purged directory: ${dirToDelete}`);
+        }
+    } catch (err) {
+        console.error('[CLEANUP] Failed to purge directory:', err.message);
+    }
 }
 
 module.exports = { 
