@@ -360,7 +360,7 @@ client.on('message', async message => {
 
             try {
                 const response = await ai.models.generateImages({
-                    model: 'imagen-3.0-generate-002',
+                    model: 'gemini-3.1-flash-image',
                     prompt: prompt,
                     config: {
                         numberOfImages: 1,
@@ -410,7 +410,7 @@ client.on('message', async message => {
                 const userPrompt = text.replace(/^!(analyze|describe)\s*/i, '').trim() || 'Describe this image in detail.';
 
                 const response = await ai.models.generateContent({
-                    model: 'gemini-3.6-flash',
+                    model: 'gemini-3.8-flash',
                     contents: [
                         {
                             inlineData: {
@@ -444,7 +444,7 @@ client.on('message', async message => {
 
             try {
                 const response = await ai.models.generateContent({
-                    model: 'gemini-3.6-flash',
+                    model: 'gemini-3.1-flash-tts-preview',
                     contents: `Convert this exact text to spoken output: "${speechText}"`,
                     config: {
                         responseMimeType: 'audio/mp3'
@@ -567,7 +567,7 @@ client.on('message', async message => {
                 }));
 
                 const response = await ai.models.generateContent({
-                    model: 'gemini-3.6-flash',
+                    model: 'gemini-3.8-flash',
                     contents,
                     config: {
                         systemInstruction:
