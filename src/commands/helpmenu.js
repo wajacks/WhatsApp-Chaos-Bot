@@ -54,6 +54,7 @@
 ┃  • \`!randomsong\` → Play a random song
 ┃  • \`!play\` → !play <song name/link>
 ┃  • \`!video\` → !video <name/link>
+┃  • \`!weather\` → !weather <city>
 ┃  • \`!ai <prompt>\` → Chat with Gemini AI
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 ┃┊ ┊*[ 𝔒𝔚ℕ𝔈ℝ ]*┊ ┊
