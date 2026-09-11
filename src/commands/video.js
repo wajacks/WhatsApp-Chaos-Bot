@@ -49,8 +49,10 @@ async function handleVideoCommand(message) {
             `2️⃣ *480p* (Balanced quality)\n` +
             `3️⃣ *720p* (High Quality)\n` +
             `4️⃣ *1080p* (Full HD - Usually sent as Document)\n` +
-            `5️⃣ *Audio Only* (MP3 / Voice Note Options)\n\n` +
-            `_Reply with 1, 2, 3, 4, or 5_`;
+            `5️⃣ *Audio Only* (MP3 / Voice Note Options)\n` +
+            `\t\t‧₊˚🖇️✩ ₊˚🎧⊹♡\n` +
+            `_Reply with 1, 2, 3, 4, or 5_\n\n` +
+            `\`wantam\`\t\t` + `👆😅`;
 
         await message.reply(promptText);
 
@@ -128,8 +130,10 @@ async function handleVideoQualityReply(message) {
             `🎵 *Select Audio Quality*\n\n` +
             `1️⃣ *High Quality* (320 kbps)\n` +
             `2️⃣ *Medium Quality* (192 kbps)\n` +
-            `3️⃣ *Low / Fast* (128 kbps)\n\n` +
-            `_Reply with 1, 2, or 3_`;
+            `3️⃣ *Low / Fast* (128 kbps)\n` +
+            `\t\t‧₊˚🖇️✩ ₊˚🎧⊹♡\n` +
+            `_Reply with 1, 2, or 3_\n\n` + 
+            `\`wantam\`\t\t` + `👆😅`;
 
         await message.reply(qualityPrompt);
         return true;
@@ -203,8 +207,10 @@ async function handleVideoQualityReply(message) {
         const formatPrompt = 
             `🎙️ *Select Audio Output Format*\n\n` +
             `1️⃣ *Voice Note* (Playable waveform message)\n` +
-            `2️⃣ *MP3 Document* (Downloadable music file)\n\n` +
-            `_Reply with 1 or 2_`;
+            `2️⃣ *MP3 Audio* (Downloadable music file)\n` +
+            `\t\t‧₊˚🖇️✩ ₊˚🎧⊹♡\n` +
+            `_Reply with 1 or 2_\n\n` +
+            `\`wantam\`\t\t` + `👆😅`;
 
         await message.reply(formatPrompt);
         return true;
@@ -247,7 +253,13 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
     let ytDlpCmd = '';
 
     if (chosenOption.audioOnly) {
-        ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" -x --audio-format mp3 --audio-quality ${chosenOption.bitrate} --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+        if (chosenOption.isVoiceNote) {
+            // Converts to native OGG/Opus with mono audio at 48kHz for iOS & Android voice note compatibility
+            ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" -x --audio-format opus --postprocessor-args "ffmpeg:-ac 1 -ar 48000" --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+        } else {
+            // Standard MP3 for downloadable music files
+            ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" -x --audio-format mp3 --audio-quality ${chosenOption.bitrate} --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+        }
     } else {
         const height = chosenOption.height;
         const formatRule = `bv*[height<=${height}][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=${height}]+ba/b[height<=${height}]/b`;
