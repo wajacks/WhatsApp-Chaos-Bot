@@ -247,23 +247,24 @@ async function handleVideoQualityReply(message) {
  * Executes yt-dlp download and handles file delivery
  */
 function processMediaInBackground(message, targetQuery, chosenOption, cookiesPath, requestDir) {
-    const outputTemplate = path.join(requestDir, '%(id)s.%(ext)s');
+    // Replaces raw ID with sanitized title (e.g., "Shape of You.m4a" instead of "-s9pasG8mPQ.m4a")
+    const outputTemplate = path.join(requestDir, '%(title)s.%(ext)s');
     const safeQuery = targetQuery.replace(/'/g, "'\\''");
 
     let ytDlpCmd = '';
 
     if (chosenOption.audioOnly) {
         if (chosenOption.isVoiceNote) {
-            // Converts to native OGG/Opus with mono audio at 48kHz for iOS & Android voice note compatibility
-            ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" -x --audio-format opus --postprocessor-args "ffmpeg:-ac 1 -ar 48000" --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+            // Replicates play.js structure with --restrict-filenames for clean song titles[cite: 1]
+            ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --restrict-filenames -f "ba[ext=m4a]/ba" --extract-audio --audio-format m4a --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
         } else {
-            // Standard MP3 for downloadable music files
-            ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" -x --audio-format mp3 --audio-quality ${chosenOption.bitrate} --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+            // Standard MP3 format with clean song title
+            ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --restrict-filenames -x --audio-format mp3 --audio-quality ${chosenOption.bitrate} --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
         }
     } else {
         const height = chosenOption.height;
         const formatRule = `bv*[height<=${height}][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=${height}]+ba/b[height<=${height}]/b`;
-        ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" -f "${formatRule}" --merge-output-format mp4 --postprocessor-args "ffmpeg:-c:v libx264 -c:a aac -b:a 128k" --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+        ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --restrict-filenames -f "${formatRule}" --merge-output-format mp4 --postprocessor-args "ffmpeg:-c:v libx264 -c:a aac -b:a 128k" --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
     }
 
     exec(ytDlpCmd, { maxBuffer: 50 * 1024 * 1024 }, async (error) => {
@@ -273,7 +274,6 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
             if (error) {
                 console.error('ytdlp execution error:', error.message);
                 await message.reply('❌ Failed to download the requested media.');
-                cleanupFilePath(requestDir);
                 return;
             }
 
@@ -282,7 +282,6 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
 
             if (validFiles.length === 0) {
                 await message.reply('❌ Media downloaded, but the output file could not be found.');
-                cleanupFilePath(requestDir);
                 return;
             }
 
@@ -342,7 +341,6 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
             console.error('Error processing or sending media:', err);
             await message.reply('❌ Media downloaded, but failed to send it over WhatsApp.');
         } finally {
-            // Guaranteed folder deletion whether send succeeded or failed
             cleanupFilePath(downloadedFilePath || requestDir);
         }
     });
