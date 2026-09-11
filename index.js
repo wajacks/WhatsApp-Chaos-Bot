@@ -93,8 +93,8 @@ function buildWeatherResponse(weatherData, userName) {
         `🌅 *Sunrise:* ${formatTime(weatherData.sunrise)}\n` +
         `🌇 *Sunset:* ${formatTime(weatherData.sunset)}\n` +
         `━━━━━━━━━━━━━━━━━━\n` +
-        `👤 *${userName}* • *ONLINE🟢*`+
-        `\`wajacks\``;
+        `👤 *${userName}* • *ONLINE🟢*\n`+
+        `\`wantam\``;
 }
 
 const {
