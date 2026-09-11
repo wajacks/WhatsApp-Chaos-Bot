@@ -247,7 +247,6 @@ async function handleVideoQualityReply(message) {
  * Executes yt-dlp download and handles file delivery
  */
 function processMediaInBackground(message, targetQuery, chosenOption, cookiesPath, requestDir) {
-    // Replaces raw ID with clean song title (e.g. "Shape of You.m4a")
     const outputTemplate = path.join(requestDir, '%(title)s.%(ext)s');
     const safeQuery = targetQuery.replace(/'/g, "'\\''");
 
@@ -255,10 +254,8 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
 
     if (chosenOption.audioOnly) {
         if (chosenOption.isVoiceNote) {
-            // Uses FFmpeg to extract clean AAC/M4A audio natively (matches play.js)
             ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --restrict-filenames -x --audio-format m4a --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
         } else {
-            // Standard MP3 for downloadable music document files
             ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --restrict-filenames -x --audio-format mp3 --audio-quality ${chosenOption.bitrate} --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
         }
     } else {
@@ -269,6 +266,7 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
 
     exec(ytDlpCmd, { maxBuffer: 50 * 1024 * 1024 }, async (error) => {
         let downloadedFilePath = null;
+        let isOversizedPending = false; // Flag to prevent early cleanup
 
         try {
             if (error) {
@@ -291,8 +289,10 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
             const chatId = message.from;
 
             // Handle oversized files (> 60 MB) for video requests
-            if (fileSizeInMB > 60 && !chosenOption.audioOnly) {
+            if (fileSizeInMB > 63 && !chosenOption.audioOnly) {
                 console.log(`[OVERSIZE] Video file size is ${fileSizeInMB.toFixed(2)} MB. Prompting user.`);
+                
+                isOversizedPending = true; // Mark true so finally block bypasses deletion
 
                 const timeoutId = setTimeout(() => {
                     if (pendingOversizeApprovals.has(chatId)) {
@@ -325,18 +325,14 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
 
             if (chosenOption.audioOnly) {
                 if (chosenOption.isVoiceNote) {
-                    // Option 1: Native M4A audio message (matches your working play.js)
                     await message.client.sendMessage(message.from, media);
                 } else {
-                    // Option 2: Standard playable MP3 document with explicit MIME type for iOS
                     const mp3Media = new MessageMedia(
-                        'audio/mp3', 
+                        'audio/mpeg', 
                         fs.readFileSync(downloadedFilePath).toString('base64'), 
                         path.basename(downloadedFilePath)
                     );
-                    await message.client.sendMessage(message.from, mp3Media, {
-                        sendMediaAsDocument: true
-                    });
+                    await message.client.sendMessage(message.from, mp3Media);
                 }
             } else {
                 await message.client.sendMessage(message.from, media);
@@ -346,7 +342,10 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
             console.error('Error processing or sending media:', err);
             await message.reply('❌ Media downloaded, but failed to send it over WhatsApp.');
         } finally {
-            cleanupFilePath(downloadedFilePath || requestDir);
+            // Delete folder ONLY if not waiting for an oversize Y/N response
+            if (!isOversizedPending) {
+                cleanupFilePath(downloadedFilePath || requestDir);
+            }
         }
     });
 }
