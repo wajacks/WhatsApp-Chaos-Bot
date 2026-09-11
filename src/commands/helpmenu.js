@@ -12,6 +12,12 @@
 ┃  • \`!beg\` → Ask for street handouts
 ┃  • \`!pay <amt>\` → Reply to \`!beg\` to fund a player
 ╣━━━━━━◉○◉◉○◉○◉○◉○◉○◉━━━━━━╣
+┃╰┈➤*[ 𝔄ℑ & 𝔐𝔘𝔏𝔗ℑ𝔐𝔒𝔇𝔄𝔏 ℭ𝔒ℝ𝔈 ]*
+┃  • \`!ai <prompt>\` → Chat with Gemini AI
+┃  • \`!draw <prompt>\` → Generate AI images
+┃  • \`!analyze\` → Reply to an image to analyze it
+┃  • \`!speak <text>\` → Convert text to Voice Note
+╣━━━━━━◉○◉◉○◉○◉○◉○◉○◉━━━━━━╣
 ┃╰┈➤*[ 𝔚𝔒ℝ𝔇𝔏𝔈 𝔊𝔄𝔐𝔈 ]*
 ┃  • \`!wordle\` → Start Wordle lobby (80s join time)
 ┃  • \`!join\` → Join active Wordle game
@@ -20,7 +26,7 @@
 ┃  💰 Rewards: Up to 40 coins × attempts left
 ┃  ⚡ XP: Up to 25 XP × attempts left
 ┃  💡 1 letter revealed at round start
-╣━━━━━━◉○◉◉○◉○◉○◉○◉○◉━━━━━━╣
+╣━━━━━━◉○◉◉○◉○◉○◉○◉◉━━━━━━╣
 ┃╰┈➤*[ ℝ𝔈𝔅𝔘𝔖 ℭ𝔒𝔘ℕ𝔗ℝ𝔜 𝔊𝔄𝔐𝔈 ]*
 ┃  • \`!rebus\` → Start Rebus lobby
 ┃  • \`!joinrebus\` → Join active Rebus game
@@ -52,10 +58,8 @@
 ┃  • \`!ping\` → Check bot latency
 ┃  • \`!menu\` → Display this control panel
 ┃  • \`!randomsong\` → Play a random song
-┃  • \`!play\` → !play <song name/link>
-┃  • \`!video\` → !video <name/link>
-┃  • \`!weather\` → !weather <city>
-┃  • \`!ai <prompt>\` → Chat with Gemini AI
+┃  • \`!video <query/link>\` → Download video or audio
+┃  • \`!weather <city>\` → Live weather report
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 ┃┊ ┊*[ 𝔒𝔚ℕ𝔈ℝ ]*┊ ┊
 ┃  ┌───────────────────────
