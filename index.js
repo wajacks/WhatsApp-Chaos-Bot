@@ -1064,6 +1064,29 @@ client.on(
             }
 
             // ====================================================
+            // WEATHER COMMAND
+            // ====================================================
+            if (lowerText.startsWith('!weather')) {
+                const city = text.split(' ')[1]?.trim(); // Extract city name
+                if (!city) {
+                    await message.reply("Please specify a city, e.g., `!weather Nairobi`.");
+                    return;
+                }
+
+                try {
+            const weatherData = await getWeather({ city });
+
+            if (weatherData.error) {
+                await message.reply(weatherData.error);
+            } else {
+                const response = `🌤️ *Weather in ${weatherData.city}, ${weatherData.country}:*\n` +
+                    `🌡️ Temperature: ${weatherData.temp}°C (Feels like ${weatherData.feelsLike}°C)\n` +
+                    `🌥️ Condition: ${weatherData.condition}\n` +
+                    `💧 Humidity: ${weatherData.humidity}%`;
+                await message.reply(response);
+            }
+
+            // ====================================================
             // RESET
             // ====================================================
 
