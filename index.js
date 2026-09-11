@@ -623,81 +623,58 @@ client.on(
 
                 if (prompt.toLowerCase().includes('weather')) {
 
-                    const city = prompt.split('weather')[1]?.replace(/^in\s+/i, '').trim();
-
-                    // Extract city name
-
+                    const city =
+                        prompt.toLowerCase()
+                            .split('weather')[1]
+                            ?.replace(/^in\s+/i, '')
+                            .trim();
+                
                     if (!city) {
-
+                
                         await message.reply(
                             "Please specify a city, e.g., 'What's the weather in Nairobi?'"
                         );
-
+                
                         return;
                     }
-
-                    const weatherData = await getWeather({ city });
-
+                
+                    const weatherData =
+                        await getWeather({ city });
+                
                     if (weatherData.error) {
-
-                        await message.reply(weatherData.error);
-
+                
+                        await message.reply(
+                            weatherData.error
+                        );
+                
                     } else {
-
-                        const visibilityKm =
-                            weatherData.visibility
-                                ? (weatherData.visibility / 1000).toFixed(1)
-                                : 'N/A';
-
-                        const windDirection =
-                            weatherData.windDirection !== undefined
-                                ? `${weatherData.windDirection}°`
-                                : 'N/A';
-
-                        const windGust =
-                            weatherData.windGust !== undefined
-                                ? `${weatherData.windGust} m/s`
-                                : 'N/A';
-
+                
+                        const contact =
+                            await message.getContact();
+                
+                        const senderName =
+                            contact.pushname ||
+                            contact.name ||
+                            'User';
+                
                         const response =
-                            `🌦️ *CHAOS WEATHER SYSTEM*\n` +
+                            `🌤️ *CHAOS WEATHER SYSTEM*\n` +
                             `━━━━━━━━━━━━━━━━━━\n\n` +
-
+                
                             `📍 *${weatherData.city}, ${weatherData.country}*\n\n` +
-
+                
                             `🌡️ Temperature: *${weatherData.temp}°C*\n` +
                             `🥵 Feels like: *${weatherData.feelsLike}°C*\n` +
-                            `⬆️ High: *${weatherData.tempMax}°C*\n` +
-                            `⬇️ Low: *${weatherData.tempMin}°C*\n\n` +
-
                             `☁️ Conditions: *${weatherData.condition}*\n` +
-                            `💧 Humidity: *${weatherData.humidity}%*\n` +
-                            `🌥️ Cloudiness: *${weatherData.clouds}%*\n` +
-                            `👁️ Visibility: *${visibilityKm} km*\n\n` +
-
-                            `💨 Wind: *${weatherData.windSpeed} m/s*\n` +
-                            `🧭 Direction: *${windDirection}*\n` +
-                            `💨 Gusts: *${windGust}*\n\n` +
-
-                            `🔵 Pressure: *${weatherData.pressure} hPa*\n\n` +
-
-                            `🌅 Sunrise: *${new Date(weatherData.sunrise * 1000).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                            })}*\n` +
-
-                            `🌇 Sunset: *${new Date(weatherData.sunset * 1000).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                            })}*\n\n` +
-
+                            `💧 Humidity: *${weatherData.humidity}%*\n\n` +
+                
                             `━━━━━━━━━━━━━━━━━━\n` +
-                            `@${senderId.split('@')[0]} • *ONLINE*\n` +
+                            `👤 *${senderName}* • *ONLINE*\n` +
                             `\`wantam\``;
-
+                
                         await message.reply(response);
                     }
-
+                
                     return;
                 }
 
