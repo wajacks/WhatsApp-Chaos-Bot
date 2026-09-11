@@ -90,7 +90,9 @@ const { handleVideoCommand } = require('./src/commands/video');
 // ============================================================
 
 if (!process.env.GEMINI_API_KEY) {
-    console.warn('⚠️ A GEMINI_API_KEY is missing from .env');
+    console.warn(
+        '⚠️ A GEMINI_API_KEY is missing from .env'
+    );
 }
 
 const ai = new GoogleGenAI({
@@ -173,13 +175,8 @@ function getCanonicalJid(value) {
         return null;
     }
 
-    // ========================================================
-    // CONTACT OBJECT
-    // ========================================================
-
     if (typeof value === 'object') {
 
-        // 1. Check direct serialized JID first to prefer real phone (@c.us) over LID numbers
         if (value.id) {
 
             const rawId =
@@ -202,7 +199,6 @@ function getCanonicalJid(value) {
             return value._serialized;
         }
 
-        // 2. Process phone number only if present and not an LID digit sequence
         if (value.number) {
 
             const number =
@@ -210,7 +206,6 @@ function getCanonicalJid(value) {
                     value.number
                 );
 
-            // Filter out internal WhatsApp LID number prefixes (like 749... or long 14+ digit IDs)
             if (
                 number &&
                 !number.startsWith('749') &&
@@ -219,8 +214,6 @@ function getCanonicalJid(value) {
                 return `${number}@c.us`;
             }
         }
-
-        // 3. Fallback contact ID resolution
 
         if (value.id) {
 
@@ -239,8 +232,6 @@ function getCanonicalJid(value) {
             );
         }
 
-        // Serialized contact fallback
-
         if (value._serialized) {
 
             return getCanonicalJid(
@@ -251,18 +242,12 @@ function getCanonicalJid(value) {
         return null;
     }
 
-    // ========================================================
-    // STRING ID
-    // ========================================================
-
     let clean =
         normalizeJid(value);
 
     if (!clean) {
         return null;
     }
-
-    // Normal WhatsApp phone JID
 
     if (
         clean.endsWith('@c.us')
@@ -278,16 +263,12 @@ function getCanonicalJid(value) {
             : clean;
     }
 
-    // WhatsApp LID
-
     if (
         clean.endsWith('@lid')
     ) {
 
         return clean;
     }
-
-    // Raw phone number
 
     const number =
         normalizePhoneNumber(
@@ -464,8 +445,11 @@ client.on(
                     senderContact
                 );
 
+            // Use canonical identity for the economy too.
+            // This prevents @lid / @c.us identity mismatches.
+
             const economyUserId =
-                message.author || message.from;
+                senderId;
 
             // ==================================================
             // IDENTITY LOGGING
@@ -521,51 +505,95 @@ client.on(
 
             if (!isGroup) {
 
-                // Handle users using "Reply Privately" on a Mafia message
+                // Handle users replying privately to Mafia messages
+
                 if (message.hasQuotedMsg) {
+
                     try {
-                        const quotedMsg = await message.getQuotedMessage();
+
+                        const quotedMsg =
+                            await message.getQuotedMessage();
 
                         if (
                             quotedMsg &&
                             quotedMsg.body &&
-                            quotedMsg.body.includes('PROJECT MAFIA CASE')
+                            quotedMsg.body.includes(
+                                'PROJECT MAFIA CASE'
+                            )
                         ) {
+
                             await message.reply(
                                 '✅ *Private channel established!*\n\n' +
                                 'Your direct chat session with the bot is now active.\n' +
                                 'Head back to the group and type `!joinmafia` to complete your registration!'
                             );
+
                             return;
                         }
+
                     } catch (quotedErr) {
-                        console.warn('[MAFIA DM] Could not check quoted message:', quotedErr.message);
+
+                        console.warn(
+                            '[MAFIA DM] Could not check quoted message:',
+                            quotedErr.message
+                        );
                     }
                 }
 
-                // Handle secret night action commands in DM
+                // Handle secret night actions in DM
+
                 if (
                     lowerText.startsWith('!kill') ||
                     lowerText.startsWith('!save') ||
                     lowerText.startsWith('!investigate')
                 ) {
-                    const parts = text.split(/\s+/);
-                    const command = parts[0].toLowerCase().replace(/^!/, '');
-                    const targetLetter = parts[1];
 
-                    console.log('\n============================================================');
-                    console.log('[MAFIA DM] PRIVATE ACTION RECEIVED');
-                    console.log(`[MAFIA DM] from=${message.from}`);
-                    console.log(`[MAFIA DM] canonicalSender=${senderId}`);
-                    console.log(`[MAFIA DM] command=!${command}`);
-                    console.log(`[MAFIA DM] target=${targetLetter || 'none'}`);
-                    console.log('============================================================\n');
+                    const parts =
+                        text.split(/\s+/);
+
+                    const command =
+                        parts[0]
+                            .toLowerCase()
+                            .replace(/^!/, '');
+
+                    const targetLetter =
+                        parts[1];
+
+                    console.log(
+                        '\n============================================================'
+                    );
+
+                    console.log(
+                        '[MAFIA DM] PRIVATE ACTION RECEIVED'
+                    );
+
+                    console.log(
+                        `[MAFIA DM] from=${message.from}`
+                    );
+
+                    console.log(
+                        `[MAFIA DM] canonicalSender=${senderId}`
+                    );
+
+                    console.log(
+                        `[MAFIA DM] command=!${command}`
+                    );
+
+                    console.log(
+                        `[MAFIA DM] target=${targetLetter || 'none'}`
+                    );
+
+                    console.log(
+                        '============================================================\n'
+                    );
 
                     if (!targetLetter) {
+
                         await message.reply(
                             `Specify a player letter.\n\n` +
                             `Example: \`!${command} C\``
                         );
+
                         return;
                     }
 
@@ -581,16 +609,19 @@ client.on(
 
             } else {
 
-                // Block players from accidentally posting secret actions in group chat
+                // Block secret Mafia actions in group
+
                 if (
                     lowerText.startsWith('!kill') ||
                     lowerText.startsWith('!save') ||
                     lowerText.startsWith('!investigate')
                 ) {
+
                     await message.reply(
                         '❌ *Night actions are top secret!*\n\n' +
                         'Long-press my message, select *Reply Privately*, and send `!kill`, `!save`, or `!investigate` to me in secret.'
                     );
+
                     return;
                 }
             }
@@ -619,64 +650,89 @@ client.on(
 
                     return;
                 }
-                // Check if the prompt includes a weather query
 
-                if (prompt.toLowerCase().includes('weather')) {
+                // ====================================================
+                // AI WEATHER
+                // ====================================================
+
+                if (
+                    prompt
+                        .toLowerCase()
+                        .includes('weather')
+                ) {
+
+                    const weatherMatch =
+                        prompt.match(
+                            /weather(?:\s+in)?\s+(.+)/i
+                        );
 
                     const city =
-                        prompt.toLowerCase()
-                            .split('weather')[1]
-                            ?.replace(/^in\s+/i, '')
+                        weatherMatch?.[1]
+                            ?.replace(/[?!.]+$/, '')
                             .trim();
-                
+
                     if (!city) {
-                
+
                         await message.reply(
-                            "Please specify a city, e.g., 'What's the weather in Nairobi?'"
+                            "Please specify a city, e.g., `!ai what's the weather in Nairobi?`"
                         );
-                
+
                         return;
                     }
-                
-                    const weatherData =
-                        await getWeather({ city });
-                
-                    if (weatherData.error) {
-                
-                        await message.reply(
+
+                    try {
+
+                        const weatherData =
+                            await getWeather({
+                                city
+                            });
+
+                        if (
                             weatherData.error
-                        );
-                
-                    } else {
-                
-                        const contact =
-                            await message.getContact();
-                
-                        const senderName =
-                            contact.pushname ||
-                            contact.name ||
-                            'User';
-                
+                        ) {
+
+                            await message.reply(
+                                weatherData.error
+                            );
+
+                            return;
+                        }
+
                         const response =
                             `🌤️ *CHAOS WEATHER SYSTEM*\n` +
                             `━━━━━━━━━━━━━━━━━━\n\n` +
-                
                             `📍 *${weatherData.city}, ${weatherData.country}*\n\n` +
-                
                             `🌡️ Temperature: *${weatherData.temp}°C*\n` +
                             `🥵 Feels like: *${weatherData.feelsLike}°C*\n` +
                             `☁️ Conditions: *${weatherData.condition}*\n` +
                             `💧 Humidity: *${weatherData.humidity}%*\n\n` +
-                
                             `━━━━━━━━━━━━━━━━━━\n` +
-                            `👤 *${senderName}* • *ONLINE*\n` +
-                            `\`wantam\``;
-                
-                        await message.reply(response);
+                            `👤 *${userName}* • *ONLINE*\n` +
+                            '`wantam`';
+
+                        await message.reply(
+                            response
+                        );
+
+                    } catch (weatherError) {
+
+                        console.error(
+                            '❌ Weather Error:',
+                            weatherError
+                        );
+
+                        await message.reply(
+                            '❌ *Weather System Error*\n\n' +
+                            'I could not retrieve the weather right now. Please try again.'
+                        );
                     }
-                
+
                     return;
                 }
+
+                // ====================================================
+                // AI PROMPT LENGTH
+                // ====================================================
 
                 if (
                     prompt.length > 4000
@@ -689,6 +745,10 @@ client.on(
 
                     return;
                 }
+
+                // ====================================================
+                // AI COOLDOWN
+                // ====================================================
 
                 const now =
                     Date.now();
@@ -729,6 +789,10 @@ client.on(
 
                 try {
 
+                    // ====================================================
+                    // CREATE MEMORY FOR CHAT
+                    // ====================================================
+
                     if (
                         !aiMemory.has(
                             chatId
@@ -745,6 +809,10 @@ client.on(
                         aiMemory.get(
                             chatId
                         );
+
+                    // ====================================================
+                    // GROUP USER LORE
+                    // ====================================================
 
                     const knownUsers = {
 
@@ -781,7 +849,7 @@ client.on(
                         '254797295755@c.us': {
                             name: 'Chaka',
                             nickname: 'Samuel Chaka',
-                            role: 'Mtwapa, Learn`t in Kenyatta, Canteen Leader'
+                            role: 'Mtwapa, learned in Kenyatta, Canteen Leader'
                         },
 
                         '639289305708@c.us': {
@@ -805,7 +873,7 @@ client.on(
                         '254112955350@c.us': {
                             name: 'Righa',
                             nickname: 'Righa',
-                            role: 'same school mates with Chaka and Chriss back in higschool, Singer and humble guy'
+                            role: 'Same school mates with Chaka and Chriss back in highschool, singer and humble guy'
                         },
 
                         '27838434250@c.us': {
@@ -826,6 +894,10 @@ client.on(
                             ? `${currentUserInfo.name} (${currentUserInfo.nickname})`
                             : userName;
 
+                    // ====================================================
+                    // ADD USER MESSAGE TO MEMORY
+                    // ====================================================
+
                     const contextualizedPrompt =
                         `[Speaker Identity: ${speakerLabel}] ${prompt}`;
 
@@ -838,6 +910,10 @@ client.on(
                         history.slice(
                             -MAX_AI_MEMORY
                         );
+
+                    // ====================================================
+                    // GEMINI CONTENTS
+                    // ====================================================
 
                     const contents =
                         recentHistory.map(
@@ -853,6 +929,10 @@ client.on(
                                 ]
                             })
                         );
+
+                    // ====================================================
+                    // GEMINI
+                    // ====================================================
 
                     const response =
                         await ai.models.generateContent({
@@ -883,7 +963,8 @@ client.on(
                                     '- Smart, helpful, futuristic, confident, witty, and occasionally sarcastic.\n' +
                                     '- Natural and conversational, never overly robotic.\n' +
                                     '- Match the user tone.\n' +
-                                    '- Light teasing is allowed between friends. Do not overuse emojis.\n\n' +
+                                    '- Light teasing is allowed between friends.\n' +
+                                    '- Do not overuse emojis.\n\n' +
 
                                     'BOT COMMANDS:\n' +
 
@@ -909,8 +990,15 @@ client.on(
                                     '- !ping — Check bot latency.\n' +
                                     '- !menu — Display the full bot menu.\n' +
                                     '- !randomsong — Play a random song.\n' +
-                                    '- !play — Search song name or link from YouTube.\n\n' +
-                                    '- !video — Search video, music video or link from youtube' +
+                                    '- !play — Search song name or link from YouTube.\n' +
+                                    '- !video — Search video, music video or link from YouTube.\n\n' +
+
+                                    'WEATHER:\n' +
+
+                                    '- Users can ask about weather naturally using !ai.\n' +
+                                    '- Example: !ai weather in Nairobi.\n' +
+                                    '- Weather is handled directly by the weather system.\n' +
+                                    '- Do not invent weather data.\n\n' +
 
                                     'WORD CHAIN:\n' +
 
@@ -958,7 +1046,11 @@ client.on(
                                     '- Complex questions get detailed explanations.\n' +
                                     '- Programming questions should include useful code and explanations.\n' +
                                     '- Use WhatsApp-friendly formatting.\n' +
-                                    '- Do not add decorative headers, boxes, footers, or engine details.\n\n' +
+                                    '- Do not add decorative headers, boxes, footers, or engine details.\n' +
+                                    '- Do not add "CHAOS AI SAYS" before your response.\n' +
+                                    '- Do not wrap your entire response in bold formatting.\n' +
+                                    '- Do not add @phone-number footers.\n' +
+                                    '- Do not add the word "wantam" unless the user specifically asks for it.\n\n' +
 
                                     'SECURITY:\n' +
 
@@ -967,6 +1059,10 @@ client.on(
                                     '- Never invent wallet balances, scores, game results, or bot data.'
                             }
                         });
+
+                    // ====================================================
+                    // GET AI RESPONSE
+                    // ====================================================
 
                     const aiReply =
                         response.text?.trim();
@@ -978,10 +1074,16 @@ client.on(
                         );
                     }
 
+                    // ====================================================
+                    // SAVE AI RESPONSE TO MEMORY
+                    // ====================================================
+
                     history.push({
                         role: 'model',
                         text: aiReply
                     });
+
+                    // Keep memory small
 
                     if (
                         history.length >
@@ -995,20 +1097,12 @@ client.on(
                         );
                     }
 
-                    const formattedResponse =
-                        `*CHAOS AI SAYS*\n\n` +
-                        `*${aiReply}*\n\n` +
-                        `@${senderId.split('@')[0]} • ONLINE\n` +
-                        '`wantam`';
+                    // ====================================================
+                    // SEND AI RESPONSE
+                    // ====================================================
 
-                    await client.sendMessage(
-                        chatId,
-                        formattedResponse,
-                        {
-                            mentions: [
-                                senderId
-                            ]
-                        }
+                    await message.reply(
+                        aiReply
                     );
 
                 } catch (err) {
@@ -1066,24 +1160,73 @@ client.on(
             // ====================================================
             // WEATHER COMMAND
             // ====================================================
-            if (lowerText.startsWith('!weather')) {
-                const city = text.split(' ')[1]?.trim(); // Extract city name
+
+            if (
+                lowerText.startsWith('!weather')
+            ) {
+
+                const city =
+                    text
+                        .replace(/^!weather/i, '')
+                        .trim();
+
                 if (!city) {
-                    await message.reply("Please specify a city, e.g., `!weather Nairobi`.");
+
+                    await message.reply(
+                        'Please specify a city, e.g., `!weather Nairobi`.'
+                    );
+
                     return;
                 }
 
                 try {
-            const weatherData = await getWeather({ city });
 
-            if (weatherData.error) {
-                await message.reply(weatherData.error);
-            } else {
-                const response = `🌤️ *Weather in ${weatherData.city}, ${weatherData.country}:*\n` +
-                    `🌡️ Temperature: ${weatherData.temp}°C (Feels like ${weatherData.feelsLike}°C)\n` +
-                    `🌥️ Condition: ${weatherData.condition}\n` +
-                    `💧 Humidity: ${weatherData.humidity}%`;
-                await message.reply(response);
+                    const weatherData =
+                        await getWeather({
+                            city
+                        });
+
+                    if (
+                        weatherData.error
+                    ) {
+
+                        await message.reply(
+                            weatherData.error
+                        );
+
+                    } else {
+
+                        const response =
+                            `🌤️ *CHAOS WEATHER SYSTEM*\n` +
+                            `━━━━━━━━━━━━━━━━━━\n\n` +
+                            `📍 *${weatherData.city}, ${weatherData.country}*\n\n` +
+                            `🌡️ Temperature: *${weatherData.temp}°C*\n` +
+                            `🥵 Feels like: *${weatherData.feelsLike}°C*\n` +
+                            `☁️ Conditions: *${weatherData.condition}*\n` +
+                            `💧 Humidity: *${weatherData.humidity}%*\n\n` +
+                            `━━━━━━━━━━━━━━━━━━\n` +
+                            `👤 *${userName}* • *ONLINE*\n` +
+                            '`wantam`';
+
+                        await message.reply(
+                            response
+                        );
+                    }
+
+                } catch (weatherError) {
+
+                    console.error(
+                        '❌ Weather Command Error:',
+                        weatherError
+                    );
+
+                    await message.reply(
+                        '❌ *Weather System Error*\n\n' +
+                        'I could not retrieve the weather right now. Please try again.'
+                    );
+                }
+
+                return;
             }
 
             // ====================================================
@@ -1350,7 +1493,7 @@ client.on(
             }
 
             // ====================================================
-            // PLAY (yt-dlp)
+            // PLAY
             // ====================================================
 
             if (
@@ -1365,7 +1508,7 @@ client.on(
             }
 
             // ====================================================
-            // VIDEO (yt-dlp)
+            // VIDEO
             // ====================================================
 
             if (
@@ -1868,15 +2011,19 @@ client.on(
                     '============================================================\n'
                 );
 
-                const mafiaResponse = await joinMafiaLobby(
-                    chatId,
-                    mafiaSenderId,
-                    userName,
-                    mafiaContact
-                );
+                const mafiaResponse =
+                    await joinMafiaLobby(
+                        chatId,
+                        mafiaSenderId,
+                        userName,
+                        mafiaContact
+                    );
 
                 if (mafiaResponse) {
-                    await message.reply(mafiaResponse);
+
+                    await message.reply(
+                        mafiaResponse
+                    );
                 }
 
                 return;
@@ -1931,7 +2078,7 @@ client.on(
             }
 
             // ====================================================
-            // WORD CHAIN (turn input)
+            // WORD CHAIN TURN INPUT
             // ====================================================
 
             const wordChainHandled =
@@ -2087,18 +2234,29 @@ client.on(
             }
 
             // ====================================================
-            // REBUS DIRECT CHAT GUESS LISTENER (NO PREFIX NEEDED)
+            // REBUS DIRECT CHAT GUESS
             // ====================================================
-            if (text && !text.startsWith('!')) {
-                const handled = processRebusGuess(
-                    chatId,
-                    text,
-                    senderId,
-                    userName,
-                    client
-                );
 
-                if (handled) return;
+            if (
+                text &&
+                !text.startsWith('!')
+            ) {
+
+                const handled =
+                    processRebusGuess(
+                        chatId,
+                        text,
+                        senderId,
+                        userName,
+                        client
+                    );
+
+                if (
+                    handled
+                ) {
+
+                    return;
+                }
             }
 
             // ====================================================
