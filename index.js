@@ -623,7 +623,7 @@ client.on(
 
                 if (prompt.toLowerCase().includes('weather')) {
 
-                    const city = prompt.split('weather')[1]?.trim();
+                    const city = prompt.split('weather')[1]?.replace(/^in\s+/i, '').trim();
 
                     // Extract city name
 
