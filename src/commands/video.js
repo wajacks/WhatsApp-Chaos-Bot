@@ -247,7 +247,7 @@ async function handleVideoQualityReply(message) {
  * Executes yt-dlp download and handles file delivery
  */
 function processMediaInBackground(message, targetQuery, chosenOption, cookiesPath, requestDir) {
-    // Replaces raw ID with sanitized title (e.g., "Shape of You.m4a" instead of "-s9pasG8mPQ.m4a")
+    // Replaces raw ID with clean song title (e.g. "Shape of You.m4a")
     const outputTemplate = path.join(requestDir, '%(title)s.%(ext)s');
     const safeQuery = targetQuery.replace(/'/g, "'\\''");
 
@@ -255,10 +255,10 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
 
     if (chosenOption.audioOnly) {
         if (chosenOption.isVoiceNote) {
-            // Replicates play.js structure with --restrict-filenames for clean song titles[cite: 1]
-            ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --restrict-filenames -f "ba[ext=m4a]/ba" --extract-audio --audio-format m4a --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+            // Uses FFmpeg to extract clean AAC/M4A audio natively (matches play.js)
+            ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --restrict-filenames -x --audio-format m4a --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
         } else {
-            // Standard MP3 format with clean song title
+            // Standard MP3 for downloadable music document files
             ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --restrict-filenames -x --audio-format mp3 --audio-quality ${chosenOption.bitrate} --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
         }
     } else {
@@ -325,9 +325,8 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
 
             if (chosenOption.audioOnly) {
                 if (chosenOption.isVoiceNote) {
-                    await message.client.sendMessage(message.from, media, {
-                        sendAudioAsVoice: true
-                    });
+                    // Sends directly as an audio track (matches line 52 of play.js for perfect iPhone playback)
+                    await message.client.sendMessage(message.from, media);
                 } else {
                     await message.client.sendMessage(message.from, media, {
                         sendMediaAsDocument: true
