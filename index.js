@@ -672,9 +672,8 @@ client.on('message', async message => {
         ) {
             try {
                 const media = MessageMedia.fromFilePath(path.join(__dirname, 'src/assets/menu.gif'));
-                await client.sendMessage(chatId, media, { caption: getBotMenu() });
 
-                // Enable gifPlayback: true to force animated looping in WhatsApp
+                // Single call with gifPlayback enabled
                 await client.sendMessage(chatId, media, { 
                     caption: getBotMenu(),
                     gifPlayback: true 
