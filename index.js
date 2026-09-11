@@ -199,6 +199,35 @@ function getCanonicalJid(value) {
             return value._serialized;
         }
 
+        // ============================================================
+// WEATHER RESPONSE BUILDER
+// ============================================================
+
+function buildWeatherResponse(weatherData, userName) {
+    const formatTime = (isoStr) => {
+        if (!isoStr) return 'N/A';
+        return new Date(isoStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+
+    return `🌤️ *CHAOS WEATHER SYSTEM*\n` +
+        `━━━━━━━━━━━━━━━━━━\n\n` +
+        `📍 *Location:* ${weatherData.city}, ${weatherData.country}\n` +
+        `🌐 *Coords:* ${weatherData.latitude}, ${weatherData.longitude}\n\n` +
+        `🌡️ *Temp:* ${weatherData.temp}°C (Feels like ${weatherData.feelsLike}°C)\n` +
+        `📊 *Min/Max:* ${weatherData.tempMin}°C / ${weatherData.tempMax}°C\n` +
+        `☁️ *Conditions:* ${weatherData.condition}\n` +
+        `☁️ *Clouds:* ${weatherData.clouds}%\n` +
+        `💧 *Humidity:* ${weatherData.humidity}%\n` +
+        `🎈 *Pressure:* ${weatherData.pressure} hPa\n` +
+        `👁️ *Visibility:* ${weatherData.visibility} m\n\n` +
+        `💨 *Wind:* ${weatherData.windSpeed} m/s (${weatherData.windDirection}°)\n` +
+        `🌬️ *Gusts:* ${weatherData.windGust} m/s\n\n` +
+        `🌅 *Sunrise:* ${formatTime(weatherData.sunrise)}\n` +
+        `🌇 *Sunset:* ${formatTime(weatherData.sunset)}\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `👤 *${userName}* • *ONLINE*`;
+}
+
         if (value.number) {
 
             const number =
@@ -655,72 +684,32 @@ client.on(
                 // AI WEATHER
                 // ====================================================
 
-                if (
-                    prompt
-                        .toLowerCase()
-                        .includes('weather')
-                ) {
+                if (prompt.toLowerCase().includes('weather')) {
+                    const weatherMatch = prompt.match(/weather(?:\s+(?:in|for|like\s+in))?\s+(.+)/i);
+                    const rawCity = weatherMatch?.[1];
 
-                    const weatherMatch =
-                        prompt.match(
-                            /weather(?:\s+in)?\s+(.+)/i
-                        );
-
-                    const city =
-                        weatherMatch?.[1]
-                            ?.replace(/[?!.]+$/, '')
-                            .trim();
+                    const city = rawCity
+                        ?.replace(/[?!.]+$/, '')
+                        ?.replace(/\b(today|now|please|right now)\b/gi, '')
+                        ?.trim();
 
                     if (!city) {
-
-                        await message.reply(
-                            "Please specify a city, e.g., `!ai what's the weather in Nairobi?`"
-                        );
-
+                        await message.reply("Please specify a city, e.g., `!ai what's the weather in Nairobi?` ");
                         return;
                     }
 
                     try {
+                        const weatherData = await getWeather({ city });
 
-                        const weatherData =
-                            await getWeather({
-                                city
-                            });
-
-                        if (
-                            weatherData.error
-                        ) {
-
-                            await message.reply(
-                                weatherData.error
-                            );
-
+                        if (weatherData.error) {
+                            await message.reply(weatherData.error);
                             return;
                         }
 
-                        const response =
-                            `🌤️ *CHAOS WEATHER SYSTEM*\n` +
-                            `━━━━━━━━━━━━━━━━━━\n\n` +
-                            `📍 *${weatherData.city}, ${weatherData.country}*\n\n` +
-                            `🌡️ Temperature: *${weatherData.temp}°C*\n` +
-                            `🥵 Feels like: *${weatherData.feelsLike}°C*\n` +
-                            `☁️ Conditions: *${weatherData.condition}*\n` +
-                            `💧 Humidity: *${weatherData.humidity}%*\n\n` +
-                            `━━━━━━━━━━━━━━━━━━\n` +
-                            `👤 *${userName}* • *ONLINE*\n` +
-                            '`wantam`';
-
-                        await message.reply(
-                            response
-                        );
+                        await message.reply(buildWeatherResponse(weatherData, userName));
 
                     } catch (weatherError) {
-
-                        console.error(
-                            '❌ Weather Error:',
-                            weatherError
-                        );
-
+                        console.error('❌ AI Weather Error:', weatherError);
                         await message.reply(
                             '❌ *Weather System Error*\n\n' +
                             'I could not retrieve the weather right now. Please try again.'
@@ -1161,65 +1150,27 @@ client.on(
             // WEATHER COMMAND
             // ====================================================
 
-            if (
-                lowerText.startsWith('!weather')
-            ) {
-
-                const city =
-                    text
-                        .replace(/^!weather/i, '')
-                        .trim();
+            if (lowerText.startsWith('!weather')) {
+                const city = text
+                    .replace(/^!weather/i, '')
+                    .trim();
 
                 if (!city) {
-
-                    await message.reply(
-                        'Please specify a city, e.g., `!weather Nairobi`.'
-                    );
-
+                    await message.reply('Please specify a city, e.g., `!weather Nairobi`.');
                     return;
                 }
 
                 try {
+                    const weatherData = await getWeather({ city });
 
-                    const weatherData =
-                        await getWeather({
-                            city
-                        });
-
-                    if (
-                        weatherData.error
-                    ) {
-
-                        await message.reply(
-                            weatherData.error
-                        );
-
+                    if (weatherData.error) {
+                        await message.reply(weatherData.error);
                     } else {
-
-                        const response =
-                            `🌤️ *CHAOS WEATHER SYSTEM*\n` +
-                            `━━━━━━━━━━━━━━━━━━\n\n` +
-                            `📍 *${weatherData.city}, ${weatherData.country}*\n\n` +
-                            `🌡️ Temperature: *${weatherData.temp}°C*\n` +
-                            `🥵 Feels like: *${weatherData.feelsLike}°C*\n` +
-                            `☁️ Conditions: *${weatherData.condition}*\n` +
-                            `💧 Humidity: *${weatherData.humidity}%*\n\n` +
-                            `━━━━━━━━━━━━━━━━━━\n` +
-                            `👤 *${userName}* • *ONLINE*\n` +
-                            '`wantam`';
-
-                        await message.reply(
-                            response
-                        );
+                        await message.reply(buildWeatherResponse(weatherData, userName));
                     }
 
                 } catch (weatherError) {
-
-                    console.error(
-                        '❌ Weather Command Error:',
-                        weatherError
-                    );
-
+                    console.error('❌ Weather Command Error:', weatherError);
                     await message.reply(
                         '❌ *Weather System Error*\n\n' +
                         'I could not retrieve the weather right now. Please try again.'
