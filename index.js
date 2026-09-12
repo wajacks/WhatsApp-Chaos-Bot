@@ -345,124 +345,217 @@ client.on('message', async message => {
             }
         }
 
-        // ====================================================
-        // MULTIMODAL GEMINI: IMAGE GENERATION (!draw)
-        // ====================================================
+        // ============================================================
+        // GEMINI IMAGE GENERATION (!draw / !image)
+        // ============================================================
 
         if (lowerText.startsWith('!draw ') || lowerText.startsWith('!image ')) {
             const prompt = text.replace(/^!(draw|image)\s+/i, '').trim();
 
             if (!prompt) {
-                await message.reply('🎨 Please provide a prompt.\n\n*Example:* `!draw a cyberpunk lion in Nairobi`');
+                await message.reply(
+                    '🎨 Please provide a prompt.\n\n' +
+                    '*Example:* `!draw a cyberpunk lion in Nairobi`'
+                );
                 return;
             }
 
-            await message.reply('🎨 *Generative Studio Active...* Synthesizing image...');
+            await message.reply(
+                '🎨 *Generative Studio Active...*\n' +
+                'Synthesizing image...'
+            );
 
             try {
-                const response = await ai.models.generateImages({
+                const interaction = await ai.interactions.create({
                     model: 'gemini-3.1-flash-image',
-                    prompt: prompt,
-                    config: {
-                        numberOfImages: 1,
-                        outputMimeType: 'image/jpeg'
-                    }
+                    input: prompt
                 });
 
-                if (response.generatedImages && response.generatedImages.length > 0) {
-                    const base64Image = response.generatedImages[0].image.imageBytes;
-                    const imageMedia = new MessageMedia('image/jpeg', base64Image, 'generated.jpg');
-                    await client.sendMessage(chatId, imageMedia, { caption: `🎨 *Prompt:* "${prompt}"` });
-                } else {
-                    await message.reply('❌ Image generation completed, but no image data was returned.');
+                const generatedImage = interaction.output_image;
+
+                if (!generatedImage?.data) {
+                    throw new Error('Gemini returned no image data.');
                 }
+
+                const imageMedia = new MessageMedia(
+                    'image/png',
+                    generatedImage.data,
+                    'generated.png'
+                );
+
+                await client.sendMessage(chatId, imageMedia, {
+                    caption: `🎨 *Prompt:* "${prompt}"`
+                });
+
             } catch (imgErr) {
                 console.error('❌ Image Generation Error:', imgErr);
-                await message.reply('❌ Failed to generate image. Please try a different prompt.');
+
+                await message.reply(
+                    '❌ Failed to generate image.\n\n' +
+                    `Error: ${imgErr.message}`
+                );
             }
+
             return;
         }
 
-        // ====================================================
-        // MULTIMODAL GEMINI: IMAGE ANALYZER (!analyze)
-        // ====================================================
+        // ============================================================
+        // GEMINI IMAGE ANALYZER (!analyze / !describe)
+        // ============================================================
 
         if (lowerText.startsWith('!analyze') || lowerText.startsWith('!describe')) {
             let targetMsg = message;
 
             if (message.hasQuotedMsg) {
-                targetMsg = await message.getQuotedMessage();
+                try {
+                    targetMsg = await message.getQuotedMessage();
+                } catch (quoteErr) {
+                    console.warn(
+                        '❌ Could not retrieve quoted image:',
+                        quoteErr.message
+                    );
+                }
             }
 
             if (!targetMsg.hasMedia) {
-                await message.reply('🖼️ Please reply to an image or send an image with `!analyze`.');
+                await message.reply(
+                    '🖼️ Please reply to an image or send an image with `!analyze`.'
+                );
                 return;
             }
 
-            await message.reply('🔍 *Analyzing media content...*');
+            await message.reply(
+                '🔍 *Analyzing media content...*'
+            );
 
             try {
                 const media = await targetMsg.downloadMedia();
-                if (!media || !media.mimetype.startsWith('image/')) {
-                    await message.reply('❌ Please provide a valid image.');
+
+                if (!media || !media.mimetype?.startsWith('image/')) {
+                    await message.reply(
+                        '❌ Please provide a valid image.'
+                    );
                     return;
                 }
 
-                const userPrompt = text.replace(/^!(analyze|describe)\s*/i, '').trim() || 'Describe this image in detail.';
+                const userPrompt =
+                    text.replace(/^!(analyze|describe)\s*/i, '').trim() ||
+                    'Describe this image in detail.';
 
-                const response = await ai.models.generateContent({
+                const interaction = await ai.interactions.create({
                     model: 'gemini-3.8-flash',
-                    contents: [
+                    input: [
                         {
-                            inlineData: {
-                                mimeType: media.mimetype,
-                                data: media.data
-                            }
+                            type: 'text',
+                            text: userPrompt
                         },
-                        { text: userPrompt }
+                        {
+                            type: 'image',
+                            data: media.data,
+                            mime_type: media.mimetype
+                        }
                     ]
                 });
 
-                await message.reply(`👁️ *Visual Neural Analysis:*\n\n${response.text}`);
+                const analysis = interaction.output_text?.trim();
+
+                if (!analysis) {
+                    throw new Error(
+                        'Gemini returned an empty analysis.'
+                    );
+                }
+
+                await message.reply(
+                    `👁️ *Visual Neural Analysis:*\n\n${analysis}`
+                );
+
             } catch (visionErr) {
-                console.error('❌ Vision Analysis Error:', visionErr);
-                await message.reply('❌ Failed to analyze image.');
+                console.error(
+                    '❌ Vision Analysis Error:',
+                    visionErr
+                );
+
+                await message.reply(
+                    '❌ Failed to analyze image.\n\n' +
+                    `Error: ${visionErr.message}`
+                );
             }
+
             return;
         }
 
-        // ====================================================
-        // MULTIMODAL GEMINI: TEXT-TO-SPEECH (!speak)
-        // ====================================================
+        // ============================================================
+        // GEMINI TEXT-TO-SPEECH (!speak / !tts)
+        // ============================================================
 
         if (lowerText.startsWith('!speak ') || lowerText.startsWith('!tts ')) {
-            const speechText = text.replace(/^!(speak|tts)\s+/i, '').trim();
+            const speechText = text
+                .replace(/^!(speak|tts)\s+/i, '')
+                .trim();
 
             if (!speechText) {
-                await message.reply('🎙️ Please provide text.\n\n*Example:* `!speak Hello Chaos Group!`');
+                await message.reply(
+                    '🎙️ Please provide text.\n\n' +
+                    '*Example:* `!speak Hello Chaos Group!`'
+                );
                 return;
             }
 
             try {
-                const response = await ai.models.generateContent({
+                await message.reply(
+                    '🎙️ *CHAOS VOICE ENGINE*\n' +
+                    'Generating voice...'
+                );
+
+                const interaction = await ai.interactions.create({
                     model: 'gemini-3.1-flash-tts-preview',
-                    contents: `Convert this exact text to spoken output: "${speechText}"`,
-                    config: {
-                        responseMimeType: 'audio/mp3'
+                    input: speechText,
+                    response_format: {
+                        type: 'audio'
+                    },
+                    generation_config: {
+                        speech_config: [
+                            {
+                                voice: 'Kore'
+                            }
+                        ]
                     }
                 });
 
-                if (response.candidates?.[0]?.content?.parts?.[0]?.inlineData) {
-                    const audioBase64 = response.candidates[0].content.parts[0].inlineData.data;
-                    const audioMedia = new MessageMedia('audio/mp3', audioBase64, 'tts.mp3');
-                    await client.sendMessage(chatId, audioMedia, { sendAudioAsVoice: true });
-                } else {
-                    await message.reply('🎙️ Audio synthesis complete.');
+                const audioData = interaction.output_audio?.data;
+
+                if (!audioData) {
+                    throw new Error(
+                        'Gemini returned no audio data.'
+                    );
                 }
+
+                const audioMedia = new MessageMedia(
+                    'audio/wav',
+                    audioData,
+                    'chaos-tts.wav'
+                );
+
+                await client.sendMessage(
+                    chatId,
+                    audioMedia,
+                    {
+                        sendAudioAsVoice: true
+                    }
+                );
+
             } catch (ttsErr) {
-                console.error('❌ Speech Generation Error:', ttsErr);
-                await message.reply('❌ Text-to-speech engine failed.');
+                console.error(
+                    '❌ Speech Generation Error:',
+                    ttsErr
+                );
+
+                await message.reply(
+                    '❌ Text-to-speech engine failed.\n\n' +
+                    `Error: ${ttsErr.message}`
+                );
             }
+
             return;
         }
 
