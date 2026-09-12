@@ -52,7 +52,7 @@ async function handleVideoCommand(message) {
             `5️⃣ *Audio Only* (MP3 / Voice Note Options)\n\n` +
             `\t\t‧₊˚🖇️✩ ₊˚🎧⊹♡\n` +
             `_Reply with \`1\`, \`2\`, \`3\`, \`4\`, or \`5\`_\n\n` +
-            `\`wantam\`\t\t` + `👆😅`;
+            `\`wantam\`\t\t\t\t` + `👆😅`;
 
         await message.reply(promptText);
 
@@ -105,7 +105,68 @@ async function handleVideoQualityReply(message) {
     }
 
     // ----------------------------------------------------
-    // 2. Audio Step 1: Format Selection (1 = Voice Note, 2 = MP3)
+    // 2. Initial Main Menu Selection (1, 2, 3, 4, 5)
+    // ----------------------------------------------------
+    if (pendingVideoRequests.has(chatId)) {
+        const validChoices = ['1', '2', '3', '4', '5'];
+        if (!validChoices.includes(selection)) return false;
+
+        const requestData = pendingVideoRequests.get(chatId);
+        clearTimeout(requestData.timeoutId);
+        pendingVideoRequests.delete(chatId);
+
+        // If 5 is selected, proceed to Audio Format Selection Prompt
+        if (selection === '5') {
+            const timeoutId = setTimeout(() => {
+                clearUserPendingStates(chatId);
+            }, 2 * 60 * 1000);
+
+            pendingAudioFormatRequests.set(chatId, {
+                targetQuery: requestData.targetQuery,
+                timeoutId
+            });
+
+            const formatPrompt = 
+                `🎙️ *Select Audio Output Format*\n\n` +
+                `1️⃣ *Voice Note* (Playable waveform message)\n` +
+                `2️⃣ *MP3 Audio* (Downloadable music file)\n\n` +
+                `\t\t‧₊˚🖇️✩ ₊˚🎧⊹♡\n` +
+                `_Reply with \`1\` or \`2\`_\n\n` +
+                `\`wantam\`\t\t\t\t` + `👆😅`;
+
+            await message.reply(formatPrompt);
+            return true;
+        }
+
+        // Handles standard video options (1 = 360p, 2 = 480p, 3 = 720p, 4 = 1080p Auto-Document)
+        const qualityMap = {
+            '1': { height: 360,  label: '360p',  audioOnly: false, sendAsDocument: false },
+            '2': { height: 480,  label: '480p',  audioOnly: false, sendAsDocument: false },
+            '3': { height: 720,  label: '720p',  audioOnly: false, sendAsDocument: false },
+            '4': { height: 1080, label: '1080p', audioOnly: false, sendAsDocument: true }
+        };
+
+        const chosenOption = qualityMap[selection];
+
+        await message.reply(`⏳ *Processing...* Fetching ${chosenOption.label} video in the background.`);
+
+        const projectRoot = path.join(__dirname, '..', '..');
+        const cookiesPath = path.join(projectRoot, 'cookies.txt');
+        const requestDir = path.join(projectRoot, 'downloads', `req_${Date.now()}_${Math.floor(Math.random() * 1000)}`);
+        
+        if (!fs.existsSync(requestDir)) {
+            fs.mkdirSync(requestDir, { recursive: true });
+        }
+
+        setImmediate(() => {
+            processMediaInBackground(message, requestData.targetQuery, chosenOption, cookiesPath, requestDir);
+        });
+
+        return true;
+    }
+
+    // ----------------------------------------------------
+    // 3. Audio Step 1: Format Selection (1 = Voice Note, 2 = MP3)
     // ----------------------------------------------------
     if (pendingAudioFormatRequests.has(chatId)) {
         if (!['1', '2'].includes(selection)) return false;
@@ -133,14 +194,14 @@ async function handleVideoQualityReply(message) {
             `3️⃣ *Low / Fast* (128 kbps)\n\n` +
             `\t\t‧₊˚🖇️✩ ₊˚🎧⊹♡\n` +
             `_Reply with \`1\`, \`2\`, or \`3\`_\n\n` + 
-            `\`wantam\`\t\t` + `👆😅`;
+            `\`wantam\`\t\t\t\t` + `👆😅`;
 
         await message.reply(qualityPrompt);
         return true;
     }
 
     // ----------------------------------------------------
-    // 3. Audio Step 2: Bitrate Selection (1 = 320k, 2 = 192k, 3 = 128k)
+    // 4. Audio Step 2: Bitrate Selection (1 = 320k, 2 = 192k, 3 = 128k)
     // ----------------------------------------------------
     if (pendingAudioQualityRequests.has(chatId)) {
         if (!['1', '2', '3'].includes(selection)) return false;
@@ -181,66 +242,7 @@ async function handleVideoQualityReply(message) {
         return true;
     }
 
-    // ----------------------------------------------------
-    // 4. Initial Main Menu Selection (1, 2, 3, 4, 5)
-    // ----------------------------------------------------
-    if (!pendingVideoRequests.has(chatId)) return false;
-
-    const validChoices = ['1', '2', '3', '4', '5'];
-    if (!validChoices.includes(selection)) return false;
-
-    const requestData = pendingVideoRequests.get(chatId);
-    clearTimeout(requestData.timeoutId);
-    pendingVideoRequests.delete(chatId);
-
-    // If 5 is selected, proceed to Audio Format Selection Prompt
-    if (selection === '5') {
-        const timeoutId = setTimeout(() => {
-            clearUserPendingStates(chatId);
-        }, 2 * 60 * 1000);
-
-        pendingAudioFormatRequests.set(chatId, {
-            targetQuery: requestData.targetQuery,
-            timeoutId
-        });
-
-        const formatPrompt = 
-            `🎙️ *Select Audio Output Format*\n\n` +
-            `1️⃣ *Voice Note* (Playable waveform message)\n` +
-            `2️⃣ *MP3 Audio* (Downloadable music file)\n\n` +
-            `\t\t‧₊˚🖇️✩ ₊˚🎧⊹♡\n` +
-            `_Reply with \`1\` or \`2\`_\n\n` +
-            `\`wantam\`\t\t` + `👆😅`;
-
-        await message.reply(formatPrompt);
-        return true;
-    }
-
-    // Handles standard video options (1 = 360p, 2 = 480p, 3 = 720p, 4 = 1080p)
-    const qualityMap = {
-        '1': { height: 360,  label: '360p',  audioOnly: false },
-        '2': { height: 480,  label: '480p',  audioOnly: false },
-        '3': { height: 720,  label: '720p',  audioOnly: false },
-        '4': { height: 1080, label: '1080p', audioOnly: true }
-    };
-
-    const chosenOption = qualityMap[selection];
-
-    await message.reply(`⏳ *Processing...* Fetching ${chosenOption.label} video in the background.`);
-
-    const projectRoot = path.join(__dirname, '..', '..');
-    const cookiesPath = path.join(projectRoot, 'cookies.txt');
-    const requestDir = path.join(projectRoot, 'downloads', `req_${Date.now()}_${Math.floor(Math.random() * 1000)}`);
-    
-    if (!fs.existsSync(requestDir)) {
-        fs.mkdirSync(requestDir, { recursive: true });
-    }
-
-    setImmediate(() => {
-        processMediaInBackground(message, requestData.targetQuery, chosenOption, cookiesPath, requestDir);
-    });
-
-    return true;
+    return false;
 }
 
 /**
@@ -254,14 +256,14 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
 
     if (chosenOption.audioOnly) {
         if (chosenOption.isVoiceNote) {
-            ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --restrict-filenames -x --audio-format m4a --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+            ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --extractor-args "youtube:player_client=android,ios" --restrict-filenames -x --audio-format m4a --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
         } else {
-            ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --restrict-filenames -x --audio-format mp3 --audio-quality ${chosenOption.bitrate} --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+            ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --extractor-args "youtube:player_client=android,ios" --restrict-filenames -x --audio-format mp3 --audio-quality ${chosenOption.bitrate} --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
         }
     } else {
         const height = chosenOption.height;
         const formatRule = `bv*[height<=${height}][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=${height}]+ba/b[height<=${height}]/b`;
-        ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --restrict-filenames -f "${formatRule}" --merge-output-format mp4 --postprocessor-args "ffmpeg:-c:v libx264 -c:a aac -b:a 128k" --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+        ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --extractor-args "youtube:player_client=android,ios" --restrict-filenames -f "${formatRule}" --merge-output-format mp4 --postprocessor-args "ffmpeg:-c:v libx264 -c:a aac -b:a 128k" --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
     }
 
     exec(ytDlpCmd, { maxBuffer: 50 * 1024 * 1024 }, async (error) => {
