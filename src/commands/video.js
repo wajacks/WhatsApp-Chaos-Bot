@@ -256,9 +256,9 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
 
     if (chosenOption.audioOnly) {
         if (chosenOption.isVoiceNote) {
-            ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --extractor-args "youtube:player_client=android,ios" --restrict-filenames -x --audio-format m4a --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+            ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --restrict-filenames -x --audio-format m4a --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
         } else {
-            ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --extractor-args "youtube:player_client=android,ios" --restrict-filenames -x --audio-format mp3 --audio-quality ${chosenOption.bitrate} --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+            ytDlpCmd = `yt-dlp --cookies "${cookiesPath}" --restrict-filenames -x --audio-format mp3 --audio-quality ${chosenOption.bitrate} --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
         }
     } else {
         const height = chosenOption.height;
