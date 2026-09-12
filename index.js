@@ -9,7 +9,8 @@ const execFileAsync = promisify(execFile);
 const { GoogleGenAI } = require('@google/genai');
 const { AzureOpenAI } = require('openai');
 const axios = require('axios');
-const googleTTS = require('google-tts-api'); 
+const googleTTS = require('google-tts-api');
+const { ttsSave } = require('edge-tts');
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 
@@ -146,6 +147,61 @@ const aiCooldowns = new Map();
 const drawCooldowns = new Map();
 const analyzeCooldowns = new Map();
 const speakCooldowns = new Map();
+const voiceCooldowns = new Map();
+// ============================================================
+// EDGE TTS VOICES
+// ============================================================
+const voiceSelections = new Map();
+
+const EDGE_TTS_VOICES = {
+    male: {
+        name: 'American Male',
+        voice: 'en-US-GuyNeural'
+    },
+
+    female: {
+        name: 'American Female',
+        voice: 'en-US-JennyNeural'
+    },
+
+    aria: {
+        name: 'American Female - Aria',
+        voice: 'en-US-AriaNeural'
+    },
+
+    british: {
+        name: 'British Female',
+        voice: 'en-GB-SoniaNeural'
+    },
+
+    britishmale: {
+        name: 'British Male',
+        voice: 'en-GB-RyanNeural'
+    },
+
+    kenya: {
+        name: 'Kenyan Female',
+        voice: 'en-KE-AsiliaNeural'
+    },
+
+    kenyanmale: {
+        name: 'Kenyan Male',
+        voice: 'en-KE-ChilembaNeural'
+    },
+
+    indian: {
+        name: 'Indian Female',
+        voice: 'en-IN-NeerjaNeural'
+    },
+
+    indianmale: {
+        name: 'Indian Male',
+        voice: 'en-IN-PrabhatNeural'
+    }
+};
+
+const DEFAULT_EDGE_VOICE = 'female';
+const VOICE_COOLDOWN_MS = 8000;
 
 // Cooldown Durations (in milliseconds)
 const AI_COOLDOWN_MS = 5000;       // 5 seconds for !ai
@@ -407,7 +463,7 @@ client.on('message', async message => {
                 // Let the library natively fetch, encode, and format the media buffer
                 const imageMedia = await MessageMedia.fromUrl(imageUrl, { unsafeMime: true });
                 
-                await client.sendMessage(chatId, imageMedia, { caption: `🎨 *Prompt:* "${prompt}"` });
+                await client.sendMessage(chatId, imageMedia, { caption: `🎨 *Prompt:* "${prompt}"\n` + `\`wantam\`` });
             
             } catch (imgErr) {
                 console.error('❌ Image Generation Error:', imgErr);
@@ -461,225 +517,259 @@ client.on('message', async message => {
         }
 
         // ============================================================
-// FREE TEXT-TO-SPEECH (!speak / !tts) VIA GOOGLE-TTS-API
-// REAL OGG/OPUS WHATSAPP VOICE NOTE
-// ============================================================
+        // FREE TEXT-TO-SPEECH (!speak / !tts) VIA GOOGLE-TTS-API
+        // REAL OGG/OPUS WHATSAPP VOICE NOTE
+        // ============================================================
 
-if (lowerText.startsWith('!speak ') || lowerText.startsWith('!tts ')) {
+        if (lowerText.startsWith('!speak ') || lowerText.startsWith('!tts ')) {
+            const speechText = text.replace(/^!(speak|tts)\s+/i, '').trim();
 
-    const speechText = text.replace(/^!(speak|tts)\s+/i, '').trim();
+            if (!speechText) {
+                await message.reply('🎙️ Please provide text.\n\n*Example:* `!speak Hello Chaos Group!`');
+                return;
+            }
 
-    if (!speechText) {
-        await message.reply(
-            '🎙️ Please provide text.\n\n*Example:* `!speak Hello Chaos Group!`'
-        );
-        return;
-    }
+            const now = Date.now();
+            const lastUsed = speakCooldowns.get(senderId) || 0;
 
-    const now = Date.now();
-    const lastUsed = speakCooldowns.get(senderId) || 0;
+            if (now - lastUsed < SPEAK_COOLDOWN_MS) {
+                const remaining = Math.ceil((SPEAK_COOLDOWN_MS - (now - lastUsed)) / 1000);
+                await message.reply(`⏳ *Voice Engine Cooling Down...*\nPlease wait ${remaining}s.`);
+                return;
+            }
 
-    if (now - lastUsed < SPEAK_COOLDOWN_MS) {
-        const remaining = Math.ceil(
-            (SPEAK_COOLDOWN_MS - (now - lastUsed)) / 1000
-        );
+            speakCooldowns.set(senderId, now);
 
-        await message.reply(
-            `⏳ *Voice Engine Cooling Down...*\nPlease wait ${remaining}s.`
-        );
-        return;
-    }
+            const tempDir = path.join(__dirname, 'temp');
+            const timestamp = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+            const inputFile = path.join(tempDir, `chaos-tts-${timestamp}.mp3`);
+            const outputFile = path.join(tempDir, `chaos-tts-${timestamp}.ogg`);
 
-    speakCooldowns.set(senderId, now);
+            try {
+                if (!fs.existsSync(tempDir)) {
+                    fs.mkdirSync(tempDir, { recursive: true });
+                }
 
-    // Temporary TTS files
-    const tempDir = path.join(__dirname, 'temp');
+                await message.reply('🎙️ *CHAOS VOICE ENGINE*\nGenerating voice audio...');
 
-    const timestamp =
-        `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+                const audioBase64 = await googleTTS.getAudioBase64(
+                    speechText,
+                    {
+                        lang: 'en',
+                        slow: false,
+                        host: 'https://translate.google.com'
+                    }
+                );
 
-    const inputFile = path.join(
-        tempDir,
-        `chaos-tts-${timestamp}.mp3`
-    );
+                fs.writeFileSync(inputFile, Buffer.from(audioBase64, 'base64'));
 
-    const outputFile = path.join(
-        tempDir,
-        `chaos-tts-${timestamp}.ogg`
-    );
+                console.log('🎙️ Converting TTS audio to OGG/Opus...');
 
-    try {
+                await execFileAsync(
+                    'ffmpeg',
+                    [
+                        '-y',
+                        '-i', inputFile,
+                        '-ac', '1',
+                        '-c:a', 'libopus',
+                        '-b:a', '32k',
+                        '-vbr', 'on',
+                        '-application', 'voip',
+                        outputFile
+                    ],
+                    { windowsHide: true }
+                );
 
-        // --------------------------------------------------------
-        // CREATE TEMP DIRECTORY
-        // --------------------------------------------------------
+                if (!fs.existsSync(outputFile)) {
+                    throw new Error('FFmpeg did not create the OGG voice file.');
+                }
 
-        if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir, { recursive: true });
+                const outputStats = fs.statSync(outputFile);
+                if (outputStats.size === 0) {
+                    throw new Error('FFmpeg created an empty OGG voice file.');
+                }
+
+                console.log(`✅ TTS conversion successful: ${(outputStats.size / 1024).toFixed(1)} KB`);
+
+                const oggBuffer = fs.readFileSync(outputFile);
+                const oggBase64 = oggBuffer.toString('base64');
+
+                const audioMedia = new MessageMedia(
+                    'audio/ogg; codecs=opus',
+                    oggBase64,
+                    'chaos-tts.ogg'
+                );
+
+                await client.sendMessage(chatId, audioMedia, { sendAudioAsVoice: true });
+                console.log(`🎙️ Chaos TTS voice note sent successfully to ${chatId}`);
+
+            } catch (ttsErr) {
+                console.error('❌ Speech Generation Error:', ttsErr);
+                await message.reply(`❌ Text-to-speech engine failed.\n\nError: ${ttsErr.message}`);
+            } finally {
+                try {
+                    if (fs.existsSync(inputFile)) fs.unlinkSync(inputFile);
+                    if (fs.existsSync(outputFile)) fs.unlinkSync(outputFile);
+                } catch (cleanupErr) {
+                    console.warn('⚠️ TTS cleanup warning:', cleanupErr.message);
+                }
+            }
+
+            return;
         }
+        
+        // ============================================================
+        // EDGE TTS VOICE SYSTEM      
+        
+        if (lowerText === '!voice' || lowerText.startsWith('!voice ')) {
+                            const voiceInput = text.replace(/^!voice\s*/i, '').trim();
 
-        await message.reply(
-            '🎙️ *CHAOS VOICE ENGINE*\nGenerating voice audio...'
-        );
+                if (!voiceInput) {
+                    const currentVoiceKey = voiceSelections.get(senderId) || DEFAULT_EDGE_VOICE;
+                    const currentVoice = EDGE_TTS_VOICES[currentVoiceKey];
 
-        // --------------------------------------------------------
-        // 1. GOOGLE TTS
-        // --------------------------------------------------------
+                    await message.reply(
+                        `🎙️ *CHAOS VOICE ENGINE*\n\n` +
+                        `Current voice:\n🔊 *${currentVoice.name}*\n\n` +
+                        `*Available Voices*\n` +
+                        `👨 *American Male* \`!voice male\`\n` +
+                        `👩 *American Female* \`!voice female\`\n` +
+                        `🎭 *Aria* \`!voice aria\`\n` +
+                        `🇬🇧 *British Female* \`!voice british\`\n` +
+                        `🇬🇧 *British Male* \`!voice britishmale\`\n` +
+                        `🇰🇪 *Kenyan Female* \`!voice kenya\`\n` +
+                        `🇰🇪 *Kenyan Male* \`!voice kenyanmale\`\n` +
+                        `🇮🇳 *Indian Female* \`!voice indian\`\n` +
+                        `🇮🇳 *Indian Male* \`!voice indianmale\`\n\n` +
+                        `━━━━━━━━━━━━━━━━━━\n\n` +
+                        `*Select a voice:* \`!voice kenyanmale\`\n` +
+                        `Then speak: \`!voice Hello Chaos Group!\``
+                    );
+                    return;
+                }
 
-        const audioBase64 = await googleTTS.getAudioBase64(
-            speechText,
-            {
-                lang: 'en',
-                slow: false,
-                host: 'https://translate.google.com'
+                const requestedVoice = voiceInput.toLowerCase();
+
+                if (EDGE_TTS_VOICES[requestedVoice]) {
+                    voiceSelections.set(senderId, requestedVoice);
+                    const selectedVoice = EDGE_TTS_VOICES[requestedVoice];
+
+                    await message.reply(
+                        `🎙️ *VOICE CHANGED*\n\n` +
+                        `🔊 *${selectedVoice.name}*\n\n` +
+                        `Voice engine:\n*Microsoft Edge TTS*\n\n` +
+                        `Use: \`!voice Your message here\`\n` +
+                        `to speak with this voice.`
+                    );
+                    return;
+                }
+
+                const speechText = voiceInput.trim();
+                if (!speechText) return;
+
+                const now = Date.now();
+                const lastUsed = voiceCooldowns.get(senderId) || 0;
+
+                if (now - lastUsed < VOICE_COOLDOWN_MS) {
+                    const remaining = Math.ceil((VOICE_COOLDOWN_MS - (now - lastUsed)) / 1000);
+                    await message.reply(`⏳ *Voice Engine Cooling Down...*\n\nPlease wait ${remaining}s.`);
+                    return;
+                }
+
+                voiceCooldowns.set(senderId, now);
+
+                const selectedVoiceKey = voiceSelections.get(senderId) || DEFAULT_EDGE_VOICE;
+                const selectedVoice = EDGE_TTS_VOICES[selectedVoiceKey] || EDGE_TTS_VOICES[DEFAULT_EDGE_VOICE];
+
+                const tempDir = path.join(__dirname, 'temp');
+                const timestamp = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+                const edgeInputFile = path.join(tempDir, `chaos-edge-${timestamp}.mp3`);
+                const opusOutputFile = path.join(tempDir, `chaos-edge-${timestamp}.ogg`);
+
+                try {
+                    if (!fs.existsSync(tempDir)) {
+                        fs.mkdirSync(tempDir, { recursive: true });
+                    }
+
+                    await message.reply(
+                        `🎙️ *CHAOS VOICE ENGINE*\n\n` +
+                        `🔊 *${selectedVoice.name}*\n` +
+                        `Generating voice...`
+                    );
+
+                    console.log(`🎙️ Edge TTS voice: ${selectedVoice.voice}`);
+                    await ttsSave(speechText, edgeInputFile, {
+                        voice: selectedVoice.voice,
+                        rate: '+0%',
+                        volume: '+0%',
+                        pitch: '+0Hz'
+                    });
+
+                    if (!fs.existsSync(edgeInputFile)) {
+                        throw new Error('Edge TTS did not create the audio file.');
+                    }
+
+                    const inputStats = fs.statSync(edgeInputFile);
+                    if (inputStats.size === 0) {
+                        throw new Error('Edge TTS created an empty audio file.');
+                    }
+
+                    console.log(`✅ Edge TTS audio created: ${(inputStats.size / 1024).toFixed(1)} KB`);
+                    console.log('🎙️ Converting Edge TTS → OGG/Opus...');
+
+                    await execFileAsync(
+                        'ffmpeg',
+                        [
+                            '-y',
+                            '-i', edgeInputFile,
+                            '-ac', '1',
+                            '-ar', '48000',
+                            '-c:a', 'libopus',
+                            '-b:a', '32k',
+                            '-vbr', 'on',
+                            '-application', 'voip',
+                            opusOutputFile
+                        ],
+                        { windowsHide: true }
+                    );
+
+                    if (!fs.existsSync(opusOutputFile)) {
+                        throw new Error('FFmpeg did not create the OGG/Opus file.');
+                    }
+
+                    const outputStats = fs.statSync(opusOutputFile);
+                    if (outputStats.size === 0) {
+                        throw new Error('FFmpeg created an empty OGG/Opus file.');
+                    }
+
+                    console.log(`✅ OGG/Opus created: ${(outputStats.size / 1024).toFixed(1)} KB`);
+
+                    const oggBuffer = fs.readFileSync(opusOutputFile);
+                    const oggBase64 = oggBuffer.toString('base64');
+
+                    const audioMedia = new MessageMedia(
+                        'audio/ogg; codecs=opus',
+                        oggBase64,
+                        'chaos-voice.ogg'
+                    );
+
+                    await client.sendMessage(chatId, audioMedia, { sendAudioAsVoice: true });
+                    console.log('🎙️ Edge TTS voice note sent successfully');
+
+                } catch (voiceErr) {
+                    console.error('❌ Edge TTS Error:', voiceErr);
+                    await message.reply(`❌ *Voice engine failed.*\n\nError: ${voiceErr.message}`);
+                } finally {
+                    try {
+                        if (fs.existsSync(edgeInputFile)) fs.unlinkSync(edgeInputFile);
+                        if (fs.existsSync(opusOutputFile)) fs.unlinkSync(opusOutputFile);
+                    } catch (cleanupErr) {
+                        console.warn('⚠️ Voice cleanup warning:', cleanupErr.message);
+                    }
+                }
+
+                return;
             }
-        );
-
-        // --------------------------------------------------------
-        // 2. SAVE GOOGLE TTS MP3
-        // --------------------------------------------------------
-
-        fs.writeFileSync(
-            inputFile,
-            Buffer.from(audioBase64, 'base64')
-        );
-
-        // --------------------------------------------------------
-        // 3. CONVERT MP3 → OGG/OPUS USING FFMPEG
-        // --------------------------------------------------------
-
-        console.log('🎙️ Converting TTS audio to OGG/Opus...');
-
-        await execFileAsync(
-            'ffmpeg',
-            [
-                '-y',
-
-                // Input
-                '-i',
-                inputFile,
-
-                // Mono
-                '-ac',
-                '1',
-
-                // Opus codec
-                '-c:a',
-                'libopus',
-
-                // Voice-note bitrate
-                '-b:a',
-                '32k',
-
-                // Variable bitrate
-                '-vbr',
-                'on',
-
-                // Optimize for voice
-                '-application',
-                'voip',
-
-                // Output
-                outputFile
-            ],
-            {
-                windowsHide: true
-            }
-        );
-
-        // --------------------------------------------------------
-        // 4. VERIFY FFMPEG OUTPUT
-        // --------------------------------------------------------
-
-        if (!fs.existsSync(outputFile)) {
-            throw new Error(
-                'FFmpeg did not create the OGG voice file.'
-            );
-        }
-
-        const outputStats = fs.statSync(outputFile);
-
-        if (outputStats.size === 0) {
-            throw new Error(
-                'FFmpeg created an empty OGG voice file.'
-            );
-        }
-
-        console.log(
-            `✅ TTS conversion successful: ` +
-            `${(outputStats.size / 1024).toFixed(1)} KB`
-        );
-
-        // --------------------------------------------------------
-        // 5. LOAD OGG/OPUS FILE
-        // --------------------------------------------------------
-
-        const oggBuffer = fs.readFileSync(outputFile);
-
-        const oggBase64 = oggBuffer.toString('base64');
-
-        // IMPORTANT:
-        // This is now a REAL OGG/Opus file.
-        const audioMedia = new MessageMedia(
-            'audio/ogg; codecs=opus',
-            oggBase64,
-            'chaos-tts.ogg'
-        );
-
-        // --------------------------------------------------------
-        // 6. SEND AS WHATSAPP VOICE NOTE
-        // --------------------------------------------------------
-
-        await client.sendMessage(
-            chatId,
-            audioMedia,
-            {
-                sendAudioAsVoice: true
-            }
-        );
-
-        console.log(
-            `🎙️ Chaos TTS voice note sent successfully to ${chatId}`
-        );
-
-    } catch (ttsErr) {
-
-        console.error(
-            '❌ Speech Generation Error:',
-            ttsErr
-        );
-
-        await message.reply(
-            `❌ Text-to-speech engine failed.\n\nError: ${ttsErr.message}`
-        );
-
-    } finally {
-
-        // --------------------------------------------------------
-        // 7. CLEAN UP TEMPORARY FILES
-        // --------------------------------------------------------
-
-        try {
-
-            if (fs.existsSync(inputFile)) {
-                fs.unlinkSync(inputFile);
-            }
-
-            if (fs.existsSync(outputFile)) {
-                fs.unlinkSync(outputFile);
-            }
-
-        } catch (cleanupErr) {
-
-            console.warn(
-                '⚠️ TTS cleanup warning:',
-                cleanupErr.message
-            );
-        }
-    }
-
-    return;
-}
 
         // ====================================================
         // !AI (HYBRID GEMINI WITH AZURE GPT-4O FALLBACK)
