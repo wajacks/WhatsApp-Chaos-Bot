@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { GoogleGenAI } = require('@google/genai');
+const { AzureOpenAI } = require('openai'); 
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 
@@ -108,7 +109,7 @@ const { handleSongCommand } = require('./src/commands/song');
 const { handleVideoCommand, handleVideoQualityReply } = require('./src/commands/video');
 
 // ============================================================
-// CHAOS NEURAL CORE GEMINI
+// CHAOS NEURAL CORE GEMINI INITIALIZATION
 // ============================================================
 
 if (!process.env.GEMINI_API_KEY) {
@@ -119,10 +120,31 @@ const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY
 });
 
+// AZURE INITIALIZATION
+if (!process.env.AZURE_OPENAI_KEY || !process.env.AZURE_OPENAI_ENDPOINT) {
+    console.warn('⚠️ Azure OpenAI credentials are missing from .env');
+}
+
+const azureClient = new AzureOpenAI({
+    endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+    apiKey: process.env.AZURE_OPENAI_KEY,
+    apiVersion: '2024-05-01-preview'
+});
+
 const aiMemory = new Map();
-const MAX_AI_MEMORY = 4;
+const MAX_AI_MEMORY = 5;
+
+// Cooldown Maps
 const aiCooldowns = new Map();
-const AI_COOLDOWN_MS = 5000;
+const drawCooldowns = new Map();
+const analyzeCooldowns = new Map();
+const speakCooldowns = new Map();
+
+// Cooldown Durations (in milliseconds)
+const AI_COOLDOWN_MS = 5000;       // 5 seconds for !ai
+const DRAW_COOLDOWN_MS = 15000;    // 15 seconds for !draw (DALL-E 3 is heavy)
+const ANALYZE_COOLDOWN_MS = 10000; // 10 seconds for !analyze (GPT-4o Vision)
+const SPEAK_COOLDOWN_MS = 8000;    // 8 seconds for !speak (TTS)
 
 // ============================================================
 // WHATSAPP CLIENT
@@ -346,7 +368,7 @@ client.on('message', async message => {
         }
 
         // ============================================================
-        // GEMINI IMAGE GENERATION (!draw / !image)
+        // AZURE OPENAI IMAGE GENERATION (!draw / !image)
         // ============================================================
 
         if (lowerText.startsWith('!draw ') || lowerText.startsWith('!image ')) {
@@ -359,27 +381,40 @@ client.on('message', async message => {
                 );
                 return;
             }
+            
+            // COOLDOWN CHECK HERE
+            const now = Date.now();
+            const lastUsed = drawCooldowns.get(senderId) || 0;
+            if (now - lastUsed < DRAW_COOLDOWN_MS) {
+                const remaining = Math.ceil((DRAW_COOLDOWN_MS - (now - lastUsed)) / 1000);
+                await message.reply(`⏳ *Image Studio Cooling Down...*\nPlease wait ${remaining}s before generating another image.`);
+                return;
+            }
+            drawCooldowns.set(senderId, now);
 
             await message.reply(
                 '🎨 *Generative Studio Active...*\n' +
-                'Synthesizing image...'
+                'Synthesizing image via Azure OpenAI...'
             );
 
             try {
-                const interaction = await ai.interactions.create({
-                    model: 'gemini-3.1-flash-image',
-                    input: prompt
+                const response = await azureClient.images.generate({
+                    model: process.env.AZURE_OPENAI_IMAGE_DEPLOYMENT || 'dall-e-3',
+                    prompt: prompt,
+                    n: 1,
+                    size: '1024x1024',
+                    response_format: 'b64_json'
                 });
 
-                const generatedImage = interaction.output_image;
+                const b64Image = response.data[0]?.b64_json;
 
-                if (!generatedImage?.data) {
-                    throw new Error('Gemini returned no image data.');
+                if (!b64Image) {
+                    throw new Error('Azure OpenAI returned no image data.');
                 }
 
                 const imageMedia = new MessageMedia(
                     'image/png',
-                    generatedImage.data,
+                    b64Image,
                     'generated.png'
                 );
 
@@ -400,7 +435,7 @@ client.on('message', async message => {
         }
 
         // ============================================================
-        // GEMINI IMAGE ANALYZER (!analyze / !describe)
+        // AZURE OPENAI IMAGE ANALYZER (!analyze / !describe)
         // ============================================================
 
         if (lowerText.startsWith('!analyze') || lowerText.startsWith('!describe')) {
@@ -424,8 +459,18 @@ client.on('message', async message => {
                 return;
             }
 
+            // COOLDOWN CHECK HERE
+            const now = Date.now();
+            const lastUsed = analyzeCooldowns.get(senderId) || 0;
+            if (now - lastUsed < ANALYZE_COOLDOWN_MS) {
+                const remaining = Math.ceil((ANALYZE_COOLDOWN_MS - (now - lastUsed)) / 1000);
+                await message.reply(`⏳ *Vision Core Cooling Down...*\nPlease wait ${remaining}s before analyzing another image.`);
+                return;
+            }
+            analyzeCooldowns.set(senderId, now);
+
             await message.reply(
-                '🔍 *Analyzing media content...*'
+                '🔍 *Analyzing media content via Azure OpenAI...*'
             );
 
             try {
@@ -442,27 +487,29 @@ client.on('message', async message => {
                     text.replace(/^!(analyze|describe)\s*/i, '').trim() ||
                     'Describe this image in detail.';
 
-                const interaction = await ai.interactions.create({
-                    model: 'gemini-3.8-flash',
-                    input: [
+                const response = await azureClient.chat.completions.create({
+                    model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || 'gpt-4o',
+                    messages: [
                         {
-                            type: 'text',
-                            text: userPrompt
-                        },
-                        {
-                            type: 'image',
-                            data: media.data,
-                            mime_type: media.mimetype
+                            role: 'user',
+                            content: [
+                                { type: 'text', text: userPrompt },
+                                {
+                                    type: 'image_url',
+                                    image_url: {
+                                        url: `data:${media.mimetype};base64,${media.data}`
+                                    }
+                                }
+                            ]
                         }
-                    ]
+                    ],
+                    max_tokens: 500
                 });
 
-                const analysis = interaction.output_text?.trim();
+                const analysis = response.choices[0]?.message?.content?.trim();
 
                 if (!analysis) {
-                    throw new Error(
-                        'Gemini returned an empty analysis.'
-                    );
+                    throw new Error('Azure OpenAI returned an empty analysis.');
                 }
 
                 await message.reply(
@@ -485,7 +532,7 @@ client.on('message', async message => {
         }
 
         // ============================================================
-        // GEMINI TEXT-TO-SPEECH (!speak / !tts)
+        // AZURE OPENAI TEXT-TO-SPEECH (!speak / !tts)
         // ============================================================
 
         if (lowerText.startsWith('!speak ') || lowerText.startsWith('!tts ')) {
@@ -501,39 +548,36 @@ client.on('message', async message => {
                 return;
             }
 
+            // COOLDOWN CHECK HERE
+            const now = Date.now();
+            const lastUsed = speakCooldowns.get(senderId) || 0;
+            if (now - lastUsed < SPEAK_COOLDOWN_MS) {
+                const remaining = Math.ceil((SPEAK_COOLDOWN_MS - (now - lastUsed)) / 1000);
+                await message.reply(`⏳ *Voice Engine Cooling Down...*\nPlease wait ${remaining}s before generating more audio.`);
+                return;
+            }
+            speakCooldowns.set(senderId, now);
+
             try {
                 await message.reply(
                     '🎙️ *CHAOS VOICE ENGINE*\n' +
-                    'Generating voice...'
+                    'Generating voice via Azure OpenAI...'
                 );
 
-                const interaction = await ai.interactions.create({
-                    model: 'gemini-3.1-flash-tts-preview',
+                const mp3Response = await azureClient.audio.speech.create({
+                    model: process.env.AZURE_OPENAI_TTS_DEPLOYMENT || 'tts',
+                    voice: 'alloy',
                     input: speechText,
-                    response_format: {
-                        type: 'audio'
-                    },
-                    generation_config: {
-                        speech_config: [
-                            {
-                                voice: 'Kore'
-                            }
-                        ]
-                    }
+                    response_format: 'mp3'
                 });
 
-                const audioData = interaction.output_audio?.data;
-
-                if (!audioData) {
-                    throw new Error(
-                        'Gemini returned no audio data.'
-                    );
-                }
+                const buffer = Buffer.from(await mp3Response.arrayBuffer());
+                const base64Audio = buffer.toString('base64');
 
                 const audioMedia = new MessageMedia(
-                    'audio/wav',
-                    audioData,
-                    'chaos-tts.wav'
+                    'audio/mp3',
+                    base64Audio,
+                    'chaos-tts.mp3'
                 );
 
                 await client.sendMessage(
