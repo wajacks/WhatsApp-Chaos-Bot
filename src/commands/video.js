@@ -221,7 +221,7 @@ async function handleVideoQualityReply(message) {
         '1': { height: 360,  label: '360p',  audioOnly: false },
         '2': { height: 480,  label: '480p',  audioOnly: false },
         '3': { height: 720,  label: '720p',  audioOnly: false },
-        '4': { height: 1080, label: '1080p', audioOnly: false }
+        '4': { height: 1080, label: '1080p', audioOnly: true }
     };
 
     const chosenOption = qualityMap[selection];
@@ -288,11 +288,11 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
             const fileSizeInMB = stats.size / (1024 * 1024);
             const chatId = message.from;
 
-            // Handle oversized files (> 60 MB) for video requests
-            if (fileSizeInMB > 63 && !chosenOption.audioOnly) {
+            // Handle oversized files (> 60 MB) for video requests (unless 1080p auto-document is set)
+            if (fileSizeInMB > 60 && !chosenOption.audioOnly && !chosenOption.sendAsDocument) {
                 console.log(`[OVERSIZE] Video file size is ${fileSizeInMB.toFixed(2)} MB. Prompting user.`);
                 
-                isOversizedPending = true; // Mark true so finally block bypasses deletion
+                isOversizedPending = true;
 
                 const timeoutId = setTimeout(() => {
                     if (pendingOversizeApprovals.has(chatId)) {
@@ -334,6 +334,11 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
                     );
                     await message.client.sendMessage(message.from, mp3Media);
                 }
+            } else if (chosenOption.sendAsDocument) {
+                // Auto-send 1080p as Document file
+                await message.client.sendMessage(message.from, media, {
+                    sendMediaAsDocument: true
+                });
             } else {
                 await message.client.sendMessage(message.from, media);
             }
