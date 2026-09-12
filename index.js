@@ -394,15 +394,13 @@ client.on('message', async message => {
 
             try {
                 const encodedPrompt = encodeURIComponent(prompt);
-                // Pollinations requires no API key. We just GET the image URL.
                 const imageUrl = `https://pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true`;
                 
-                const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-                const base64Image = Buffer.from(response.data, 'binary').toString('base64');
+                // Let the library natively fetch, encode, and format the media buffer
+                const imageMedia = await MessageMedia.fromUrl(imageUrl, { unsafeMime: true });
                 
-                const imageMedia = new MessageMedia('image/jpeg', base64Image, 'generated.jpg');
                 await client.sendMessage(chatId, imageMedia, { caption: `🎨 *Prompt:* "${prompt}"` });
-
+            
             } catch (imgErr) {
                 console.error('❌ Image Generation Error:', imgErr);
                 await message.reply(`❌ Failed to generate image.\n\nError: ${imgErr.message}`);
