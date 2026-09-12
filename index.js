@@ -3,7 +3,9 @@
 const fs = require('fs');
 const path = require('path');
 const { GoogleGenAI } = require('@google/genai');
-const { AzureOpenAI } = require('openai'); 
+const { AzureOpenAI } = require('openai');
+const axios = require('axios');
+const googleTTS = require('google-tts-api'); 
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 
@@ -132,7 +134,7 @@ const azureClient = new AzureOpenAI({
 });
 
 const aiMemory = new Map();
-const MAX_AI_MEMORY = 5;
+const MAX_AI_MEMORY = 8;
 
 // Cooldown Maps
 const aiCooldowns = new Map();
@@ -368,67 +370,42 @@ client.on('message', async message => {
         }
 
         // ============================================================
-        // AZURE OPENAI IMAGE GENERATION (!draw / !image)
+        // FREE IMAGE GENERATOR (!draw / !image) VIA POLLINATIONS
         // ============================================================
 
         if (lowerText.startsWith('!draw ') || lowerText.startsWith('!image ')) {
             const prompt = text.replace(/^!(draw|image)\s+/i, '').trim();
 
             if (!prompt) {
-                await message.reply(
-                    '🎨 Please provide a prompt.\n\n' +
-                    '*Example:* `!draw a cyberpunk lion in Nairobi`'
-                );
+                await message.reply('🎨 Please provide a prompt.\n\n*Example:* `!draw a cyberpunk lion in Nairobi`');
                 return;
             }
-            
-            // COOLDOWN CHECK HERE
+
             const now = Date.now();
             const lastUsed = drawCooldowns.get(senderId) || 0;
             if (now - lastUsed < DRAW_COOLDOWN_MS) {
                 const remaining = Math.ceil((DRAW_COOLDOWN_MS - (now - lastUsed)) / 1000);
-                await message.reply(`⏳ *Image Studio Cooling Down...*\nPlease wait ${remaining}s before generating another image.`);
+                await message.reply(`⏳ *Image Studio Cooling Down...*\nPlease wait ${remaining}s.`);
                 return;
             }
             drawCooldowns.set(senderId, now);
 
-            await message.reply(
-                '🎨 *Generative Studio Active...*\n' +
-                'Synthesizing image via Azure OpenAI...'
-            );
+            await message.reply('🎨 *Generative Studio Active...*\nSynthesizing image (Free Engine)...');
 
             try {
-                const response = await azureClient.images.generate({
-                    model: process.env.AZURE_OPENAI_IMAGE_DEPLOYMENT || 'dall-e-3',
-                    prompt: prompt,
-                    n: 1,
-                    size: '1024x1024',
-                    response_format: 'b64_json'
-                });
-
-                const b64Image = response.data[0]?.b64_json;
-
-                if (!b64Image) {
-                    throw new Error('Azure OpenAI returned no image data.');
-                }
-
-                const imageMedia = new MessageMedia(
-                    'image/png',
-                    b64Image,
-                    'generated.png'
-                );
-
-                await client.sendMessage(chatId, imageMedia, {
-                    caption: `🎨 *Prompt:* "${prompt}"`
-                });
+                const encodedPrompt = encodeURIComponent(prompt);
+                // Pollinations requires no API key. We just GET the image URL.
+                const imageUrl = `https://pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true`;
+                
+                const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+                const base64Image = Buffer.from(response.data, 'binary').toString('base64');
+                
+                const imageMedia = new MessageMedia('image/jpeg', base64Image, 'generated.jpg');
+                await client.sendMessage(chatId, imageMedia, { caption: `🎨 *Prompt:* "${prompt}"` });
 
             } catch (imgErr) {
                 console.error('❌ Image Generation Error:', imgErr);
-
-                await message.reply(
-                    '❌ Failed to generate image.\n\n' +
-                    `Error: ${imgErr.message}`
-                );
+                await message.reply(`❌ Failed to generate image.\n\nError: ${imgErr.message}`);
             }
 
             return;
@@ -532,72 +509,42 @@ client.on('message', async message => {
         }
 
         // ============================================================
-        // AZURE OPENAI TEXT-TO-SPEECH (!speak / !tts)
+        // FREE TEXT-TO-SPEECH (!speak / !tts) VIA GOOGLE-TTS-API
         // ============================================================
 
         if (lowerText.startsWith('!speak ') || lowerText.startsWith('!tts ')) {
-            const speechText = text
-                .replace(/^!(speak|tts)\s+/i, '')
-                .trim();
+            const speechText = text.replace(/^!(speak|tts)\s+/i, '').trim();
 
             if (!speechText) {
-                await message.reply(
-                    '🎙️ Please provide text.\n\n' +
-                    '*Example:* `!speak Hello Chaos Group!`'
-                );
+                await message.reply('🎙️ Please provide text.\n\n*Example:* `!speak Hello Chaos Group!`');
                 return;
             }
 
-            // COOLDOWN CHECK HERE
             const now = Date.now();
             const lastUsed = speakCooldowns.get(senderId) || 0;
             if (now - lastUsed < SPEAK_COOLDOWN_MS) {
                 const remaining = Math.ceil((SPEAK_COOLDOWN_MS - (now - lastUsed)) / 1000);
-                await message.reply(`⏳ *Voice Engine Cooling Down...*\nPlease wait ${remaining}s before generating more audio.`);
+                await message.reply(`⏳ *Voice Engine Cooling Down...*\nPlease wait ${remaining}s.`);
                 return;
             }
             speakCooldowns.set(senderId, now);
 
             try {
-                await message.reply(
-                    '🎙️ *CHAOS VOICE ENGINE*\n' +
-                    'Generating voice via Azure OpenAI...'
-                );
+                await message.reply('🎙️ *CHAOS VOICE ENGINE*\nGenerating voice audio...');
 
-                const mp3Response = await azureClient.audio.speech.create({
-                    model: process.env.AZURE_OPENAI_TTS_DEPLOYMENT || 'tts',
-                    voice: 'alloy',
-                    input: speechText,
-                    response_format: 'mp3'
+                // Fetch base64 audio directly from Google's free TTS endpoints
+                const audioBase64 = await googleTTS.getAudioBase64(speechText, {
+                    lang: 'en',
+                    slow: false,
+                    host: 'https://translate.google.com',
                 });
 
-                const buffer = Buffer.from(await mp3Response.arrayBuffer());
-                const base64Audio = buffer.toString('base64');
-
-                const audioMedia = new MessageMedia(
-                    'audio/mp3',
-                    base64Audio,
-                    'chaos-tts.mp3'
-                );
-
-                await client.sendMessage(
-                    chatId,
-                    audioMedia,
-                    {
-                        sendAudioAsVoice: true
-                    }
-                );
+                const audioMedia = new MessageMedia('audio/mp3', audioBase64, 'chaos-tts.mp3');
+                await client.sendMessage(chatId, audioMedia, { sendAudioAsVoice: true });
 
             } catch (ttsErr) {
-                console.error(
-                    '❌ Speech Generation Error:',
-                    ttsErr
-                );
-
-                await message.reply(
-                    '❌ Text-to-speech engine failed.\n\n' +
-                    `Error: ${ttsErr.message}`
-                );
+                console.error('❌ Speech Generation Error:', ttsErr);
+                await message.reply(`❌ Text-to-speech engine failed.\n\nError: ${ttsErr.message}`);
             }
 
             return;
@@ -791,7 +738,7 @@ client.on('message', async message => {
                     }));
 
                     const response = await azureClient.chat.completions.create({
-                        model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || 'gpt-4o',
+                        model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || 'gpt-4o-mini',
                         messages: [
                             { role: 'system', content: systemInstructionText },
                             ...formattedAzureHistory

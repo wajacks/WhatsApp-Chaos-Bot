@@ -35,23 +35,15 @@ async function handleProfileCommand(message, client) {
 
         const response =
 `👑 *PLAYER PROFILE* 👑
-
 ━━━━━━━━━━━━━━━━━━
 
 👤 *Name:* ${user.name}
-
 📊 *Level:* ${user.level || 1}
-
 ⭐ *XP:* ${user.xp || 0} / ${xpNeeded}
-
 💰 *Coins:* ${user.coins || 0}
-
 ⚔️ *Wins/Losses:* ${user.wins || 0}W - ${user.losses || 0}L
-
 🔤 *Wordle Solves:* ${wordleSolved}
-
 🚘 *Vehicle:* ${assets.car}
-
 🏠 *Residence:* ${assets.house}
 
 ━━━━━━━━━━━━━━━━━━`;
