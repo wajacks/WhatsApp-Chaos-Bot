@@ -539,7 +539,8 @@ client.on('message', async message => {
                     host: 'https://translate.google.com',
                 });
 
-                const audioMedia = new MessageMedia('audio/mp3', audioBase64, 'chaos-tts.mp3');
+                // Wrapper updated for iOS/M4A compatibility
+                const audioMedia = new MessageMedia('audio/mp4', audioBase64, 'chaos-tts.m4a');
                 await client.sendMessage(chatId, audioMedia, { sendAudioAsVoice: true });
 
             } catch (ttsErr) {

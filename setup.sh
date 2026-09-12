@@ -35,14 +35,16 @@ if [ ! -f .env ]; then
 GEMINI_API_KEY=${user_gemini_key}
 OPENWEATHERMAP_API_KEY=${user_weather_key}
 
-# Azure OpenAI (Handles !draw, Vision/Analyze, and !speak)
+# Azure OpenAI (Handles !analyze Vision and !ai Chat Fallback)
 AZURE_OPENAI_KEY=${user_azure_key}
 AZURE_OPENAI_ENDPOINT=${user_azure_endpoint}
 
 # Model Deployments
-AZURE_OPENAI_IMAGE_DEPLOYMENT=dall-e-3
-AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4o
-AZURE_OPENAI_TTS_DEPLOYMENT=tts
+AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4o-mini
+
+# Media Routing Note:
+# !draw  -> Pollinations.ai (Keyless)
+# !speak -> google-tts-api (Keyless)
 
 PORT=4416
 EOF
@@ -61,11 +63,11 @@ if ! grep -q "OPENWEATHERMAP_API_KEY=." .env; then
 fi
 
 if ! grep -q "AZURE_OPENAI_KEY=." .env; then
-    warn "AZURE_OPENAI_KEY appears to be empty in .env. Image generation, Vision, and TTS will fail."
+    warn "AZURE_OPENAI_KEY appears to be empty in .env. Vision analysis (!analyze) and chat fallback will fail."
 fi
 
 if ! grep -q "AZURE_OPENAI_ENDPOINT=." .env; then
-    warn "AZURE_OPENAI_ENDPOINT appears to be empty in .env. Image generation, Vision, and TTS will fail."
+    warn "AZURE_OPENAI_ENDPOINT appears to be empty in .env. Vision analysis (!analyze) and chat fallback will fail."
 fi
 
 # 3. Check Node.js & npm
