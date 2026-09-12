@@ -539,7 +539,7 @@ client.on('message', async message => {
                     host: 'https://translate.google.com',
                 });
 
-                // Wrapper updated for iOS/M4A compatibility
+                // Use audio/mp4 with .m4a extension matching video.js voice note structure
                 const audioMedia = new MessageMedia('audio/mp4', audioBase64, 'chaos-tts.m4a');
                 await client.sendMessage(chatId, audioMedia, { sendAudioAsVoice: true });
 
