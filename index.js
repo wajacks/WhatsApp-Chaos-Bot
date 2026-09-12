@@ -134,6 +134,7 @@ const client = new Client({
     }),
     puppeteer: {
         headless: true,
+        protocolTimeout: 900000,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -477,7 +478,8 @@ client.on('message', async message => {
                     '*CHAOS NEURAL CORE*\n\n' +
                     'You forgot to ask something.\n\n' +
                     'Example:\n' +
-                    '`!ai How to be smart like Chriss?`'
+                    '`!ai How to be smart like Chriss?\n`' +
+                    `\`wantam\`\t\t` + `👆😅`
                 );
                 return;
             }
@@ -507,7 +509,8 @@ client.on('message', async message => {
                     console.error('❌ AI Weather Error:', weatherError);
                     await message.reply(
                         '❌ *Weather System Error*\n\n' +
-                        'I could not retrieve the weather right now. Please try again.'
+                        'I could not retrieve the weather right now. Please try again.\n' +
+                        `\`wantam\`\t\t` + `👆😅`
                     );
                 }
                 return;
@@ -528,7 +531,8 @@ client.on('message', async message => {
                 const remaining = Math.ceil((AI_COOLDOWN_MS - (now - lastUsed)) / 1000);
                 await message.reply(
                     '*Neural Core cooling down...*\n' +
-                    `Try again in ${remaining}s.`
+                    `Try again in ${remaining}s.\n` +
+                    `\`wantam\`\t\t` + `👆😅`
                 );
                 return;
             }
@@ -606,7 +610,8 @@ client.on('message', async message => {
 
             } catch (err) {
                 console.error('❌ Chaos Neural Core Error:', err);
-                await message.reply('❌ The neural connection was interrupted. Please try again.');
+                await message.reply('❌ The neural connection was interrupted. Please try again.\n' +
+                    `\`wantam\`\t\t` + `👆😅`);
             }
             return;
         }
