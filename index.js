@@ -134,7 +134,7 @@ const client = new Client({
     }),
     puppeteer: {
         headless: true,
-        protocolTimeout: 0,
+        protocolTimeout: 1200000,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
