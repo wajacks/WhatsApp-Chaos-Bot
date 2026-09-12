@@ -27,11 +27,23 @@ if [ ! -f .env ]; then
     # Prompt user for required API keys
     read -p "Enter your Google Gemini API Key (GEMINI_API_KEY): " user_gemini_key
     read -p "Enter your OpenWeatherMap API Key (OPENWEATHERMAP_API_KEY): " user_weather_key
+    read -p "Enter your Azure OpenAI Key (AZURE_OPENAI_KEY): " user_azure_key
+    read -p "Enter your Azure OpenAI Endpoint (AZURE_OPENAI_ENDPOINT): " user_azure_endpoint
     
     cat <<EOF > .env
 # WhatsApp Chaos Bot Configuration
 GEMINI_API_KEY=${user_gemini_key}
 OPENWEATHERMAP_API_KEY=${user_weather_key}
+
+# Azure OpenAI (Handles !draw, Vision/Analyze, and !speak)
+AZURE_OPENAI_KEY=${user_azure_key}
+AZURE_OPENAI_ENDPOINT=${user_azure_endpoint}
+
+# Model Deployments
+AZURE_OPENAI_IMAGE_DEPLOYMENT=dall-e-3
+AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4o
+AZURE_OPENAI_TTS_DEPLOYMENT=tts
+
 PORT=4416
 EOF
     info ".env file created successfully."
@@ -46,6 +58,14 @@ fi
 
 if ! grep -q "OPENWEATHERMAP_API_KEY=." .env; then
     warn "OPENWEATHERMAP_API_KEY appears to be empty in .env. Weather features may fail."
+fi
+
+if ! grep -q "AZURE_OPENAI_KEY=." .env; then
+    warn "AZURE_OPENAI_KEY appears to be empty in .env. Image generation, Vision, and TTS will fail."
+fi
+
+if ! grep -q "AZURE_OPENAI_ENDPOINT=." .env; then
+    warn "AZURE_OPENAI_ENDPOINT appears to be empty in .env. Image generation, Vision, and TTS will fail."
 fi
 
 # 3. Check Node.js & npm
