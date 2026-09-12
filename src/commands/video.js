@@ -45,6 +45,7 @@ async function handleVideoCommand(message) {
         const promptText = 
             `🎬 *Select Media Type / Quality*\n\n` +
             `Reply with the number of your choice within 2 minutes:\n\n` +
+            `\`I prefer 360p so you don't request large files taking forever to download\`\n\n` +
             `1️⃣ *360p* (Fast / Small file size)\n` +
             `2️⃣ *480p* (Balanced quality)\n` +
             `3️⃣ *720p* (High Quality)\n` +
@@ -128,8 +129,8 @@ async function handleVideoQualityReply(message) {
 
             const formatPrompt = 
                 `🎙️ *Select Audio Output Format*\n\n` +
-                `1️⃣ *Voice Note* (Playable waveform message)\n` +
-                `2️⃣ *MP3 Audio* (Downloadable music file)\n\n` +
+                `1️⃣ *Voice Note* \`IPHONE USER\`\n` +
+                `2️⃣ *MP3 Audio* \`ANDROID USER\`\n\n` +
                 `\t\t‧₊˚🖇️✩ ₊˚🎧⊹♡\n` +
                 `_Reply with \`1\` or \`2\`_\n\n` +
                 `\`wantam\`\t\t\t\t` + `👆😅`;
