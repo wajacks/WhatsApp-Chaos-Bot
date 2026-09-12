@@ -17,6 +17,7 @@
 ┃  • \`!draw <prompt>\` → Generate AI images (pollinations ai)
 ┃  • \`!catchup\` → Easil understand context while you were away(Azure GPT-4o)
 ┃  • \`!speak <text>\` → Convert text to Voice Note (Gemini TTS)
+┃  • \`!voice <text>\` → Convert text to Voice Note --choose person (Edge TTS)
 ╣━━━━━━◉○◉◉○◉○◉○◉○◉○◉━━━━━━╣
 ┃╰┈➤*[ 𝔚𝔒ℝ𝔇𝔏𝔈 𝔊𝔄𝔐𝔈 ]*
 ┃  • \`!wordle\` → Start Wordle lobby (80s join time)
