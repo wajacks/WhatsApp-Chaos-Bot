@@ -2,6 +2,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+
+const execFileAsync = promisify(execFile);
 const { GoogleGenAI } = require('@google/genai');
 const { AzureOpenAI } = require('openai');
 const axios = require('axios');
@@ -56,6 +60,7 @@ const {
 const { getGamesList } = require('./src/commands/gameslist');
 const { handleBalanceCommand } = require('./src/commands/balance');
 const { getWeather } = require('./src/tools/weather');
+const { logMessage, getChatHistory } = require('./src/database/chatlog');
 
 // ============================================================
 // WEATHER RESPONSE BUILDER
@@ -317,6 +322,9 @@ client.on('message', async message => {
         const text = message.body ? message.body.trim() : '';
         const lowerText = text.toLowerCase();
 
+        // Record message for the catch-up feature
+        logMessage(chatId, userName, text);
+
         // ====================================================
         // MAFIA PRIVATE NIGHT COMMANDS & REPLIES
         // ====================================================
@@ -394,7 +402,7 @@ client.on('message', async message => {
 
             try {
                 const encodedPrompt = encodeURIComponent(prompt);
-                const imageUrl = `https://pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true`;
+                const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true`;
                 
                 // Let the library natively fetch, encode, and format the media buffer
                 const imageMedia = await MessageMedia.fromUrl(imageUrl, { unsafeMime: true });
@@ -409,145 +417,269 @@ client.on('message', async message => {
             return;
         }
 
-        // ============================================================
-        // AZURE OPENAI IMAGE ANALYZER (!analyze / !describe)
-        // ============================================================
+        // ====================================================
+        // CATCHUP SUMMARY COMMAND (!catchup)
+        // ====================================================
 
-        if (lowerText.startsWith('!analyze') || lowerText.startsWith('!describe')) {
-            let targetMsg = message;
+        if (lowerText === '!catchup' || lowerText === '!summary') {
+            const history = getChatHistory(chatId);
 
-            if (message.hasQuotedMsg) {
-                try {
-                    targetMsg = await message.getQuotedMessage();
-                } catch (quoteErr) {
-                    console.warn(
-                        '❌ Could not retrieve quoted image:',
-                        quoteErr.message
-                    );
-                }
-            }
-
-            if (!targetMsg.hasMedia) {
-                await message.reply(
-                    '🖼️ Please reply to an image or send an image with `!analyze`.'
-                );
+            if (history.length === 0) {
+                await message.reply('📭 Not enough recent chat history to summarize yet.');
                 return;
             }
 
-            // COOLDOWN CHECK HERE
-            const now = Date.now();
-            const lastUsed = analyzeCooldowns.get(senderId) || 0;
-            if (now - lastUsed < ANALYZE_COOLDOWN_MS) {
-                const remaining = Math.ceil((ANALYZE_COOLDOWN_MS - (now - lastUsed)) / 1000);
-                await message.reply(`⏳ *Vision Core Cooling Down...*\nPlease wait ${remaining}s before analyzing another image.`);
-                return;
-            }
-            analyzeCooldowns.set(senderId, now);
-
-            await message.reply(
-                '🔍 *Analyzing media content via Azure OpenAI...*'
-            );
+            await message.reply('⏳ *Analyzing recent group conversations...*');
 
             try {
-                const media = await targetMsg.downloadMedia();
-
-                if (!media || !media.mimetype?.startsWith('image/')) {
-                    await message.reply(
-                        '❌ Please provide a valid image.'
-                    );
-                    return;
-                }
-
-                const userPrompt =
-                    text.replace(/^!(analyze|describe)\s*/i, '').trim() ||
-                    'Describe this image in detail.';
+                const transcript = history.map(h => `${h.sender}: ${h.text}`).join('\n');
 
                 const response = await azureClient.chat.completions.create({
-                    model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || 'gpt-4o',
+                    model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || 'gpt-4o-mini',
                     messages: [
                         {
+                            role: 'system',
+                            content: 'You are an intelligent group chat summarizer. Read the recent chat transcript and provide a brief, engaging, and slightly humorous "While you were away" summary highlighting key topics, arguments, or inside jokes.'
+                        },
+                        {
                             role: 'user',
-                            content: [
-                                { type: 'text', text: userPrompt },
-                                {
-                                    type: 'image_url',
-                                    image_url: {
-                                        url: `data:${media.mimetype};base64,${media.data}`
-                                    }
-                                }
-                            ]
+                            content: `Here is the recent group chat history:\n\n${transcript}`
                         }
                     ],
-                    max_tokens: 500
+                    max_tokens: 400
                 });
 
-                const analysis = response.choices[0]?.message?.content?.trim();
+                const summary = response.choices[0]?.message?.content?.trim();
+                await message.reply(`📜 *Group Catch-Up Summary:*\n\n${summary}`);
 
-                if (!analysis) {
-                    throw new Error('Azure OpenAI returned an empty analysis.');
-                }
-
-                await message.reply(
-                    `👁️ *Visual Neural Analysis:*\n\n${analysis}`
-                );
-
-            } catch (visionErr) {
-                console.error(
-                    '❌ Vision Analysis Error:',
-                    visionErr
-                );
-
-                await message.reply(
-                    '❌ Failed to analyze image.\n\n' +
-                    `Error: ${visionErr.message}`
-                );
+            } catch (err) {
+                console.error('❌ Catchup Error:', err);
+                await message.reply('❌ Failed to generate chat summary.');
             }
 
             return;
         }
 
         // ============================================================
-        // FREE TEXT-TO-SPEECH (!speak / !tts) VIA GOOGLE-TTS-API
-        // ============================================================
+// FREE TEXT-TO-SPEECH (!speak / !tts) VIA GOOGLE-TTS-API
+// REAL OGG/OPUS WHATSAPP VOICE NOTE
+// ============================================================
 
-        if (lowerText.startsWith('!speak ') || lowerText.startsWith('!tts ')) {
-            const speechText = text.replace(/^!(speak|tts)\s+/i, '').trim();
+if (lowerText.startsWith('!speak ') || lowerText.startsWith('!tts ')) {
 
-            if (!speechText) {
-                await message.reply('🎙️ Please provide text.\n\n*Example:* `!speak Hello Chaos Group!`');
-                return;
-            }
+    const speechText = text.replace(/^!(speak|tts)\s+/i, '').trim();
 
-            const now = Date.now();
-            const lastUsed = speakCooldowns.get(senderId) || 0;
-            if (now - lastUsed < SPEAK_COOLDOWN_MS) {
-                const remaining = Math.ceil((SPEAK_COOLDOWN_MS - (now - lastUsed)) / 1000);
-                await message.reply(`⏳ *Voice Engine Cooling Down...*\nPlease wait ${remaining}s.`);
-                return;
-            }
-            speakCooldowns.set(senderId, now);
+    if (!speechText) {
+        await message.reply(
+            '🎙️ Please provide text.\n\n*Example:* `!speak Hello Chaos Group!`'
+        );
+        return;
+    }
 
-            try {
-                await message.reply('🎙️ *CHAOS VOICE ENGINE*\nGenerating voice audio...');
+    const now = Date.now();
+    const lastUsed = speakCooldowns.get(senderId) || 0;
 
-                // Fetch base64 audio directly from Google's free TTS endpoints
-                const audioBase64 = await googleTTS.getAudioBase64(speechText, {
-                    lang: 'en',
-                    slow: false,
-                    host: 'https://translate.google.com',
-                });
+    if (now - lastUsed < SPEAK_COOLDOWN_MS) {
+        const remaining = Math.ceil(
+            (SPEAK_COOLDOWN_MS - (now - lastUsed)) / 1000
+        );
 
-                // Use audio/mp4 with .m4a extension matching video.js voice note structure
-                const audioMedia = new MessageMedia('audio/mp4', audioBase64, 'chaos-tts.m4a');
-                await client.sendMessage(chatId, audioMedia, { sendAudioAsVoice: true });
+        await message.reply(
+            `⏳ *Voice Engine Cooling Down...*\nPlease wait ${remaining}s.`
+        );
+        return;
+    }
 
-            } catch (ttsErr) {
-                console.error('❌ Speech Generation Error:', ttsErr);
-                await message.reply(`❌ Text-to-speech engine failed.\n\nError: ${ttsErr.message}`);
-            }
+    speakCooldowns.set(senderId, now);
 
-            return;
+    // Temporary TTS files
+    const tempDir = path.join(__dirname, 'temp');
+
+    const timestamp =
+        `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
+    const inputFile = path.join(
+        tempDir,
+        `chaos-tts-${timestamp}.mp3`
+    );
+
+    const outputFile = path.join(
+        tempDir,
+        `chaos-tts-${timestamp}.ogg`
+    );
+
+    try {
+
+        // --------------------------------------------------------
+        // CREATE TEMP DIRECTORY
+        // --------------------------------------------------------
+
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
         }
+
+        await message.reply(
+            '🎙️ *CHAOS VOICE ENGINE*\nGenerating voice audio...'
+        );
+
+        // --------------------------------------------------------
+        // 1. GOOGLE TTS
+        // --------------------------------------------------------
+
+        const audioBase64 = await googleTTS.getAudioBase64(
+            speechText,
+            {
+                lang: 'en',
+                slow: false,
+                host: 'https://translate.google.com'
+            }
+        );
+
+        // --------------------------------------------------------
+        // 2. SAVE GOOGLE TTS MP3
+        // --------------------------------------------------------
+
+        fs.writeFileSync(
+            inputFile,
+            Buffer.from(audioBase64, 'base64')
+        );
+
+        // --------------------------------------------------------
+        // 3. CONVERT MP3 → OGG/OPUS USING FFMPEG
+        // --------------------------------------------------------
+
+        console.log('🎙️ Converting TTS audio to OGG/Opus...');
+
+        await execFileAsync(
+            'ffmpeg',
+            [
+                '-y',
+
+                // Input
+                '-i',
+                inputFile,
+
+                // Mono
+                '-ac',
+                '1',
+
+                // Opus codec
+                '-c:a',
+                'libopus',
+
+                // Voice-note bitrate
+                '-b:a',
+                '32k',
+
+                // Variable bitrate
+                '-vbr',
+                'on',
+
+                // Optimize for voice
+                '-application',
+                'voip',
+
+                // Output
+                outputFile
+            ],
+            {
+                windowsHide: true
+            }
+        );
+
+        // --------------------------------------------------------
+        // 4. VERIFY FFMPEG OUTPUT
+        // --------------------------------------------------------
+
+        if (!fs.existsSync(outputFile)) {
+            throw new Error(
+                'FFmpeg did not create the OGG voice file.'
+            );
+        }
+
+        const outputStats = fs.statSync(outputFile);
+
+        if (outputStats.size === 0) {
+            throw new Error(
+                'FFmpeg created an empty OGG voice file.'
+            );
+        }
+
+        console.log(
+            `✅ TTS conversion successful: ` +
+            `${(outputStats.size / 1024).toFixed(1)} KB`
+        );
+
+        // --------------------------------------------------------
+        // 5. LOAD OGG/OPUS FILE
+        // --------------------------------------------------------
+
+        const oggBuffer = fs.readFileSync(outputFile);
+
+        const oggBase64 = oggBuffer.toString('base64');
+
+        // IMPORTANT:
+        // This is now a REAL OGG/Opus file.
+        const audioMedia = new MessageMedia(
+            'audio/ogg; codecs=opus',
+            oggBase64,
+            'chaos-tts.ogg'
+        );
+
+        // --------------------------------------------------------
+        // 6. SEND AS WHATSAPP VOICE NOTE
+        // --------------------------------------------------------
+
+        await client.sendMessage(
+            chatId,
+            audioMedia,
+            {
+                sendAudioAsVoice: true
+            }
+        );
+
+        console.log(
+            `🎙️ Chaos TTS voice note sent successfully to ${chatId}`
+        );
+
+    } catch (ttsErr) {
+
+        console.error(
+            '❌ Speech Generation Error:',
+            ttsErr
+        );
+
+        await message.reply(
+            `❌ Text-to-speech engine failed.\n\nError: ${ttsErr.message}`
+        );
+
+    } finally {
+
+        // --------------------------------------------------------
+        // 7. CLEAN UP TEMPORARY FILES
+        // --------------------------------------------------------
+
+        try {
+
+            if (fs.existsSync(inputFile)) {
+                fs.unlinkSync(inputFile);
+            }
+
+            if (fs.existsSync(outputFile)) {
+                fs.unlinkSync(outputFile);
+            }
+
+        } catch (cleanupErr) {
+
+            console.warn(
+                '⚠️ TTS cleanup warning:',
+                cleanupErr.message
+            );
+        }
+    }
+
+    return;
+}
 
         // ====================================================
         // !AI (HYBRID GEMINI WITH AZURE GPT-4O FALLBACK)

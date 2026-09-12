@@ -15,7 +15,7 @@
 ┃╰┈➤*[ 𝔄ℑ & 𝔐𝔘𝔏𝔗ℑ𝔐𝔒𝔇𝔄𝔏 ℭ𝔒ℝ𝔈 ]*
 ┃  • \`!ai <prompt>\` → Chat with Gemini AI
 ┃  • \`!draw <prompt>\` → Generate AI images (pollinations ai)
-┃  • \`!analyze\` → Reply to an image to analyze it (Azure GPT-4o)
+┃  • \`!catchup\` → Easil understand context while you were away(Azure GPT-4o)
 ┃  • \`!speak <text>\` → Convert text to Voice Note (Gemini TTS)
 ╣━━━━━━◉○◉◉○◉○◉○◉○◉○◉━━━━━━╣
 ┃╰┈➤*[ 𝔚𝔒ℝ𝔇𝔏𝔈 𝔊𝔄𝔐𝔈 ]*
