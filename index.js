@@ -1599,7 +1599,7 @@ client.on('message', async message => {
 
                 const announcement =
                     ownerArgs.slice(2).join(' ').trim();
-
+            
                 if (!announcement) {
                     await message.reply(
                         '❌ Usage:\n' +
@@ -1607,71 +1607,82 @@ client.on('message', async message => {
                     );
                     return;
                 }
-
+            
                 await message.reply(
                     '📡 *BROADCAST STARTING...*\n\n' +
-                    'Sending your announcement to all groups.'
+                    'Sending your announcement to all known groups.'
                 );
-
+            
                 let successful = 0;
                 let failed = 0;
-
+            
                 try {
-
-                    const chats = await client.getChats();
-
-                    const groups = chats.filter(chat =>
-                        chat.isGroup
-                    );
-
-                    for (const group of groups) {
-
+            
+                    const groupIds = [...knownGroupChats];
+            
+                    if (groupIds.length === 0) {
+                        await message.reply(
+                            '⚠️ *No known groups found.*\n\n' +
+                            'The bot has not seen any group messages since its last restart.'
+                        );
+                        return;
+                    }
+            
+                    for (const groupId of groupIds) {
+            
                         try {
-
+            
+                            const group = await client.getChatById(groupId);
+            
+                            if (!group) {
+                                failed++;
+                                continue;
+                            }
+            
                             await group.sendMessage(
                                 '📢 *MASTER OWNER ANNOUNCEMENT*\n\n' +
                                 announcement +
-                                '\n\n👑 *— Chriss, Chaos Bot Owner*'
+                                '\n\n👑 *— \`Chriss\`, Chaos Bot Owner*'
                             );
-
+            
                             successful++;
-
+            
                             // Small delay between groups
                             await new Promise(resolve =>
                                 setTimeout(resolve, 1000)
                             );
-
+            
                         } catch (err) {
-
+            
                             failed++;
-
+            
                             console.error(
-                                `[OWNER] Broadcast failed for ${group.id._serialized}:`,
+                                `[OWNER] Broadcast failed for ${groupId}:`,
                                 err.message
                             );
                         }
                     }
-
+            
                     await message.reply(
                         '📡 *BROADCAST COMPLETE*\n\n' +
                         `✅ Sent: ${successful}\n` +
                         `❌ Failed: ${failed}\n` +
-                        `👥 Groups: ${groups.length}`
+                        `👥 Groups: ${groupIds.length}`
                     );
-
+            
                 } catch (err) {
-
+            
                     console.error(
                         '[OWNER] Broadcast error:',
                         err
                     );
-
+            
                     await message.reply(
                         '❌ *Broadcast failed.*\n\n' +
-                        'Unable to retrieve WhatsApp groups.'
+                        'Unable to send the announcement to known groups.'
                     );
                 }
-
+            
                 return;
             }
 
