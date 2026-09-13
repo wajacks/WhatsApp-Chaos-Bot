@@ -150,6 +150,13 @@ const speakCooldowns = new Map();
 const voiceCooldowns = new Map();
 
 // ====================================================
+// 📊 CHAOS CHAT STATISTICS
+// ====================================================
+
+const knownGroupChats = new Set();
+const knownPrivateChats = new Set();
+
+// ====================================================
 // 👑 OWNER SYSTEM
 // ====================================================
 
@@ -404,6 +411,12 @@ client.on('message', async message => {
 
     try {
         const chatId = message.from;
+        // Track chats for Owner Statistics
+        if (chatId.endsWith('@g.us')) {
+            knownGroupChats.add(chatId);
+        } else if (chatId.endsWith('@c.us')) {
+            knownPrivateChats.add(chatId);
+        }
 
         const wasHandledAsVideoReply = await handleVideoQualityReply(message);
         if (wasHandledAsVideoReply) {
@@ -1266,7 +1279,7 @@ client.on('message', async message => {
                 try {
                     const db = readDB();
 
-                    const users = db.users || {};
+                    const users = db;
 
                     const userCount = Object.keys(users).length;
 
@@ -1274,35 +1287,17 @@ client.on('message', async message => {
                     let totalXP = 0;
 
                     for (const user of Object.values(users)) {
-                        totalCoins += Number(
-                            user.coins ??
-                            user.balance ??
-                            0
-                        );
+                        if (!user || typeof user !== 'object') continue;
 
-                        totalXP += Number(
-                            user.xp ??
-                            0
-                        );
+                        totalCoins += Number(user.coins || 0);
+                        totalXP += Number(user.xp || 0);
                     }
 
-                    // Get WhatsApp chat statistics
-                    let chats = [];
-                    let groups = [];
-                    let privateChats = [];
-
-                    try {
-                        chats = await client.getChats();
-
-                        groups = chats.filter(chat => chat.isGroup);
-                        privateChats = chats.filter(chat => !chat.isGroup);
-
-                    } catch (err) {
-                        console.warn(
-                            '[OWNER] Could not retrieve WhatsApp chats:',
-                            err.message
-                        );
-                    }
+                    // WhatsApp chat statistics
+                    const groups = knownGroupChats;
+                    const privateChats = knownPrivateChats;
+                    const totalChats =
+                        groups.size + privateChats.size;
 
                     // Node process statistics
                     const memory = process.memoryUsage();
@@ -1487,9 +1482,9 @@ client.on('message', async message => {
                         `🧩 Heap Used: ${heapUsedMB} MB\n\n` +
 
                         '💬 *WHATSAPP*\n' +
-                        `👥 Groups: ${groups.length}\n` +
-                        `👤 Private Chats: ${privateChats.length}\n` +
-                        `💬 Total Chats: ${chats.length}\n\n` +
+                        `👥 Groups: ${groups.size}\n` +
+                        `👤 Private Chats: ${privateChats.size}\n` +
+                        `💬 Total Chats: ${totalChats}\n\n` +
 
                         '💰 *ECONOMY*\n' +
                         `👤 Users: ${userCount}\n` +
