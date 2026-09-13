@@ -6,6 +6,6 @@ sessions/
 session/
 auth/
 *.log
-data/
+/data/
 cookies.txt
 downloads/
