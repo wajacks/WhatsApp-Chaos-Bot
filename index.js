@@ -10,7 +10,7 @@ const { GoogleGenAI } = require('@google/genai');
 const { AzureOpenAI } = require('openai');
 const axios = require('axios');
 const googleTTS = require('google-tts-api');
-const { ttsSave } = require('edge-tts');
+const { EdgeTTS } = require('node-edge-tts');
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 
@@ -148,6 +148,47 @@ const drawCooldowns = new Map();
 const analyzeCooldowns = new Map();
 const speakCooldowns = new Map();
 const voiceCooldowns = new Map();
+
+// ====================================================
+// 👑 OWNER SYSTEM
+// ====================================================
+
+const OWNER_NUMBER = '254111659469';
+
+function isOwner(senderId) {
+    if (!senderId) return false;
+
+    return senderId === `${OWNER_NUMBER}@c.us`;
+}
+
+function getOwnerMenu() {
+    return (
+        '👑 *CHAOS OWNER CONTROL*\n' +
+        '━━━━━━━━━━━━━━━━━━\n\n' +
+
+        '📊 *!owner stats*\n' +
+        'View live bot and VPS statistics.\n\n' +
+
+        '💥 *!owner reset*\n' +
+        'Reset the entire economy.\n\n' +
+
+        '🔄 *!owner restart*\n' +
+        'Restart Chaos Bot through PM2.\n\n' +
+
+        '📢 *!owner announce <message>*\n' +
+        'Announce something in the current chat.\n\n' +
+
+        '📡 *!owner broadcast <message>*\n' +
+        'Broadcast an announcement to all groups.\n\n' +
+
+        'ℹ️ *!owner help*\n' +
+        'Show this owner panel.\n\n' +
+
+        '━━━━━━━━━━━━━━━━━━\n' +
+        '👑 *Master Owner*: \`Chriss\`'
+    );
+}
+
 // ============================================================
 // EDGE TTS VOICES
 // ============================================================
@@ -622,154 +663,241 @@ client.on('message', async message => {
         // EDGE TTS VOICE SYSTEM      
         
         if (lowerText === '!voice' || lowerText.startsWith('!voice ')) {
-                            const voiceInput = text.replace(/^!voice\s*/i, '').trim();
-
-                if (!voiceInput) {
-                    const currentVoiceKey = voiceSelections.get(senderId) || DEFAULT_EDGE_VOICE;
-                    const currentVoice = EDGE_TTS_VOICES[currentVoiceKey];
-
-                    await message.reply(
-                        `🎙️ *CHAOS VOICE ENGINE*\n\n` +
-                        `Current voice:\n🔊 *${currentVoice.name}*\n\n` +
-                        `*Available Voices*\n` +
-                        `👨 *American Male* \`!voice male\`\n` +
-                        `👩 *American Female* \`!voice female\`\n` +
-                        `🎭 *Aria* \`!voice aria\`\n` +
-                        `🇬🇧 *British Female* \`!voice british\`\n` +
-                        `🇬🇧 *British Male* \`!voice britishmale\`\n` +
-                        `🇰🇪 *Kenyan Female* \`!voice kenya\`\n` +
-                        `🇰🇪 *Kenyan Male* \`!voice kenyanmale\`\n` +
-                        `🇮🇳 *Indian Female* \`!voice indian\`\n` +
-                        `🇮🇳 *Indian Male* \`!voice indianmale\`\n\n` +
-                        `━━━━━━━━━━━━━━━━━━\n\n` +
-                        `*Select a voice:* \`!voice kenyanmale\`\n` +
-                        `Then speak: \`!voice Hello Chaos Group!\``
-                    );
-                    return;
-                }
-
-                const requestedVoice = voiceInput.toLowerCase();
-
-                if (EDGE_TTS_VOICES[requestedVoice]) {
-                    voiceSelections.set(senderId, requestedVoice);
-                    const selectedVoice = EDGE_TTS_VOICES[requestedVoice];
-
-                    await message.reply(
-                        `🎙️ *VOICE CHANGED*\n\n` +
-                        `🔊 *${selectedVoice.name}*\n\n` +
-                        `Voice engine:\n*Microsoft Edge TTS*\n\n` +
-                        `Use: \`!voice Your message here\`\n` +
-                        `to speak with this voice.`
-                    );
-                    return;
-                }
-
-                const speechText = voiceInput.trim();
-                if (!speechText) return;
-
-                const now = Date.now();
-                const lastUsed = voiceCooldowns.get(senderId) || 0;
-
-                if (now - lastUsed < VOICE_COOLDOWN_MS) {
-                    const remaining = Math.ceil((VOICE_COOLDOWN_MS - (now - lastUsed)) / 1000);
-                    await message.reply(`⏳ *Voice Engine Cooling Down...*\n\nPlease wait ${remaining}s.`);
-                    return;
-                }
-
-                voiceCooldowns.set(senderId, now);
-
-                const selectedVoiceKey = voiceSelections.get(senderId) || DEFAULT_EDGE_VOICE;
-                const selectedVoice = EDGE_TTS_VOICES[selectedVoiceKey] || EDGE_TTS_VOICES[DEFAULT_EDGE_VOICE];
-
-                const tempDir = path.join(__dirname, 'temp');
-                const timestamp = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-                const edgeInputFile = path.join(tempDir, `chaos-edge-${timestamp}.mp3`);
-                const opusOutputFile = path.join(tempDir, `chaos-edge-${timestamp}.ogg`);
-
-                try {
-                    if (!fs.existsSync(tempDir)) {
-                        fs.mkdirSync(tempDir, { recursive: true });
-                    }
-
-                    await message.reply(
-                        `🎙️ *CHAOS VOICE ENGINE*\n\n` +
-                        `🔊 *${selectedVoice.name}*\n` +
-                        `Generating voice...`
-                    );
-
-                    console.log(`🎙️ Edge TTS voice: ${selectedVoice.voice}`);
-                    await ttsSave(speechText, edgeInputFile, {
-                        voice: selectedVoice.voice,
-                        rate: '+0%',
-                        volume: '+0%',
-                        pitch: '+0Hz'
-                    });
-
-                    if (!fs.existsSync(edgeInputFile)) {
-                        throw new Error('Edge TTS did not create the audio file.');
-                    }
-
-                    const inputStats = fs.statSync(edgeInputFile);
-                    if (inputStats.size === 0) {
-                        throw new Error('Edge TTS created an empty audio file.');
-                    }
-
-                    console.log(`✅ Edge TTS audio created: ${(inputStats.size / 1024).toFixed(1)} KB`);
-                    console.log('🎙️ Converting Edge TTS → OGG/Opus...');
-
-                    await execFileAsync(
-                        'ffmpeg',
-                        [
-                            '-y',
-                            '-i', edgeInputFile,
-                            '-ac', '1',
-                            '-ar', '48000',
-                            '-c:a', 'libopus',
-                            '-b:a', '32k',
-                            '-vbr', 'on',
-                            '-application', 'voip',
-                            opusOutputFile
-                        ],
-                        { windowsHide: true }
-                    );
-
-                    if (!fs.existsSync(opusOutputFile)) {
-                        throw new Error('FFmpeg did not create the OGG/Opus file.');
-                    }
-
-                    const outputStats = fs.statSync(opusOutputFile);
-                    if (outputStats.size === 0) {
-                        throw new Error('FFmpeg created an empty OGG/Opus file.');
-                    }
-
-                    console.log(`✅ OGG/Opus created: ${(outputStats.size / 1024).toFixed(1)} KB`);
-
-                    const oggBuffer = fs.readFileSync(opusOutputFile);
-                    const oggBase64 = oggBuffer.toString('base64');
-
-                    const audioMedia = new MessageMedia(
-                        'audio/ogg; codecs=opus',
-                        oggBase64,
-                        'chaos-voice.ogg'
-                    );
-
-                    await client.sendMessage(chatId, audioMedia, { sendAudioAsVoice: true });
-                    console.log('🎙️ Edge TTS voice note sent successfully');
-
-                } catch (voiceErr) {
-                    console.error('❌ Edge TTS Error:', voiceErr);
-                    await message.reply(`❌ *Voice engine failed.*\n\nError: ${voiceErr.message}`);
-                } finally {
-                    try {
-                        if (fs.existsSync(edgeInputFile)) fs.unlinkSync(edgeInputFile);
-                        if (fs.existsSync(opusOutputFile)) fs.unlinkSync(opusOutputFile);
-                    } catch (cleanupErr) {
-                        console.warn('⚠️ Voice cleanup warning:', cleanupErr.message);
-                    }
-                }
-
+            const voiceInput = text.replace(/^!voice\s*/i, '').trim();
+        
+            if (!voiceInput) {
+                const currentVoiceKey = voiceSelections.get(senderId) || DEFAULT_EDGE_VOICE;
+                const currentVoice = EDGE_TTS_VOICES[currentVoiceKey];
+        
+                await message.reply(
+                    `🎙️ *CHAOS VOICE ENGINE*\n\n` +
+                    `Current voice:\n🔊 *${currentVoice.name}*\n\n` +
+                    `*Available Voices*\n` +
+                    `👨 *American Male* \`!voice male\`\n` +
+                    `👩 *American Female* \`!voice female\`\n` +
+                    `🎭 *Aria* \`!voice aria\`\n` +
+                    `🇬🇧 *British Female* \`!voice british\`\n` +
+                    `🇬🇧 *British Male* \`!voice britishmale\`\n` +
+                    `🇰🇪 *Kenyan Female* \`!voice kenya\`\n` +
+                    `🇰🇪 *Kenyan Male* \`!voice kenyanmale\`\n` +
+                    `🇮🇳 *Indian Female* \`!voice indian\`\n` +
+                    `🇮🇳 *Indian Male* \`!voice indianmale\`\n\n` +
+                    `━━━━━━━━━━━━━━━━━━\n\n` +
+                    `*Select a voice:* \`!voice kenyanmale\`\n` +
+                    `Then speak: \`!voice Hello Chaos Group!\``
+                );
                 return;
             }
+        
+            const requestedVoice = voiceInput.toLowerCase();
+        
+            if (EDGE_TTS_VOICES[requestedVoice]) {
+                voiceSelections.set(senderId, requestedVoice);
+                const selectedVoice = EDGE_TTS_VOICES[requestedVoice];
+        
+                await message.reply(
+                    `🎙️ *VOICE CHANGED*\n\n` +
+                    `🔊 *${selectedVoice.name}*\n\n` +
+                    `Voice engine:\n*Microsoft Edge TTS*\n\n` +
+                    `Use: \`!voice Your message here\`\n` +
+                    `to speak with this voice.`
+                );
+                return;
+            }
+        
+            const speechText = voiceInput.trim();
+            if (!speechText) return;
+        
+            const now = Date.now();
+            const lastUsed = voiceCooldowns.get(senderId) || 0;
+        
+            if (now - lastUsed < VOICE_COOLDOWN_MS) {
+                const remaining = Math.ceil(
+                    (VOICE_COOLDOWN_MS - (now - lastUsed)) / 1000
+                );
+        
+                await message.reply(
+                    `⏳ *Voice Engine Cooling Down...*\n\n` +
+                    `Please wait ${remaining}s.`
+                );
+        
+                return;
+            }
+        
+            voiceCooldowns.set(senderId, now);
+        
+            const selectedVoiceKey =
+                voiceSelections.get(senderId) || DEFAULT_EDGE_VOICE;
+        
+            const selectedVoice =
+                EDGE_TTS_VOICES[selectedVoiceKey] ||
+                EDGE_TTS_VOICES[DEFAULT_EDGE_VOICE];
+        
+            const tempDir = path.join(__dirname, 'temp');
+        
+            const timestamp =
+                `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        
+            const edgeInputFile =
+                path.join(tempDir, `chaos-edge-${timestamp}.mp3`);
+        
+            const opusOutputFile =
+                path.join(tempDir, `chaos-edge-${timestamp}.ogg`);
+        
+            try {
+                if (!fs.existsSync(tempDir)) {
+                    fs.mkdirSync(tempDir, { recursive: true });
+                }
+        
+                await message.reply(
+                    `🎙️ *CHAOS VOICE ENGINE*\n\n` +
+                    `🔊 *${selectedVoice.name}*\n` +
+                    `Generating voice...`
+                );
+        
+                console.log(
+                    `🎙️ Edge TTS voice: ${selectedVoice.voice}`
+                );
+        
+                // ============================================
+                // MICROSOFT EDGE TTS
+                // ============================================
+        
+                const tts = new EdgeTTS({
+                    voice: selectedVoice.voice,
+                    lang: selectedVoice.voice.split('-').slice(0, 2).join('-')
+                });
+        
+                await tts.ttsPromise(
+                    speechText,
+                    edgeInputFile
+                );
+        
+                if (!fs.existsSync(edgeInputFile)) {
+                    throw new Error(
+                        'Edge TTS did not create the audio file.'
+                    );
+                }
+        
+                const inputStats = fs.statSync(edgeInputFile);
+        
+                if (inputStats.size === 0) {
+                    throw new Error(
+                        'Edge TTS created an empty audio file.'
+                    );
+                }
+        
+                console.log(
+                    `✅ Edge TTS audio created: ${(inputStats.size / 1024).toFixed(1)} KB`
+                );
+        
+                console.log(
+                    '🎙️ Converting Edge TTS → OGG/Opus...'
+                );
+        
+                // ============================================
+                // CONVERT TO REAL WHATSAPP OGG/OPUS
+                // ============================================
+        
+                await execFileAsync(
+                    'ffmpeg',
+                    [
+                        '-y',
+                        '-i', edgeInputFile,
+                        '-ac', '1',
+                        '-ar', '48000',
+                        '-c:a', 'libopus',
+                        '-b:a', '32k',
+                        '-vbr', 'on',
+                        '-application', 'voip',
+                        opusOutputFile
+                    ],
+                    {
+                        windowsHide: true
+                    }
+                );
+        
+                if (!fs.existsSync(opusOutputFile)) {
+                    throw new Error(
+                        'FFmpeg did not create the OGG/Opus file.'
+                    );
+                }
+        
+                const outputStats = fs.statSync(opusOutputFile);
+        
+                if (outputStats.size === 0) {
+                    throw new Error(
+                        'FFmpeg created an empty OGG/Opus file.'
+                    );
+                }
+        
+                console.log(
+                    `✅ OGG/Opus created: ${(outputStats.size / 1024).toFixed(1)} KB`
+                );
+        
+                // ============================================
+                // SEND AS REAL WHATSAPP VOICE NOTE
+                // ============================================
+        
+                const oggBuffer =
+                    fs.readFileSync(opusOutputFile);
+        
+                const oggBase64 =
+                    oggBuffer.toString('base64');
+        
+                const audioMedia = new MessageMedia(
+                    'audio/ogg; codecs=opus',
+                    oggBase64,
+                    'chaos-voice.ogg'
+                );
+        
+                await client.sendMessage(
+                    chatId,
+                    audioMedia,
+                    {
+                        sendAudioAsVoice: true
+                    }
+                );
+        
+                console.log(
+                    '🎙️ Edge TTS voice note sent successfully'
+                );
+        
+            } catch (voiceErr) {
+        
+                console.error(
+                    '❌ Edge TTS Error:',
+                    voiceErr
+                );
+        
+                await message.reply(
+                    `❌ *Voice engine failed.*\n\n` +
+                    `Error: ${voiceErr.message}`
+                );
+        
+            } finally {
+        
+                try {
+        
+                    if (fs.existsSync(edgeInputFile)) {
+                        fs.unlinkSync(edgeInputFile);
+                    }
+        
+                    if (fs.existsSync(opusOutputFile)) {
+                        fs.unlinkSync(opusOutputFile);
+                    }
+        
+                } catch (cleanupErr) {
+        
+                    console.warn(
+                        '⚠️ Voice cleanup warning:',
+                        cleanupErr.message
+                    );
+                }
+            }
+        
+            return;
+        }
 
         // ====================================================
         // !AI (HYBRID GEMINI WITH AZURE GPT-4O FALLBACK)
@@ -1033,25 +1161,568 @@ client.on('message', async message => {
         }
 
         // ====================================================
-        // RESET
+        // 👤 OWNER CONTACT
+        // ====================================================
+
+        if (
+            lowerText === '!ownercontact' ||
+            lowerText === '!contactowner'
+        ) {
+            try {
+                const ownerContact = await client.getContactById(
+                    `${OWNER_NUMBER}@c.us`
+                );
+
+                if (!ownerContact) {
+                    await message.reply(
+                        '❌ *Owner contact could not be found right now.*'
+                    );
+                    return;
+                }
+
+                await message.reply(
+                    '👑 *MASTER OWNER*\n\n' +
+                    'Here is the contact for the Chaos Bot Owner.\n\n' +
+                    '📇 *Tap the contact card below to save the Master Owner.*'
+                );
+
+                await client.sendMessage(
+                    chatId,
+                    ownerContact
+                );
+
+            } catch (err) {
+                console.error(
+                    '[OWNER CONTACT] Error:',
+                    err
+                );
+
+                await message.reply(
+                    '❌ *Could not send the owner contact card.*\n\n' +
+                    'Please try again.'
+                );
+            }
+
+            return;
+        }
+
+        // ====================================================
+        // 👑 OWNER CONTROL PANEL
+        // ====================================================
+
+        if (lowerText === '!owner' || lowerText.startsWith('!owner ')) {
+
+            if (!isOwner(senderId)) {
+                await message.reply(
+                    '❌ *Access Denied*\n\n' +
+                    'This command is restricted to the Master Owner. 👑'
+                );
+                return;
+            }
+
+            const ownerArgs = text.split(/\s+/);
+            const ownerCommand = (ownerArgs[1] || 'help').toLowerCase();
+
+            // --------------------------------------------
+            // !owner / !owner help
+            // --------------------------------------------
+
+            if (ownerCommand === 'help') {
+                await message.reply(getOwnerMenu());
+                return;
+            }
+
+            // --------------------------------------------
+            // !owner reset
+            // --------------------------------------------
+
+            if (ownerCommand === 'reset') {
+                try {
+                    resetEconomy();
+
+                    await message.reply(
+                        '💥 *ECONOMY RESET SUCCESSFUL!*\n\n' +
+                        'All wallets, user scores, and economy statistics have been wiped.\n\n' +
+                        '👑 *Executed by: Master Owner*'
+                    );
+                } catch (err) {
+                    console.error('Owner reset error:', err);
+
+                    await message.reply(
+                        '❌ *ECONOMY RESET FAILED*\n\n' +
+                        'An error occurred while resetting the economy.'
+                    );
+                }
+
+                return;
+            }
+
+            // --------------------------------------------
+            // !owner stats
+            // --------------------------------------------
+
+            if (ownerCommand === 'stats') {
+
+                try {
+                    const db = readDB();
+
+                    const users = db.users || {};
+
+                    const userCount = Object.keys(users).length;
+
+                    let totalCoins = 0;
+                    let totalXP = 0;
+
+                    for (const user of Object.values(users)) {
+                        totalCoins += Number(
+                            user.coins ??
+                            user.balance ??
+                            0
+                        );
+
+                        totalXP += Number(
+                            user.xp ??
+                            0
+                        );
+                    }
+
+                    // Get WhatsApp chat statistics
+                    let chats = [];
+                    let groups = [];
+                    let privateChats = [];
+
+                    try {
+                        chats = await client.getChats();
+
+                        groups = chats.filter(chat => chat.isGroup);
+                        privateChats = chats.filter(chat => !chat.isGroup);
+
+                    } catch (err) {
+                        console.warn(
+                            '[OWNER] Could not retrieve WhatsApp chats:',
+                            err.message
+                        );
+                    }
+
+                    // Node process statistics
+                    const memory = process.memoryUsage();
+
+                    const ramUsedMB = (
+                        memory.rss / 1024 / 1024
+                    ).toFixed(0);
+
+                    const heapUsedMB = (
+                        memory.heapUsed / 1024 / 1024
+                    ).toFixed(0);
+
+                    // VPS memory
+                    let vpsMemory = 'Unavailable';
+
+                    try {
+                        const { stdout } = await execFileAsync(
+                            'free',
+                            ['-m']
+                        );
+
+                        const lines = stdout.trim().split('\n');
+
+                        const memLine = lines.find(line =>
+                            line.startsWith('Mem:')
+                        );
+
+                        if (memLine) {
+                            const parts = memLine.trim().split(/\s+/);
+
+                            const total = Number(parts[1]);
+                            const used = Number(parts[2]);
+
+                            if (total) {
+                                const percentage = (
+                                    (used / total) * 100
+                                ).toFixed(0);
+
+                                vpsMemory =
+                                    `${used} MB / ${total} MB (${percentage}%)`;
+                            }
+                        }
+                    } catch (err) {
+                        console.warn(
+                            '[OWNER] Could not read VPS memory:',
+                            err.message
+                        );
+                    }
+
+                    // VPS disk
+                    let diskUsage = 'Unavailable';
+
+                    try {
+                        const { stdout } = await execFileAsync(
+                            'df',
+                            ['-h', '/']
+                        );
+
+                        const lines = stdout.trim().split('\n');
+
+                        if (lines.length >= 2) {
+                            const parts = lines[1].trim().split(/\s+/);
+
+                            diskUsage =
+                                `${parts[2]} / ${parts[1]} (${parts[4]})`;
+                        }
+                    } catch (err) {
+                        console.warn(
+                            '[OWNER] Could not read VPS disk:',
+                            err.message
+                        );
+                    }
+
+                    // VPS CPU load
+                    let cpuLoad = 'Unavailable';
+
+                    try {
+                        const { stdout } = await execFileAsync(
+                            'uptime'
+                        );
+
+                        const match = stdout.match(
+                            /load average[s]?:\s*([0-9.]+)/
+                        );
+
+                        if (match) {
+                            cpuLoad = match[1];
+                        }
+                    } catch (err) {
+                        console.warn(
+                            '[OWNER] Could not read CPU load:',
+                            err.message
+                        );
+                    }
+
+                    // PM2 status
+                    let pm2Status = 'Unavailable';
+
+                    try {
+                        const { stdout } = await execFileAsync(
+                            'pm2',
+                            ['jlist']
+                        );
+
+                        const processes = JSON.parse(stdout);
+
+                        const chaosProcess = processes.find(
+                            process =>
+                                process.name === 'chaos-bot'
+                        );
+
+                        if (chaosProcess) {
+                            const status =
+                                chaosProcess.pm2_env?.status;
+
+                            pm2Status =
+                                status === 'online'
+                                    ? '🟢 ONLINE'
+                                    : `🔴 ${String(status).toUpperCase()}`;
+                        } else {
+                            pm2Status = '🔴 NOT FOUND';
+                        }
+
+                    } catch (err) {
+                        console.warn(
+                            '[OWNER] Could not read PM2 status:',
+                            err.message
+                        );
+                    }
+
+                    const uptimeSeconds = process.uptime();
+
+                    const days = Math.floor(
+                        uptimeSeconds / 86400
+                    );
+
+                    const hours = Math.floor(
+                        (uptimeSeconds % 86400) / 3600
+                    );
+
+                    const minutes = Math.floor(
+                        (uptimeSeconds % 3600) / 60
+                    );
+
+                    const seconds = Math.floor(
+                        uptimeSeconds % 60
+                    );
+
+                    let botUptime = '';
+
+                    if (days > 0) {
+                        botUptime += `${days}d `;
+                    }
+
+                    if (hours > 0 || days > 0) {
+                        botUptime += `${hours}h `;
+                    }
+
+                    if (minutes > 0 || hours > 0 || days > 0) {
+                        botUptime += `${minutes}m `;
+                    }
+
+                    botUptime += `${seconds}s`;
+
+                    const statsMessage =
+                        '👑 *CHAOS SERVER STATUS*\n' +
+                        '━━━━━━━━━━━━━━━━━━\n\n' +
+
+                        '🤖 *BOT*\n' +
+                        `🟢 Status: ONLINE\n` +
+                        `⚙️ PM2: ${pm2Status}\n` +
+                        `🟢 Node: ${process.version}\n` +
+                        `⏱️ Uptime: ${botUptime}\n\n` +
+
+                        '🖥️ *VPS*\n' +
+                        `⚡ Load Average: ${cpuLoad}\n` +
+                        `🧠 RAM: ${vpsMemory}\n` +
+                        `💾 Disk: ${diskUsage}\n\n` +
+
+                        '💻 *NODE PROCESS*\n' +
+                        `📦 RSS Memory: ${ramUsedMB} MB\n` +
+                        `🧩 Heap Used: ${heapUsedMB} MB\n\n` +
+
+                        '💬 *WHATSAPP*\n' +
+                        `👥 Groups: ${groups.length}\n` +
+                        `👤 Private Chats: ${privateChats.length}\n` +
+                        `💬 Total Chats: ${chats.length}\n\n` +
+
+                        '💰 *ECONOMY*\n' +
+                        `👤 Users: ${userCount}\n` +
+                        `🪙 Total Coins: ${totalCoins.toLocaleString()}\n` +
+                        `⭐ Total XP: ${totalXP.toLocaleString()}\n\n` +
+
+                        '━━━━━━━━━━━━━━━━━━\n' +
+                        '👑 *Master Owner: Chriss*';
+
+                    await message.reply(statsMessage);
+
+                } catch (err) {
+                    console.error(
+                        '[OWNER] Stats error:',
+                        err
+                    );
+
+                    await message.reply(
+                        '❌ *Could not retrieve server statistics.*\n\n' +
+                        'Check the bot console for details.'
+                    );
+                }
+
+                return;
+            }
+
+            // --------------------------------------------
+            // !owner restart
+            // --------------------------------------------
+
+            if (ownerCommand === 'restart') {
+
+                await message.reply(
+                    '🔄 *CHAOS BOT RESTARTING...*\n\n' +
+                    'PM2 is restarting the bot now. 👑\n\n' +
+                    'See you in a moment, Boss.'
+                );
+
+                setTimeout(() => {
+
+                    const pm2Command =
+                        process.platform === 'win32'
+                            ? 'pm2.cmd'
+                            : 'pm2';
+
+                    execFile(
+                        pm2Command,
+                        ['restart', 'chaos-bot'],
+                        {
+                            windowsHide: true
+                        },
+                        (error, stdout, stderr) => {
+
+                            if (error) {
+                                console.error(
+                                    '[OWNER] PM2 restart failed:',
+                                    error.message
+                                );
+
+                                console.error(stderr);
+
+                                // Fallback
+                                process.exit(0);
+                            }
+
+                            console.log(
+                                '[OWNER] Chaos Bot restarted through PM2.'
+                            );
+
+                            if (stdout) {
+                                console.log(stdout);
+                            }
+                        }
+                    );
+
+                }, 1500);
+
+                return;
+            }
+
+            // --------------------------------------------
+            // !owner announce <message>
+            // --------------------------------------------
+
+            if (ownerCommand === 'announce') {
+
+                const announcement =
+                    ownerArgs.slice(2).join(' ').trim();
+
+                if (!announcement) {
+                    await message.reply(
+                        '❌ Usage:\n' +
+                        '`!owner announce <message>`'
+                    );
+                    return;
+                }
+
+                await message.reply(
+                    '📢 *MASTER OWNER ANNOUNCEMENT*\n\n' +
+                    announcement +
+                    '\n\n👑 *— Chriss, Chaos Bot Owner*'
+                );
+
+                return;
+            }
+
+            // --------------------------------------------
+            // !owner broadcast <message>
+            // --------------------------------------------
+
+            if (ownerCommand === 'broadcast') {
+
+                const announcement =
+                    ownerArgs.slice(2).join(' ').trim();
+
+                if (!announcement) {
+                    await message.reply(
+                        '❌ Usage:\n' +
+                        '`!owner broadcast <message>`'
+                    );
+                    return;
+                }
+
+                await message.reply(
+                    '📡 *BROADCAST STARTING...*\n\n' +
+                    'Sending your announcement to all groups.'
+                );
+
+                let successful = 0;
+                let failed = 0;
+
+                try {
+
+                    const chats = await client.getChats();
+
+                    const groups = chats.filter(chat =>
+                        chat.isGroup
+                    );
+
+                    for (const group of groups) {
+
+                        try {
+
+                            await group.sendMessage(
+                                '📢 *MASTER OWNER ANNOUNCEMENT*\n\n' +
+                                announcement +
+                                '\n\n👑 *— Chriss, Chaos Bot Owner*'
+                            );
+
+                            successful++;
+
+                            // Small delay between groups
+                            await new Promise(resolve =>
+                                setTimeout(resolve, 1000)
+                            );
+
+                        } catch (err) {
+
+                            failed++;
+
+                            console.error(
+                                `[OWNER] Broadcast failed for ${group.id._serialized}:`,
+                                err.message
+                            );
+                        }
+                    }
+
+                    await message.reply(
+                        '📡 *BROADCAST COMPLETE*\n\n' +
+                        `✅ Sent: ${successful}\n` +
+                        `❌ Failed: ${failed}\n` +
+                        `👥 Groups: ${groups.length}`
+                    );
+
+                } catch (err) {
+
+                    console.error(
+                        '[OWNER] Broadcast error:',
+                        err
+                    );
+
+                    await message.reply(
+                        '❌ *Broadcast failed.*\n\n' +
+                        'Unable to retrieve WhatsApp groups.'
+                    );
+                }
+
+                return;
+            }
+
+            // --------------------------------------------
+            // UNKNOWN OWNER COMMAND
+            // --------------------------------------------
+
+            await message.reply(
+                '❌ *Unknown Owner Command*\n\n' +
+                `You entered: *${ownerCommand}*\n\n` +
+                'Use `!owner` to view the available commands.'
+            );
+
+            return;
+        }
+
+        // ====================================================
+        // 👑 OWNER RESET
         // ====================================================
 
         if (lowerText === '!reset' || lowerText === '!clearance' || lowerText === '!wipe') {
-            const ownerNumber = '254111659469';
-            const isOwner = senderId.includes(ownerNumber);
-
-            if (!isOwner) {
-                await message.reply('❌ *Access Denied:* Only the master owner can execute a system reset!');
+            if (!isOwner(senderId)) {
+                await message.reply(
+                    '❌ *Access Denied*\n\n' +
+                    'Only the Master Owner can execute a system reset. 👑'
+                );
                 return;
             }
 
             try {
                 resetEconomy();
-                await message.reply('*SYSTEM RESET SUCCESSFUL!* All wallets, user scores, and economy stats wiped.');
+
+                await message.reply(
+                    '💥 *SYSTEM RESET SUCCESSFUL!*\n\n' +
+                    'All wallets, user scores, and economy statistics have been wiped.\n\n' +
+                    '👑 *Executed by: Master Owner*'
+                );
             } catch (err) {
                 console.error('System reset error:', err);
-                await message.reply('❌ Failed to execute system reset.');
+
+                await message.reply(
+                    '❌ *SYSTEM RESET FAILED*\n\n' +
+                    'An error occurred while resetting the economy.'
+                );
             }
+
             return;
         }
 
