@@ -1,74 +1,190 @@
 ﻿function getBotMenu() {
-  return `╭━━[ℭ𝔥𝔞𝔬𝔰 ℭ𝔬𝔪𝔪𝔞𝔫𝔡 ℭ𝔢𝔫𝔱𝔢𝔯]━━╮
-┃ 
-┃✄┈┈┈┈YOU CALLED ME 😎┈┈┈┈
-╣━━━━━━◉○◉◉○◉○◉○◉○◉○◉━━━━━━╣
-┃╰┈➤*[ 𝔈ℭ𝔒ℕ𝔒𝔐𝔜 & 𝔓ℝ𝔒𝔉ℑ𝔏𝔈 ]*
-┃  • \`!profile\` → View stats & assets
-┃  • \`!daily\` → Claim 24h bonus
-┃  • \`!bal\` → Check wallet balance
-┃  • \`!store\` → Browse car & house market
-┃  • \`!buy <item>\` → Purchase vehicles/homes
-┃  • \`!beg\` → Ask for street handouts
-┃  • \`!pay <amt>\` → Reply to \`!beg\` to fund a player
-╣━━━━━━◉○◉◉○◉○◉○◉○◉○◉━━━━━━╣
-┃╰┈➤*[ 𝔄ℑ & 𝔐𝔘𝔏𝔗ℑ𝔐𝔒𝔇𝔄𝔏 ℭ𝔒ℝ𝔈 ]*
-┃  • \`!ai <prompt>\` → Chat with Gemini AI
-┃  • \`!draw <prompt>\` → Generate AI images (pollinations ai)
-┃  • \`!catchup\` → Easily understand context while you were away(Azure GPT-4o-mini)
-┃  • \`!speak <text>\` → Convert text to Voice Note (Gemini TTS)
-┃  • \`!voice <text>\` → Convert text to Voice Note --choose person (Edge TTS)
-╣━━━━━━◉○◉◉○◉○◉○◉○◉○◉━━━━━━╣
-┃╰┈➤*[ 𝔚𝔒ℝ𝔇𝔏𝔈 𝔊𝔄𝔐𝔈 ]*
-┃  • \`!wordle\` → Start Wordle lobby (80s join time)
-┃  • \`!join\` → Join active Wordle game
-┃  📊 10 rounds max, 4 mins per round
-┃  🎯 15 guesses per player per word
-┃  💰 Rewards: Up to 40 coins × attempts left
-┃  ⚡ XP: Up to 25 XP × attempts left
-┃  💡 1 letter revealed at round start
-╣━━━━━━◉○◉◉○◉○◉○◉○◉◉━━━━━━╣
-┃╰┈➤*[ ℝ𝔈𝔅𝔘𝔖 ℭ𝔒𝔘ℕ𝔗ℝ𝔜 𝔊𝔄𝔐𝔈 ]*
-┃  • \`!rebus\` → Start Rebus lobby
-┃  • \`!joinrebus\` → Join active Rebus game
-┃  • \`!rguess <answer>\` → Submit your guess
-┃  • \`!country <answer>\` → Alternative guess cmd
-┃  • \`!hint\` → Get hint (-10 coins)
-┃  • \`!steal @user\` → Winner steals 12.5% wallet
-┃  ⏱️ 5 minute game, 50 sec per round
-┃  🎯 100 points per correct answer
-┃  🏆 Top scorer can steal from losers (60s window)
-╣━━━━━━◉○◉◉○◉○◉○◉○◉○◉━━━━━━╣
-┃╰┈➤*[ 𝔐𝔄𝔉ℑ𝔄 𝔇𝔈𝔇𝔘ℭ𝔗ℑ𝔒ℕ 𝔊𝔄𝔐𝔈 ]*
-┃  • \`!mafia\` or \`!startmafia\` → Start lobby
-┃  • \`!joinmafia\` → Join active case
-┃  • \`!endmafia\` → Force stop game
-┃  🎭 Roles: Mafia, Doctor, Detective, Villagers
-┃  🌙 Night phase: DM bot with actions
-┃     - \`!kill <letter>\` → Mafia eliminates target
-┃     - \`!save <letter>\` → Doctor protects target
-┃     - \`!investigate <letter>\` → Detective checks role
-┃  ☀️ Day phase: Vote in group
-┃     - \`!vote @user\` → Vote to eliminate
-┃  📝 Each player gets a letter alias (A, B, C...)
-┃  🎯 Town wins if Mafia eliminated
-┃  🎯 Mafia wins if equals/outnumbers town
-╣━━━━━━◉○◉◉○◉○◉○◉○◉○◉━━━━━━╣
-┃╰┈➤*[ 𝔊𝔈ℕ𝔈ℝ𝔄𝔏 ℭ𝔒𝔐𝔐𝔄ℕ𝔇𝔖 ]*
-┃  • \`!games\` → View all game modes
-┃  • \`!ping\` → Check bot latency
-┃  • \`!menu\` → Display this control panel
-┃  • \`!randomsong\` → Play a random song
-┃  • \`!video <query/link>\` → Download video or audio
-┃  • \`!weather <city>\` → Live weather report
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-┃┊ ┊*[ 𝔒𝔚ℕ𝔈ℝ ]*┊ ┊
-┃  ┌───────────────────────
-┃  │ 🛡️ *Creator:* \`⚘Chriss⚘\`
-┃  │ ⚡ *Contact:* *[0111659469]*
-┃  └───────────────────────
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-    \`wantam\`\t\t` + `👆😅`;
-}
+  return `╔══════════════════════════════════════╗
+║                                      ║
+║  ████████╗ ██╗   ██╗ ███╗   ███╗    ║
+║  ╚══██╔══╝ ██║   ██║ ████╗ ████║    ║
+║     ██║    ██║   ██║ ██╔████╔██║    ║
+║     ██║    ██║   ██║ ██║╚██╔╝██║    ║
+║     ██║    ╚██████╔╝ ██║ ╚═╝ ██║    ║
+║     ╚═╝     ╚═════╝  ╚═╝     ╚═╝    ║
+║                                      ║
+║          C H A O S   O S             ║
+║        COMMAND INTERFACE             ║
+║                                      ║
+╠══════════════════════════════════════╣
+║  ◉ SYSTEM STATUS                     ║
+║  ├─ NETWORK     : ONLINE             ║
+║  ├─ NEURAL CORE : ACTIVE             ║
+║  ├─ GAME ENGINE : READY              ║
+║  ├─ ECONOMY     : ONLINE             ║
+║  └─ CHAOS       : UNLEASHED          ║
+╚══════════════════════════════════════╝
 
-module.exports = { getBotMenu };
+╭━━━[ ◈ ECONOMY TERMINAL ◈ ]━━━━━━━━━━╮
+┃                                     
+┃  💳 \`!profile\`
+┃     View your stats, level & assets
+┃
+┃  💰 \`!bal\`
+┃     Check your wallet
+┃
+┃  🎁 \`!daily\`
+┃     Claim your 24h reward
+┃
+┃  🏪 \`!store\`
+┃     Browse the Chaos marketplace
+┃
+┃  🛒 \`!buy <item>\`
+┃     Purchase vehicles & properties
+┃
+┃  🥷 \`!beg\`
+┃     Ask the streets for coins
+┃
+┃  💸 \`!pay <amount>\`
+┃     Transfer coins to another player
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+╭━━━[ ◈ NEURAL & MEDIA CORE ◈ ]━━━━━━━╮
+┃                                     
+┃  🧠 \`!ai <prompt>\`
+┃     Talk with Chaos AI
+┃
+┃  🎨 \`!draw <prompt>\`
+┃     Generate an AI image
+┃
+┃  🛰️ \`!catchup\`
+┃     Recover what you missed
+┃
+┃  🎙️ \`!speak <text>\`
+┃     Gemini voice synthesis
+┃
+┃  🗣️ \`!voice <text>\`
+┃     Choose your AI voice
+┃
+┃  🎵 \`!randomsong\`
+┃     Random music from Chaos
+┃
+┃  🎬 \`!video <query/link>\`
+┃     Download video or audio
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+╭━━━[ ◈ WORDLE PROTOCOL ◈ ]━━━━━━━━━━━╮
+┃                                     
+┃  🟩 \`!wordle\`
+┃     Open a Wordle lobby
+┃
+┃  🟩 \`!join\`
+┃     Join the active game
+┃
+┃  ⏱️ 80 sec lobby
+┃  🔢 10 rounds maximum
+┃  🎯 15 guesses per player
+┃  💰 Up to 40 coins × attempts
+┃  ⚡ Up to 25 XP × attempts
+┃  💡 1 letter revealed each round
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+╭━━━[ ◈ REBUS COUNTRY SYSTEM ◈ ]━━━━━╮
+┃                                     
+┃  🌍 \`!rebus\`
+┃     Start a country challenge
+┃
+┃  👥 \`!joinrebus\`
+┃     Join the active game
+┃
+┃  🎯 \`!rguess <answer>\`
+┃     Submit your answer
+┃
+┃  🌎 \`!country <answer>\`
+┃     Alternative answer command
+┃
+┃  💡 \`!hint\`
+┃     Request a clue
+┃
+┃  🥷 \`!steal @user\`
+┃     Steal from a defeated player
+┃
+┃  ⏱️ 5 min game
+┃  ⚡ 50 sec per round
+┃  🏆 100 points per answer
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+╭━━━[ ◈ MAFIA CASE FILE ◈ ]━━━━━━━━━━╮
+┃                                     
+┃  🕵️ \`!mafia\`
+┃     Open a new Mafia case
+┃
+┃  🎭 \`!joinmafia\`
+┃     Enter the investigation
+┃
+┃  🛑 \`!endmafia\`
+┃     Force-close the case
+┃
+┃  ┌─ ROLES ─────────────────────────┐
+┃  │ 🔴 Mafia                        │
+┃  │ 🟢 Doctor                       │
+┃  │ 🔵 Detective                    │
+┃  │ ⚪ Villagers                    │
+┃  └─────────────────────────────────┘
+┃
+┃  🌙 NIGHT PHASE
+┃  ├─ \`!kill <letter>\`
+┃  ├─ \`!save <letter>\`
+┃  └─ \`!investigate <letter>\`
+┃
+┃  ☀️ DAY PHASE
+┃  └─ \`!vote @user\`
+┃
+┃  🔐 Roles remain classified
+┃  📝 Every player receives a letter
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+╭━━━[ ◈ GENERAL SYSTEM COMMANDS ◈ ]━━╮
+┃                                     
+┃  🎮 \`!games\`
+┃     View all available games
+┃
+┃  📡 \`!ping\`
+┃     Check Chaos latency
+┃
+┃  📋 \`!menu\`
+┃     Reopen this command center
+┃
+┃  🌤️ \`!weather <city>\`
+┃     Get live weather information
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+╔══════════════════════════════════════╗
+║          ◈ CHAOS NETWORK ◈          ║
+║                                      ║
+║  STATUS      : ● ONLINE              ║
+║  SECURITY    : ● ACTIVE              ║
+║  DATABASE    : ● CONNECTED           ║
+║  AI CORE     : ● ONLINE              ║
+║  GAME SERVER : ● READY               ║
+║                                      ║
+║  ──────────────────────────────────  ║
+║                                       ║
+║       👑 MASTER OWNER ACCESS       ║
+║                                       ║
+║  📞 \`!contactowner\`              ║
+║     Contact the Master Owner          ║
+║                                     ║
+║  🔐 \`!owner\`                        ║
+║     Restricted Owner Control        ║
+║                                       ║
+║       \`⚘ C H R I S S ⚘\`           ║
+║          CHAOS CREATOR                ║
+║            \`wantam\`               ║
+╚══════════════════════════════════════╝
+
+      ⚡ T U M  ×  C H A O S ⚡
+      「 CONTROL THE CHAOS 」
+`;
+}

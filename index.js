@@ -1064,6 +1064,7 @@ client.on('message', async message => {
                 '- !tts <text> — Generate a voice note from text.\n' +
                 '- !speak <text> — Generate a voice note from text.\n' +
                 '- !pay <amount> — Pay another player.\n' +
+                '- !owner — Access the owner control panel (Owner only).\n' +
                 '- !games — View available game modes.\n' +
                 '- !video — Search video, music video, audio, or link from YouTube.';
 
@@ -1495,7 +1496,7 @@ client.on('message', async message => {
                         `⭐ Total XP: ${totalXP.toLocaleString()}\n\n` +
 
                         '━━━━━━━━━━━━━━━━━━\n' +
-                        '👑 *Master Owner: Chriss*';
+                        '👑 *Master Owner*: \`Chriss\`';
 
                     await message.reply(statsMessage);
 
@@ -1943,7 +1944,7 @@ client.on('message', async message => {
                             ? 'Dependencies updated.\n'
                             : '') +
                         'Chaos Bot restarted successfully.\n\n' +
-                        '*Updated by: Chriss*'
+                        '*Updated by*: \`Chriss\`'
                     );
 
                 } catch (error) {
@@ -1984,7 +1985,7 @@ client.on('message', async message => {
                 await message.reply(
                     '📢 *MASTER OWNER ANNOUNCEMENT*\n\n' +
                     announcement +
-                    '\n\n👑 *— Chriss, Chaos Bot Owner*'
+                    '\n\n👑 *— \`Chriss\`, Chaos Bot Owner*'
                 );
 
                 return;
@@ -2035,7 +2036,7 @@ client.on('message', async message => {
                                 groupId,
                                 '📢 *MASTER OWNER ANNOUNCEMENT*\n\n' +
                                 announcement +
-                                '\n\n👑 *— Chriss, Chaos Bot Owner*'
+                                '\n\n👑 *— \`Chriss\`, Chaos Bot Owner*'
                             );
                         
                             successful++;
