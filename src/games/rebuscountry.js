@@ -221,7 +221,7 @@ function startRebusLobby(groupId, client) {
         activePuzzle: null,
         roundTimer: null,
         gameTimer: null,
-        hintGiven: false
+        hintBuyers: []
     };
 
     activeGames.set(groupId, gameState);
@@ -354,7 +354,7 @@ function nextRound(groupId, client) {
 
     game.activePuzzle = game.puzzlesPool.pop();
     game.currentRound++;
-    game.hintGiven = false;
+    game.hintBuyers = [];
 
     client.sendMessage(
         groupId,
@@ -416,9 +416,12 @@ function processRebusHint(groupId, senderId, client) {
         return '⚠️ There is no active puzzle!';
     }
 
-    // Only one hint per round
-    if (game.hintGiven) {
-        return '💡 The hint for this round has already been revealed!';
+    // Ensure the array exists (failsafe)
+    if (!game.hintBuyers) game.hintBuyers = [];
+
+    // Check if this specific player already bought the hint
+    if (game.hintBuyers.includes(senderId)) {
+        return '💡 You have already purchased the hint for this round! Check your DMs.';
     }
 
     const userBalance = getBalance(senderId);
@@ -427,22 +430,24 @@ function processRebusHint(groupId, senderId, client) {
         return `❌ You don't have enough coins! A hint costs \`${HINT_COST} coins\`.`;
     }
 
-    // Deduct hint fee from user wallet
+    // Deduct hint fee from user wallet and record the purchase
     subtractCoins(senderId, HINT_COST);
-    game.hintGiven = true;
+    game.hintBuyers.push(senderId);
 
+    // Send the hint PRIVATELY to the user who requested it
     client.sendMessage(
-        groupId,
+        senderId,
 `💡 *HINT — ROUND ${game.currentRound}* (\`-${HINT_COST} coins\`)
 ━━━━━━━━━━━━━━━━━━━━━
 
 ${game.activePuzzle.hint}
 
-🧠 *Keep guessing!*
+🧠 *Keep guessing in the group!*
 🎯 Correct answer = *+100 points*`
     ).catch(() => {});
 
-    return null;
+    // Return a public confirmation to the group chat
+    return `✅ Hint sent to your DM! (-${HINT_COST} coins)\n\nCheck your private messages with me.`;
 }
 
 // ============================================================
@@ -574,7 +579,7 @@ function endGame(groupId, client) {
 `\n🎉 *CONGRATULATIONS ${winner.name}! YOU WIN! 👑*
 
 💰 *WINNER PRIVILEGE:*
-You have \`120 seconds\` to steal \`12.5%\` of any losing player's wallet savings!
+You have \`120 seconds\` to steal \`25%\` of any losing player's wallet savings!
 
 👉 *${winner.name}*, tag a player now:
 \`!steal @User\``;
@@ -624,7 +629,7 @@ function handleStealCommand(
     }
 
     // 12.5% = 1/8
-    const stealAmount = Math.floor(victimBal / 8);
+    const stealAmount = Math.floor(victimBal / 4);
 
     subtractCoins(
         mentionedJid,
