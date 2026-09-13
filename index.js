@@ -1065,6 +1065,8 @@ client.on('message', async message => {
                 '- !speak <text> — Generate a voice note from text.\n' +
                 '- !pay <amount> — Pay another player.\n' +
                 '- !owner — Access the owner control panel (Owner only).\n' +
+                '- !contactowner — Get the contact card for the bot owner.\n' +
+                '- !ownercontact — Get the contact card for the bot owner.\n' +
                 '- !games — View available game modes.\n' +
                 '- !video — Search video, music video, audio, or link from YouTube.';
 
@@ -1569,209 +1571,100 @@ client.on('message', async message => {
                 return;
             }
 
-            // ====================================================
-            // OWNER UPDATE - GIT PULL + OPTIONAL NPM INSTALL + RESTART
-            // ====================================================
+            // ------------------------------------------------
+            // OWNER UPDATE - GITHUB PULL + DEPENDENCY CHECK
+            // ------------------------------------------------
 
-            if (ownerCommand === 'update') {
+            if (
+                lowerText === '!owner update' &&
+                isOwner(senderId)
+            ) {
 
-                const runCommand = (command, args, options = {}) => {
-                    return new Promise((resolve, reject) => {
-
-                        execFile(
-                            command,
-                            args,
-                            {
-                                ...options,
-                                windowsHide: true
-                            },
-                            (error, stdout, stderr) => {
-
-                                if (error) {
-                                    error.stdout = stdout;
-                                    error.stderr = stderr;
-                                    reject(error);
-                                    return;
-                                }
-
-                                resolve({
-                                    stdout: stdout || '',
-                                    stderr: stderr || ''
-                                });
-                            }
-                        );
-
-                    });
-                };
+                const projectDir = process.cwd();
 
                 try {
 
+                    // ------------------------------------------------
+                    // STEP 1 - FETCH LATEST GITHUB INFORMATION
+                    // ------------------------------------------------
+
                     await message.reply(
-                        '*CHAOS BOT UPDATE STARTING...*\n\n' +
-                        'Checking GitHub for new changes...\n' +
-                        'Please wait.'
+                        '*CHAOS BOT UPDATE*\n\n' +
+                        'Checking GitHub for new changes...'
                     );
 
-                    const projectDir = process.cwd();
+                    await runCommand(
+                        'git',
+                        ['fetch', 'origin'],
+                        {
+                            cwd: projectDir,
+                            maxBuffer: 1024 * 1024
+                        }
+                    );
+
 
                     // ------------------------------------------------
-                    // STEP 1 - FETCH FROM GITHUB
+                    // STEP 2 - CHECK FOR LOCAL UNCOMMITTED CHANGES
                     // ------------------------------------------------
 
-                    try {
-
-                        await runCommand(
-                            'git',
-                            ['fetch', 'origin'],
-                            {
-                                cwd: projectDir,
-                                maxBuffer: 1024 * 1024
-                            }
-                        );
-
-                    } catch (error) {
-
-                        console.error(
-                            '[OWNER UPDATE] git fetch failed:',
-                            error
-                        );
-
-                        await message.reply(
-                            '*UPDATE FAILED*\n\n' +
-                            'Could not contact GitHub.\n\n' +
-                            `Error: ${error.message}`
-                        );
-
-                        return;
-                    }
-
-                    // ------------------------------------------------
-                    // STEP 2 - CHECK FOR LOCAL CHANGES
-                    // ------------------------------------------------
-
-                    let statusResult;
-
-                    try {
-
-                        statusResult = await runCommand(
-                            'git',
-                            ['status', '--porcelain'],
-                            {
-                                cwd: projectDir,
-                                maxBuffer: 1024 * 1024
-                            }
-                        );
-
-                    } catch (error) {
-
-                        console.error(
-                            '[OWNER UPDATE] git status failed:',
-                            error
-                        );
-
-                        await message.reply(
-                            '*UPDATE FAILED*\n\n' +
-                            'Could not check the VPS Git status.'
-                        );
-
-                        return;
-                    }
+                    const statusResult = await runCommand(
+                        'git',
+                        ['status', '--porcelain'],
+                        {
+                            cwd: projectDir,
+                            maxBuffer: 1024 * 1024
+                        }
+                    );
 
                     if (statusResult.stdout.trim()) {
 
-                        console.warn(
-                            '[OWNER UPDATE] Local changes detected:',
-                            statusResult.stdout
-                        );
-
                         await message.reply(
                             '*UPDATE STOPPED*\n\n' +
-                            'Local uncommitted changes were detected on the VPS.\n\n' +
-                            'I will not overwrite them automatically.\n\n' +
-                            'Use SSH to inspect the changes before updating.'
+                            'Local uncommitted changes were detected.\n\n' +
+                            'Chaos Bot will not overwrite local work.'
                         );
 
                         return;
                     }
 
-                    // ------------------------------------------------
-                    // STEP 3 - GET CURRENT COMMIT
-                    // ------------------------------------------------
-
-                    let oldCommit;
-
-                    try {
-
-                        const commitResult = await runCommand(
-                            'git',
-                            ['rev-parse', 'HEAD'],
-                            {
-                                cwd: projectDir,
-                                maxBuffer: 1024 * 1024
-                            }
-                        );
-
-                        oldCommit = commitResult.stdout.trim();
-
-                    } catch (error) {
-
-                        console.error(
-                            '[OWNER UPDATE] Could not get current commit:',
-                            error
-                        );
-
-                        await message.reply(
-                            '*UPDATE FAILED*\n\n' +
-                            'Could not determine the current Git commit.'
-                        );
-
-                        return;
-                    }
 
                     // ------------------------------------------------
-                    // STEP 4 - PULL LATEST CODE
+                    // STEP 3 - SAVE CURRENT COMMIT
                     // ------------------------------------------------
 
-                    let pullResult;
+                    const oldCommitResult = await runCommand(
+                        'git',
+                        ['rev-parse', 'HEAD'],
+                        {
+                            cwd: projectDir,
+                            maxBuffer: 1024 * 1024
+                        }
+                    );
 
-                    try {
+                    const oldCommit = oldCommitResult.stdout.trim();
 
-                        pullResult = await runCommand(
-                            'git',
-                            ['pull', '--ff-only'],
-                            {
-                                cwd: projectDir,
-                                maxBuffer: 5 * 1024 * 1024
-                            }
-                        );
-
-                    } catch (error) {
-
-                        console.error(
-                            '[OWNER UPDATE] git pull failed:',
-                            error
-                        );
-
-                        console.error(
-                            '[OWNER UPDATE] stderr:',
-                            error.stderr
-                        );
-
-                        await message.reply(
-                            '*UPDATE FAILED*\n\n' +
-                            'Git could not safely pull the latest changes.\n\n' +
-                            'No automatic restart was performed.\n\n' +
-                            `Error: ${error.message}`
-                        );
-
-                        return;
-                    }
-
-                    const pullOutput =
-                        `${pullResult.stdout}\n${pullResult.stderr}`.trim();
 
                     // ------------------------------------------------
-                    // STEP 5 - CHECK IF ANYTHING CHANGED
+                    // STEP 4 - PULL FROM GITHUB
+                    // ------------------------------------------------
+
+                    const pullResult = await runCommand(
+                        'git',
+                        ['pull', '--ff-only'],
+                        {
+                            cwd: projectDir,
+                            maxBuffer: 5 * 1024 * 1024
+                        }
+                    );
+
+                    const pullOutput = (
+                        pullResult.stdout +
+                        pullResult.stderr
+                    ).trim();
+
+
+                    // ------------------------------------------------
+                    // STEP 5 - CHECK WHETHER CODE ACTUALLY CHANGED
                     // ------------------------------------------------
 
                     if (
@@ -1781,15 +1674,16 @@ client.on('message', async message => {
 
                         await message.reply(
                             '*CHAOS BOT IS ALREADY UP TO DATE*\n\n' +
-                            'No new GitHub changes were found.\n\n' +
-                            'No restart was necessary.'
+                            'GitHub has no newer changes.\n\n' +
+                            'No restart was required.'
                         );
 
                         return;
                     }
 
+
                     // ------------------------------------------------
-                    // STEP 6 - FIND CHANGED FILES
+                    // STEP 6 - DETERMINE WHICH FILES CHANGED
                     // ------------------------------------------------
 
                     let changedFiles = [];
@@ -1806,7 +1700,7 @@ client.on('message', async message => {
                             ],
                             {
                                 cwd: projectDir,
-                                maxBuffer: 1024 * 1024
+                                maxBuffer: 5 * 1024 * 1024
                             }
                         );
 
@@ -1818,78 +1712,107 @@ client.on('message', async message => {
                     } catch (error) {
 
                         console.error(
-                            '[OWNER UPDATE] git diff failed:',
+                            '[OWNER UPDATE] Could not determine changed files:',
                             error
                         );
 
                         await message.reply(
                             '*CODE UPDATED*\n\n' +
                             'Git pull succeeded, but I could not determine whether dependencies changed.\n\n' +
-                            'Restarting Chaos Bot without npm install.'
+                            'Continuing without npm install.'
                         );
                     }
 
+
                     // ------------------------------------------------
-                    // STEP 7 - CHECK DEPENDENCIES
+                    // STEP 7 - CHECK PACKAGE FILES
                     // ------------------------------------------------
 
                     const packageChanged =
                         changedFiles.includes('package.json') ||
                         changedFiles.includes('package-lock.json');
 
+
+                    // ------------------------------------------------
+                    // STEP 7B - INSTALL DEPENDENCIES IF REQUIRED
+                    // ------------------------------------------------
+
                     if (packageChanged) {
 
                         await message.reply(
                             '*DEPENDENCIES CHANGED*\n\n' +
-                            'Running npm install before restarting Chaos Bot...'
+                            'package.json or package-lock.json changed.\n\n' +
+                            'Running npm install now...'
                         );
 
-                        try {
-
-                            const npmResult = await runCommand(
-                                'npm',
-                                ['install'],
-                                {
-                                    cwd: projectDir,
-                                    maxBuffer: 10 * 1024 * 1024
-                                }
-                            );
-
-                            console.log(
-                                '[OWNER UPDATE] npm install successful:',
-                                npmResult.stdout
-                            );
-
-                        } catch (error) {
-
-                            console.error(
-                                '[OWNER UPDATE] npm install failed:',
-                                error
-                            );
-
-                            console.error(
-                                '[OWNER UPDATE] npm stderr:',
-                                error.stderr
-                            );
-
-                            await message.reply(
-                                '*UPDATE FAILED*\n\n' +
-                                'GitHub code was pulled, but npm install failed.\n\n' +
-                                'Chaos Bot was NOT automatically restarted.'
-                            );
-
-                            return;
-                        }
+                        await runCommand(
+                            'npm',
+                            ['install'],
+                            {
+                                cwd: projectDir,
+                                maxBuffer: 10 * 1024 * 1024
+                            }
+                        );
                     }
 
+
                     // ------------------------------------------------
-                    // STEP 8 - RESTART PM2
+                    // STEP 8 - GET LATEST COMMIT MESSAGE
+                    // ------------------------------------------------
+
+                    let commitMessage =
+                        'Latest changes pulled from GitHub.';
+
+                    try {
+
+                        const commitResult = await runCommand(
+                            'git',
+                            [
+                                'log',
+                                '-1',
+                                '--pretty=%s'
+                            ],
+                            {
+                                cwd: projectDir,
+                                maxBuffer: 1024 * 1024
+                            }
+                        );
+
+                        commitMessage =
+                            commitResult.stdout.trim() ||
+                            'Latest changes pulled from GitHub.';
+
+                    } catch (error) {
+
+                        console.error(
+                            '[OWNER UPDATE] Could not get commit message:',
+                            error
+                        );
+                    }
+
+
+                    // ------------------------------------------------
+                    // STEP 9 - ANNOUNCE UPDATE BEFORE RESTART
                     // ------------------------------------------------
 
                     await message.reply(
-                        '*UPDATES INSTALLED*\n\n' +
-                        'Restarting Chaos Bot now...'
+                        '*CHAOS BOT UPDATE COMPLETE*\n\n' +
+                        '*CHANGE*\n' +
+                        '`' + commitMessage + '`\n\n' +
+                        (
+                            packageChanged
+                                ? 'Dependencies updated.\n'
+                                : ''
+                        ) +
+                        'Latest code pulled from GitHub.\n' +
+                        'Chaos Bot is restarting now.\n\n' +
+                        '*Updated by*: \`Chriss\`'
                     );
+
+
+                    // ------------------------------------------------
+                    // STEP 10 - RESTART PM2
+                    // ------------------------------------------------
 
                     const pm2Command =
                         process.platform === 'win32'
@@ -1900,7 +1823,10 @@ client.on('message', async message => {
 
                         const restartResult = await runCommand(
                             pm2Command,
-                            ['restart', 'chaos-bot'],
+                            [
+                                'restart',
+                                'chaos-bot'
+                            ],
                             {
                                 cwd: projectDir,
                                 maxBuffer: 1024 * 1024
@@ -1925,70 +1851,39 @@ client.on('message', async message => {
                             error.stderr
                         );
 
-                        await message.reply(
-                            '*UPDATE PARTIALLY FAILED*\n\n' +
-                            'GitHub changes were pulled successfully, but PM2 could not restart Chaos Bot.'
-                        );
-
                         return;
                     }
-
-                    // ------------------------------------------------
-                    // STEP 9 - SUCCESS
-                    // ------------------------------------------------
-
-                    await message.reply(
-                        '*CHAOS BOT UPDATE COMPLETE*\n\n' +
-                        'Latest code pulled from GitHub.\n' +
-                        (packageChanged
-                            ? 'Dependencies updated.\n'
-                            : '') +
-                        'Chaos Bot restarted successfully.\n\n' +
-                        '*Updated by*: \`Chriss\`'
-                    );
 
                 } catch (error) {
 
                     console.error(
-                        '[OWNER UPDATE] Unexpected error:',
+                        '[OWNER UPDATE] Update process failed:',
                         error
                     );
 
-                    await message.reply(
-                        '*UPDATE FAILED*\n\n' +
-                        'An unexpected error occurred while updating Chaos Bot.\n\n' +
-                        `Error: ${error.message}`
+                    console.error(
+                        '[OWNER UPDATE] stderr:',
+                        error.stderr
                     );
 
-                }
+                    try {
 
-                return;
-            }
+                        await message.reply(
+                            '*CHAOS BOT UPDATE FAILED*\n\n' +
+                            'The GitHub update could not be completed.\n\n' +
+                            'Check the PM2 logs for details.'
+                        );
 
-            // --------------------------------------------
-            // !owner announce <message>
-            // --------------------------------------------
+                    } catch (replyError) {
 
-            if (ownerCommand === 'announce') {
+                        console.error(
+                            '[OWNER UPDATE] Could not send failure message:',
+                            replyError
+                        );
+                    }
 
-                const announcement =
-                    ownerArgs.slice(2).join(' ').trim();
-
-                if (!announcement) {
-                    await message.reply(
-                        '❌ Usage:\n' +
-                        '`!owner announce <message>`'
-                    );
                     return;
                 }
-
-                await message.reply(
-                    '📢 *MASTER OWNER ANNOUNCEMENT*\n\n' +
-                    announcement +
-                    '\n\n👑 *— \`Chriss\`, Chaos Bot Owner*'
-                );
-
-                return;
             }
 
             // --------------------------------------------
