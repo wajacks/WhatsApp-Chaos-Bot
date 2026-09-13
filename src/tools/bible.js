@@ -83,13 +83,143 @@ async function getBooks(translationId) {
 }
 
 function findBook(books, input) {
-    const wanted = normalize(input);
+  const wanted = normalize(input);
 
-    return books.find(book =>
-        [book.id, book.name, book.commonName, book.title]
-            .filter(Boolean)
-            .some(value => normalize(value) === wanted)
-    );
+  // English → Kiswahili book-name aliases
+  const swahiliAliases = {
+      genesis: 'mwanzo',
+      exodus: 'kutoka',
+      leviticus: 'walawi',
+      numbers: 'hesabu',
+      deuteronomy: 'kumbukumbuletorati',
+      joshua: 'yoshua',
+      judges: 'waamuzi',
+      ruth: 'ruthu',
+      '1samuel': '1samweli',
+      '2samuel': '2samweli',
+      '1kings': '1wafalme',
+      '2kings': '2wafalme',
+      '1chronicles': '1mamboyanyakati',
+      '2chronicles': '2mamboyanyakati',
+      ezra: 'ezra',
+      nehemiah: 'nehemia',
+      esther: 'esta',
+      job: 'ayubu',
+      psalms: 'zaburi',
+      proverbs: 'mithali',
+      ecclesiastes: 'mhubiri',
+      songofsolomon: 'wimbouliobora',
+      songofsongs: 'wimbouliobora',
+      isaiah: 'isaya',
+      jeremiah: 'yeremia',
+      lamentations: 'maombolezo',
+      ezekiel: 'ezekieli',
+      daniel: 'danieli',
+      hosea: 'hosea',
+      joel: 'yoeli',
+      amos: 'amos',
+      obadiah: 'obadia',
+      jonah: 'yona',
+      micah: 'mika',
+      nahum: 'nahumu',
+      habakkuk: 'habakuki',
+      zephaniah: 'sefania',
+      haggai: 'hagai',
+      zechariah: 'zekaria',
+      malachi: 'malaki',
+
+      matthew: 'mathayo',
+      mark: 'marko',
+      luke: 'luka',
+      john: 'yohana',
+      acts: 'matendoyamitume',
+      romans: 'warumi',
+      '1corinthians': '1wakorintho',
+      '2corinthians': '2wakorintho',
+      galatians: 'wagalatia',
+      ephesians: 'waefeso',
+      philippians: 'wafilipi',
+      colossians: 'wakolosai',
+      '1thessalonians': '1wathesalonike',
+      '2thessalonians': '2wathesalonike',
+      '1timothy': '1timotheo',
+      '2timothy': '2timotheo',
+      titus: 'tito',
+      philemon: 'filemoni',
+      hebrews: 'waebrania',
+      james: 'yakobo',
+      '1peter': '1petro',
+      '2peter': '2petro',
+      '1john': '1yohana',
+      '2john': '2yohana',
+      '3john': '3yohana',
+      jude: 'yuda',
+      revelation: 'ufunuo'
+  };
+
+  // Common alternative English spellings
+  const englishAliases = {
+      songsofsolomon: 'songofsolomon',
+      songofsolomon: 'songofsolomon',
+      canticles: 'songofsolomon',
+
+      psalm: 'psalms',
+
+      '1sam': '1samuel',
+      '2sam': '2samuel',
+      '1kgs': '1kings',
+      '2kgs': '2kings',
+      '1chron': '1chronicles',
+      '2chron': '2chronicles',
+
+      mt: 'matthew',
+      mk: 'mark',
+      lk: 'luke',
+      jn: 'john',
+      acts: 'acts',
+      rom: 'romans',
+      rev: 'revelation'
+  };
+
+  const normalizedInput =
+      englishAliases[wanted] || wanted;
+
+  // First: exact match against the actual API book data
+  const exactMatch = books.find(book =>
+      [book.id, book.name, book.commonName, book.title]
+          .filter(Boolean)
+          .some(value => normalize(value) === normalizedInput)
+  );
+
+  if (exactMatch) {
+      return exactMatch;
+  }
+
+  // Second: English → Kiswahili alias lookup
+  const swahiliName = swahiliAliases[normalizedInput];
+
+  if (swahiliName) {
+      const swahiliMatch = books.find(book =>
+          [book.id, book.name, book.commonName, book.title]
+              .filter(Boolean)
+              .some(value => normalize(value) === swahiliName)
+      );
+
+      if (swahiliMatch) {
+          return swahiliMatch;
+      }
+  }
+
+  // Third: allow the user to type the Kiswahili name directly
+  const directSwahiliMatch = books.find(book => {
+      const values = [book.id, book.name, book.commonName, book.title]
+          .filter(Boolean)
+          .map(value => normalize(value));
+
+      return values.includes(wanted);
+  });
+
+  return directSwahiliMatch;
 }
 
 async function fetchBibleVerse(reference, language) {
