@@ -188,3 +188,6 @@
       「 CONTROL THE CHAOS 」
 `;
 }
+module.exports = {
+  getBotMenu
+};
