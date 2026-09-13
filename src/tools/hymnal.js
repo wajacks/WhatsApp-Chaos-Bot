@@ -21,17 +21,30 @@ function getHymn(query) {
         return '📖 Please provide a hymn number.\n\n*Example:* `!nyimbo 15`';
     }
 
-    const hymnId = parseInt(query.trim(), 10);
-    
-    if (isNaN(hymnId)) {
-        return '❌ Please provide a valid hymn number.\n\n*Example:* `!nyimbo 15`';
+    const cleanQuery = query.trim();
+    let song = null;
+
+    if (!isNaN(cleanQuery)) {
+        // 1. Search by Number (ID)
+        const hymnId = parseInt(cleanQuery, 10);
+        song = hymnalDB.Songs.find(s => s.ID === hymnId);
+    } else {
+        const lowerQuery = cleanQuery.toLowerCase();
+        
+        // 2. Search by Title
+        song = hymnalDB.Songs.find(s => s.Text.toLowerCase().includes(lowerQuery));
+        
+        // 3. Search by Lyrics (if title wasn't found)
+        if (!song) {
+            song = hymnalDB.Songs.find(s => {
+                // Return true if ANY verse in this song contains the search phrase
+                return s.Verses.some(verse => verse.Text.toLowerCase().includes(lowerQuery));
+            });
+        }
     }
 
-    // Search for the specific song ID in the JSON array
-    const song = hymnalDB.Songs.find(s => s.ID === hymnId);
-
     if (!song) {
-        return `❌ Hymn #${hymnId} not found in Nyimbo za Kristo.`;
+        return `❌ No hymn found matching "${cleanQuery}".`;
     }
 
     // Build the WhatsApp formatted string
