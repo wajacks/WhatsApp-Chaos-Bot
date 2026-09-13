@@ -62,6 +62,7 @@ const { getGamesList } = require('./src/commands/gameslist');
 const { handleBalanceCommand } = require('./src/commands/balance');
 const { getWeather } = require('./src/tools/weather');
 const { fetchBibleVerse } = require('./src/tools/bible');
+const { getHymn } = require('./src/tools/hymnal');
 const { logMessage, getChatHistory } = require('./src/database/chatlog');
 
 // ============================================================
@@ -522,6 +523,18 @@ client.on('message', async message => {
                 'Reply with *1* or *2*.'
             );
 
+            return;
+        }
+
+        // ====================================================
+        // 🎵 NYIMBO ZA KRISTO
+        // ====================================================
+
+        if (lowerText.startsWith('!nyimbo')) {
+            const query = text.replace(/^!nyimbo/i, '').trim();
+            const response = getHymn(query);
+            
+            await message.reply(response);
             return;
         }
 
