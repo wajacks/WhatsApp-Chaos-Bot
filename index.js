@@ -1631,34 +1631,33 @@ client.on('message', async message => {
                     for (const groupId of groupIds) {
             
                         try {
-            
-                            const group = await client.getChatById(groupId);
-            
-                            if (!group) {
-                                failed++;
-                                continue;
-                            }
-            
-                            await group.sendMessage(
+
+                            await client.sendMessage(
+                                groupId,
                                 '📢 *MASTER OWNER ANNOUNCEMENT*\n\n' +
                                 announcement +
-                                '\n\n👑 *— \`Chriss\`, Chaos Bot Owner*'
+                                '\n\n👑 *— Chriss, Chaos Bot Owner*'
                             );
-            
+                        
                             successful++;
-            
+                        
                             // Small delay between groups
                             await new Promise(resolve =>
                                 setTimeout(resolve, 1000)
                             );
-            
+                        
                         } catch (err) {
-            
+                        
                             failed++;
-            
+                        
                             console.error(
                                 `[OWNER] Broadcast failed for ${groupId}:`,
-                                err.message
+                                err
+                            );
+                        
+                            console.error(
+                                `[OWNER] Broadcast error stack for ${groupId}:`,
+                                err?.stack
                             );
                         }
                     }
