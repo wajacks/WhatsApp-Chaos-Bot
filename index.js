@@ -463,7 +463,7 @@ client.on('message', async message => {
                 // Let the library natively fetch, encode, and format the media buffer
                 const imageMedia = await MessageMedia.fromUrl(imageUrl, { unsafeMime: true });
                 
-                await client.sendMessage(chatId, imageMedia, { caption: `🎨 *Prompt:* "${prompt}"\n` + `\`wantam\`` });
+                await client.sendMessage(chatId, imageMedia, { caption: `🎨 *Prompt:* "${prompt}"\n` + `\t\t\t\t\`wantam\`👆😅` });
             
             } catch (imgErr) {
                 console.error('❌ Image Generation Error:', imgErr);
@@ -909,6 +909,16 @@ client.on('message', async message => {
                 '- !store — Browse the car and house market.\n' +
                 '- !beg — Ask for street handouts.\n' +
                 '- !buy <item> — Purchase vehicles or homes.\n' +
+                '- !voice — Change the bot\'s voice for TTS.\n' +
+                '- !weather <city> — Get current weather for a city.\n' +
+                '- !catchup — Summarize recent group conversations.\n' +
+                '- !reset — Reset the bot\'s economy and stats (Owner only).\n' +
+                '- !help — View the bot\'s command menu.\n' +
+                '- !menu — View the bot\'s command menu.\n' +
+                '- !draw <prompt> — Generate an image based on a prompt.\n' +
+                '- !image <prompt> — Generate an image based on a prompt.\n' +
+                '- !tts <text> — Generate a voice note from text.\n' +
+                '- !speak <text> — Generate a voice note from text.\n' +
                 '- !pay <amount> — Pay another player.\n' +
                 '- !games — View available game modes.\n' +
                 '- !video — Search video, music video, audio, or link from YouTube.';
