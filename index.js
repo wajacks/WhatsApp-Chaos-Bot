@@ -1169,6 +1169,7 @@ client.on('message', async message => {
                 '- !pay <amount> — Pay another player.\n' +
                 '- !owner — Access the owner control panel (Owner only).\n' +
                 '- !verse <reference> — Get a Bible verse in English or Kiswahili.\n' +
+                '- !nyimbo <query> — Search for a hymn(swahili).\n' +
                 '- !contactowner — Get the contact card for the bot owner.\n' +
                 '- !ownercontact — Get the contact card for the bot owner.\n' +
                 '- !games — View available game modes.\n' +

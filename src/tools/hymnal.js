@@ -35,17 +35,17 @@ function getHymn(query) {
     }
 
     // Build the WhatsApp formatted string
-    let responseText = `📖 *NYIMBO ZA KRISTO #${song.ID}*\n`;
-    responseText += `🎵 *${song.Text}*\n━━━━━━━━━━━━━━━━━━\n\n`;
+    let responseText = `📖 *NYIMBO ZA KRISTO*『${song.ID}』\n`;
+    responseText += `🎵 \t❒*${song.Text}*\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
     let verseCounter = 1;
 
     song.Verses.forEach(verse => {
         // In your JSON, "Tag": 1 denotes a chorus section
         if (verse.Tag === 1) {
-            responseText += `*[Chorus]*\n_${verse.Text}_\n\n`;
+            responseText += `➫➫➫➫\t░◈ _*Chorus*_ ◈░\n_*${verse.Text}*_\n\n`;
         } else {
-            responseText += `*${verseCounter}.* ${verse.Text}\n\n`;
+            responseText += `『*${verseCounter}*』 ${verse.Text}\n\n`;
             verseCounter++;
         }
     });

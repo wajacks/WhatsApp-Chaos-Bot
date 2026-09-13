@@ -56,6 +56,9 @@
 │🎵 \`!verse\`
 │     ☞『_*Request BIBLE verse*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🎵 \`!nyimbo\`
+│     ☞『_*Request Song Hymnals*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🎵 \`!randomsong\`
 │     ☞『_*Random music*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
