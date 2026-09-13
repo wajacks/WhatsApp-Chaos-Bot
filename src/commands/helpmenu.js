@@ -5,10 +5,10 @@
 │                \`C H A O S\`           
 │           \`COMMAND CENTER\`          
 │                              
-│   ❒ SYSTEM  ☞『_*ONLINE*_』          
-│   ❒ AI CORE  ☞『_*ACTIVE*_』          
-│   ❒ GAMES   ☞『_*READY*_』           
-│   ❒ CHAOS   ☞『_*UNLEASHED*_』       
+│   ❒ SYSTEM ☞『_*ONLINE*_』          
+│   ❒ AI CORE ☞『_*ACTIVE*_』          
+│   ❒ GAMES  ☞『_*READY*_』           
+│   ❒ CHAOS  ☞『_*UNLEASHED*_』       
 ╰──────────────────────────────╯
 
 ┌─── ░◈ _*ECONOMY*_ ◈░ ──────────────┐
