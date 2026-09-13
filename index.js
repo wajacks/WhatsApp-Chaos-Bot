@@ -63,6 +63,7 @@ const { handleBalanceCommand } = require('./src/commands/balance');
 const { getWeather } = require('./src/tools/weather');
 const { fetchBibleVerse } = require('./src/tools/bible');
 const { getHymn } = require('./src/tools/hymnal');
+const { sendHymnPianoAudio } = require('./src/tools/hymnalAudio');
 const { logMessage, getChatHistory } = require('./src/database/chatlog');
 
 // ============================================================
@@ -532,9 +533,16 @@ client.on('message', async message => {
 
         if (lowerText.startsWith('!nyimbo')) {
             const query = text.replace(/^!nyimbo/i, '').trim();
-            const response = getHymn(query);
+            const result = getHymn(query);
             
-            await message.reply(response);
+            // 1. Reply with the text lyrics instantly
+            await message.reply(result.text);
+
+            // 2. If a valid song was found, generate and send the piano voice note
+            if (result.success && result.song) {
+                await client.sendMessage(chatId, '🎹 *Synthesizing piano instrumental voice note...*');
+                await sendHymnPianoAudio(chatId, result.song.ID, result.song.Text, client);
+            }
             return;
         }
 

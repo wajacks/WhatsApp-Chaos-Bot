@@ -14,11 +14,11 @@ try {
 
 function getHymn(query) {
     if (!hymnalDB || !hymnalDB.Songs) {
-        return '❌ Hymnal database is currently unavailable.';
+        return { success: false, text: '❌ Hymnal database is currently unavailable.' };
     }
 
     if (!query) {
-        return '📖 Please provide a hymn number.\n\n*Example:* `!nyimbo 15`';
+        return { success: false, text: '📖 Please provide a hymn number.\n\n*Example:* `!nyimbo 15`' };
     }
 
     const cleanQuery = query.trim();
@@ -44,7 +44,7 @@ function getHymn(query) {
     }
 
     if (!song) {
-        return `❌ No hymn found matching "${cleanQuery}".`;
+        return { success: false, text: `❌ No hymn found matching "${cleanQuery}".` };
     }
 
     // Build the WhatsApp formatted string
@@ -63,7 +63,11 @@ function getHymn(query) {
         }
     });
 
-    return responseText.trim();
+    return {
+        success: true,
+        song: song,
+        text: responseText.trim()
+    };
 }
 
 module.exports = { getHymn };
