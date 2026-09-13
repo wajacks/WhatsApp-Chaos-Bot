@@ -53,6 +53,9 @@
 │🗣️ \`!voice <text>\`
 │     ☞『_*Choose a voice*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🎵 \`!verse\`
+│     ☞『_*Request BIBLE verse*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🎵 \`!randomsong\`
 │     ☞『_*Random music*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ

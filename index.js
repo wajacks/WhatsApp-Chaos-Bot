@@ -61,6 +61,7 @@ const {
 const { getGamesList } = require('./src/commands/gameslist');
 const { handleBalanceCommand } = require('./src/commands/balance');
 const { getWeather } = require('./src/tools/weather');
+const { fetchBibleVerse } = require('./src/tools/bible');
 const { logMessage, getChatHistory } = require('./src/database/chatlog');
 
 // ============================================================
@@ -148,6 +149,7 @@ const drawCooldowns = new Map();
 const analyzeCooldowns = new Map();
 const speakCooldowns = new Map();
 const voiceCooldowns = new Map();
+const pendingBibleRequests = new Map();
 
 // ====================================================
 // 📊 CHAOS CHAT STATISTICS
@@ -434,6 +436,94 @@ client.on('message', async message => {
         const userName = senderContact?.pushname || senderContact?.name || 'Chaos Member';
         const text = message.body ? message.body.trim() : '';
         const lowerText = text.toLowerCase();
+
+                // ====================================================
+        // 📖 BIBLE VERSE
+        // ====================================================
+
+        const bibleKey = `${chatId}:${senderId}`;
+
+        if (pendingBibleRequests.has(bibleKey)) {
+            const pending = pendingBibleRequests.get(bibleKey);
+
+            if (lowerText === '1' || lowerText === '2') {
+                pendingBibleRequests.delete(bibleKey);
+
+                const language = lowerText === '1' ? 'english' : 'swahili';
+
+                try {
+                    await message.reply('📖 Fetching your verse...');
+
+                    const result = await fetchBibleVerse(
+                        pending.reference,
+                        language
+                    );
+
+                    if (!result.success) {
+                        await message.reply(`❌ ${result.error}`);
+                        return;
+                    }
+
+                    const verseReference =
+                        `${result.book} ${result.chapter}:${result.startVerse}` +
+                        (result.endVerse !== result.startVerse
+                            ? `-${result.endVerse}`
+                            : '');
+
+                    const languageName =
+                        language === 'english'
+                            ? 'English'
+                            : 'Kiswahili';
+
+                    await message.reply(
+                        `📖 *${verseReference}*\n\n` +
+                        `${result.text}\n\n` +
+                        `— *${languageName}*`
+                    );
+
+                } catch (error) {
+                    console.error('❌ Bible Error:', error);
+
+                    await message.reply(
+                        '❌ *Bible System Error*\n\n' +
+                        'I could not retrieve that verse right now.'
+                    );
+                }
+
+                return;
+            }
+        }
+
+        if (lowerText === '!verse' || lowerText.startsWith('!verse ')) {
+            const reference = text.replace(/^!verse/i, '').trim();
+
+            if (!reference) {
+                await message.reply(
+                    '📖 *BIBLE VERSE*\n\n' +
+                    'Enter a Bible reference.\n\n' +
+                    'Example:\n' +
+                    '`!verse John 3:16`\n\n' +
+                    'You can also request a range:\n' +
+                    '`!verse John 3:16-18`'
+                );
+                return;
+            }
+
+            pendingBibleRequests.set(bibleKey, {
+                reference,
+                timestamp: Date.now()
+            });
+
+            await message.reply(
+                `📖 *${reference}*\n\n` +
+                'Choose a language:\n\n' +
+                '1. 🇬🇧 *English*\n' +
+                '2. 🇰🇪 *Kiswahili*\n\n' +
+                'Reply with *1* or *2*.'
+            );
+
+            return;
+        }
 
         // Record message for the catch-up feature
         logMessage(chatId, userName, text);
@@ -1065,6 +1155,7 @@ client.on('message', async message => {
                 '- !speak <text> — Generate a voice note from text.\n' +
                 '- !pay <amount> — Pay another player.\n' +
                 '- !owner — Access the owner control panel (Owner only).\n' +
+                '- !verse <reference> — Get a Bible verse in English or Kiswahili.\n' +
                 '- !contactowner — Get the contact card for the bot owner.\n' +
                 '- !ownercontact — Get the contact card for the bot owner.\n' +
                 '- !games — View available game modes.\n' +
