@@ -175,8 +175,28 @@ async function handleInput(client, message, userId, text, userName) {
                 } else if (input === '2') {
                     updateSessionState(userId, 'REP_UPDATES_MENU', session.data);
                     await message.reply(`📢 *UPDATES MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n\n0. 🔙 Back to Dashboard`);
-                } else if (['3', '4', '5'].includes(input)) {
-                    await message.reply(`🚧 This feature is coming in Phase 5 (Student Registrations & Issues).\nType *0* to go back.`);
+                  } else if (input === '3') {
+                    updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
+                    await message.reply(`👥 *CLASS MEMBERS*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View All Members\n2. 🗑️ Remove a Member (Intruder)\n\n0. 🔙 Back to Dashboard`);
+                } else if (input === '4') {
+                    updateSessionState(userId, 'REP_ISSUES_MENU', session.data);
+                    await message.reply(`🚨 *ISSUES DESK*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Locked Accounts\n2. 🔓 Resolve / Unlock an Account\n\n0. 🔙 Back to Dashboard`);
+                } else if (input === '5') {
+                    // View Logs (No sub-menu needed, just show and stay in Dashboard)
+                    const logs = db.classes[session.data.loggedInClass].logs || [];
+                    if (logs.length === 0) {
+                        await message.reply(`📭 No logs available yet.\n\n(Type *0* to go back)`);
+                    } else {
+                        let logStr = `📜 *CLASS AUDIT LOGS*\n━━━━━━━━━━━━━━━━━━\n`;
+                        // Show last 10 logs
+                        logs.slice(-10).forEach(l => {
+                            const dateObj = new Date(l.timestamp);
+                            const tStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' });
+                            const dStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Africa/Nairobi' });
+                            logStr += `▪️ [${dStr} ${tStr}] ${l.text}\n`;
+                        });
+                        await message.reply(logStr + `\n(Type *0* to go back)`);
+                    }
                 } else {
                     await message.reply(`❌ Invalid choice. Type 1-5, 0 to go back, or 99 to exit.`);
                 }
@@ -317,6 +337,151 @@ async function handleInput(client, message, userId, text, userName) {
                 break;
             }
 
+            // ==========================================
+            // PHASE 5: REP MEMBERS & ISSUES MANAGEMENT
+            // ==========================================
+            case 'REP_MEMBERS_MENU': {
+              if (input === '0') {
+                  updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                  await sendRepDashboard(message, session.data.loggedInClass);
+                  return;
+              }
+              const members = db.classes[session.data.loggedInClass].members;
+              const mIds = Object.keys(members);
+
+              if (input === '1') {
+                  if (mIds.length === 0) {
+                      await message.reply(`📭 No students registered yet.\n(Type *0* to go back)`);
+                      return;
+                  }
+                  let mList = `👥 *REGISTERED STUDENTS*\n━━━━━━━━━━━━━━━━━━\n`;
+                  mIds.forEach(id => {
+                      const m = members[id];
+                      mList += `▪️ *${m.name}* (${m.admission})\n`;
+                  });
+                  await message.reply(mList + `\n(Type *0* to go back)`);
+              } else if (input === '2') {
+                  if (mIds.length === 0) {
+                      await message.reply(`📭 No students to remove.\n(Type *0* to go back)`);
+                      return;
+                  }
+                  let mList = `🗑️ *REMOVE A STUDENT*\n━━━━━━━━━━━━━━━━━━\n`;
+                  mIds.forEach((id, idx) => {
+                      mList += `${idx + 1}. ${members[id].name} (${members[id].admission})\n`;
+                  });
+                  mList += `\n*Reply with the number to REMOVE them:*\n(Type *0* to cancel)`;
+                  updateSessionState(userId, 'REP_MEMBERS_REMOVE', { ...session.data, memberIds: mIds });
+                  await message.reply(mList);
+              }
+              break;
+          }
+
+          case 'REP_MEMBERS_REMOVE': {
+              if (input === '0') {
+                  updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
+                  await message.reply(`👥 *CLASS MEMBERS*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View All Members\n2. 🗑️ Remove a Member (Intruder)\n\n0. 🔙 Back`);
+                  return;
+              }
+              const selectedIdx = parseInt(input) - 1;
+              const mIds = session.data.memberIds;
+              
+              if (isNaN(selectedIdx) || selectedIdx < 0 || selectedIdx >= mIds.length) {
+                  await message.reply(`❌ Invalid selection. Reply with a valid number.`);
+                  return;
+              }
+              
+              const targetId = mIds[selectedIdx];
+              const targetName = db.classes[session.data.loggedInClass].members[targetId].name;
+              
+              // Delete member
+              delete db.classes[session.data.loggedInClass].members[targetId];
+              // Log it
+              db.classes[session.data.loggedInClass].logs.push({
+                  text: `Removed Member: ${targetName}`,
+                  timestamp: Date.now()
+              });
+              writeClassDB(db);
+
+              updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
+              await message.reply(`✅ *${targetName}* has been removed from the class.\n\n1. 👁️ View All Members\n2. 🗑️ Remove a Member\n\n0. 🔙 Back`);
+              break;
+          }
+
+          case 'REP_ISSUES_MENU': {
+              if (input === '0') {
+                  updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                  await sendRepDashboard(message, session.data.loggedInClass);
+                  return;
+              }
+              
+              const issues = db.classes[session.data.loggedInClass].issues;
+              
+              if (input === '1') {
+                  if (issues.length === 0) {
+                      await message.reply(`✅ No pending security issues!\n(Type *0* to go back)`);
+                      return;
+                  }
+                  let issList = `🚨 *LOCKED ACCOUNTS*\n━━━━━━━━━━━━━━━━━━\n`;
+                  issues.forEach(iss => {
+                      const dateObj = new Date(iss.timestamp);
+                      const dStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Africa/Nairobi' });
+                      issList += `▪️ *${iss.name}* (Locked on ${dStr})\n   Reason: ${iss.reason}\n\n`;
+                  });
+                  await message.reply(issList + `(Type *0* to go back)`);
+              } else if (input === '2') {
+                  if (issues.length === 0) {
+                      await message.reply(`✅ No accounts to unlock.\n(Type *0* to go back)`);
+                      return;
+                  }
+                  let issList = `🔓 *UNLOCK A STUDENT*\n━━━━━━━━━━━━━━━━━━\nPlease verify their identity in the group chat before unlocking.\n\n`;
+                  issues.forEach((iss, idx) => {
+                      issList += `${idx + 1}. ${iss.name}\n`;
+                  });
+                  issList += `\n*Reply with the number to UNLOCK:*\n(Type *0* to cancel)`;
+                  updateSessionState(userId, 'REP_ISSUES_RESOLVE', session.data);
+                  await message.reply(issList);
+              }
+              break;
+          }
+
+          case 'REP_ISSUES_RESOLVE': {
+              if (input === '0') {
+                  updateSessionState(userId, 'REP_ISSUES_MENU', session.data);
+                  await message.reply(`🚨 *ISSUES DESK*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Locked Accounts\n2. 🔓 Resolve / Unlock an Account\n\n0. 🔙 Back`);
+                  return;
+              }
+              
+              const issues = db.classes[session.data.loggedInClass].issues;
+              const selectedIdx = parseInt(input) - 1;
+              
+              if (isNaN(selectedIdx) || selectedIdx < 0 || selectedIdx >= issues.length) {
+                  await message.reply(`❌ Invalid selection. Reply with a valid number.`);
+                  return;
+              }
+              
+              const targetIssue = issues[selectedIdx];
+              
+              // Unlock the student in members list
+              if (db.classes[session.data.loggedInClass].members[targetIssue.memberId]) {
+                  db.classes[session.data.loggedInClass].members[targetIssue.memberId].locked = false;
+              }
+              
+              // Remove issue from array
+              issues.splice(selectedIdx, 1);
+              
+              // Log it
+              db.classes[session.data.loggedInClass].logs.push({
+                  text: `Unlocked Member: ${targetIssue.name}`,
+                  timestamp: Date.now()
+              });
+              
+              writeClassDB(db);
+
+              updateSessionState(userId, 'REP_ISSUES_MENU', session.data);
+              await message.reply(`✅ *${targetIssue.name}* has been unlocked and can now login.\n\n1. 👁️ View Locked Accounts\n2. 🔓 Resolve / Unlock an Account\n\n0. 🔙 Back`);
+              break;
+          }
+            
             // ==========================================
             // PHASE 4: STUDENT GATEWAY & SECURITY
             // ==========================================
