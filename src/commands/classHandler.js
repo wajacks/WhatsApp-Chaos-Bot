@@ -445,42 +445,45 @@ async function handleInput(client, message, userId, text, userName) {
           }
 
           case 'REP_ISSUES_RESOLVE': {
-              if (input === '0') {
-                  updateSessionState(userId, 'REP_ISSUES_MENU', session.data);
-                  await message.reply(`🚨 *ISSUES DESK*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Locked Accounts\n2. 🔓 Resolve / Unlock an Account\n\n0. 🔙 Back`);
-                  return;
-              }
-              
-              const issues = db.classes[session.data.loggedInClass].issues;
-              const selectedIdx = parseInt(input) - 1;
-              
-              if (isNaN(selectedIdx) || selectedIdx < 0 || selectedIdx >= issues.length) {
-                  await message.reply(`❌ Invalid selection. Reply with a valid number.`);
-                  return;
-              }
-              
-              const targetIssue = issues[selectedIdx];
-              
-              // Unlock the student in members list
-              if (db.classes[session.data.loggedInClass].members[targetIssue.memberId]) {
-                  db.classes[session.data.loggedInClass].members[targetIssue.memberId].locked = false;
-              }
-              
-              // Remove issue from array
-              issues.splice(selectedIdx, 1);
-              
-              // Log it
-              db.classes[session.data.loggedInClass].logs.push({
-                  text: `Unlocked Member: ${targetIssue.name}`,
-                  timestamp: Date.now()
-              });
-              
-              writeClassDB(db);
+            if (input === '0') {
+                updateSessionState(userId, 'REP_ISSUES_MENU', session.data);
+                await message.reply(`🚨 *ISSUES DESK*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Locked Accounts\n2. 🔓 Resolve / Unlock an Account\n\n0. 🔙 Back`);
+                return;
+            }
+            
+            const issues = db.classes[session.data.loggedInClass].issues;
+            const selectedIdx = parseInt(input) - 1;
+            
+            if (isNaN(selectedIdx) || selectedIdx < 0 || selectedIdx >= issues.length) {
+                await message.reply(`❌ Invalid selection. Reply with a valid number.`);
+                return;
+            }
+            
+            const targetIssue = issues[selectedIdx];
+            
+            // Generate a random 4-digit One-Time Code
+            const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
+            
+            // Unlock the student and assign the OTP
+            if (db.classes[session.data.loggedInClass].members[targetIssue.memberId]) {
+                db.classes[session.data.loggedInClass].members[targetIssue.memberId].locked = false;
+                db.classes[session.data.loggedInClass].members[targetIssue.memberId].pendingRepReset = true;
+                db.classes[session.data.loggedInClass].members[targetIssue.memberId].resetOtp = otpCode;
+            }
+            
+            issues.splice(selectedIdx, 1);
+            
+            db.classes[session.data.loggedInClass].logs.push({
+                text: `Unlocked Member: ${targetIssue.name} (OTP Issued)`,
+                timestamp: Date.now()
+            });
+            
+            writeClassDB(db);
 
-              updateSessionState(userId, 'REP_ISSUES_MENU', session.data);
-              await message.reply(`✅ *${targetIssue.name}* has been unlocked and can now login.\n\n1. 👁️ View Locked Accounts\n2. 🔓 Resolve / Unlock an Account\n\n0. 🔙 Back`);
-              break;
-          }
+            updateSessionState(userId, 'REP_ISSUES_MENU', session.data);
+            await message.reply(`✅ *${targetIssue.name}* has been unlocked.\n\n🔒 *CRITICAL:* Please give them this One-Time Reset Code: *${otpCode}*\n\nThey must enter this code to regain access to their account.\n\n0. 🔙 Back`);
+            break;
+        }
             
             // ==========================================
             // PHASE 4: STUDENT GATEWAY & SECURITY
@@ -572,28 +575,36 @@ async function handleInput(client, message, userId, text, userName) {
 
             // --- LOGIN FLOW ---
             case 'STUDENT_LOGIN_SELECT': {
-                if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
-                
-                const selectedIdx = parseInt(input) - 1;
-                const mIds = session.data.memberIds;
-                
-                if (isNaN(selectedIdx) || selectedIdx < 0 || selectedIdx >= mIds.length) {
-                    await message.reply(`❌ Invalid selection. Reply with a valid number.`);
-                    return;
-                }
-                
-                const chosenMemberId = mIds[selectedIdx];
-                const chosenStudent = db.classes[session.data.loggedInClass].members[chosenMemberId];
-                
-                if (chosenStudent.locked) {
-                    await message.reply(`🚨 *ACCOUNT LOCKED*\n\nYour account has been locked due to failed security attempts. The Class Rep has been notified to resolve this issue.\n\nType *0* to go back.`);
-                    return;
-                }
+              if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
+              
+              const selectedIdx = parseInt(input) - 1;
+              const mIds = session.data.memberIds;
+              
+              if (isNaN(selectedIdx) || selectedIdx < 0 || selectedIdx >= mIds.length) {
+                  await message.reply(`❌ Invalid selection. Reply with a valid number.`);
+                  return;
+              }
+              
+              const chosenMemberId = mIds[selectedIdx];
+              const chosenStudent = db.classes[session.data.loggedInClass].members[chosenMemberId];
+              
+              if (chosenStudent.locked) {
+                  await message.reply(`🚨 *ACCOUNT LOCKED*\n\nYour account has been locked due to failed security attempts. The Class Rep has been notified to resolve this issue.\n\nType *0* to go back.`);
+                  return;
+              }
 
-                updateSessionState(userId, 'STUDENT_LOGIN_PASS', { ...session.data, loginTargetId: chosenMemberId, attempts: 0 });
-                await message.reply(`🔐 *LOGIN: ${chosenStudent.name}*\n\nEnter your Personal Password:\n(Type *0* to go back)`);
-                break;
-            }
+              // NEW BLOCK: Check if the Rep just unlocked them and issued an OTP
+              if (chosenStudent.pendingRepReset) {
+                  updateSessionState(userId, 'STUDENT_LOGIN_OTP', { ...session.data, loginTargetId: chosenMemberId, otpAttempts: 0 });
+                  await message.reply(`🔓 *ACCOUNT UNLOCKED*\n\nYour Class Rep has resolved your lockout. \n\nPlease enter the *4-Digit One-Time Code* provided by your Class Rep:`);
+                  return;
+              }
+
+              // Normal Login (If not locked, and not pending an OTP reset)
+              updateSessionState(userId, 'STUDENT_LOGIN_PASS', { ...session.data, loginTargetId: chosenMemberId, attempts: 0 });
+              await message.reply(`🔐 *LOGIN: ${chosenStudent.name}*\n\nEnter your Personal Password:\n(Type *0* to go back)`);
+              break;
+          }
 
             case 'STUDENT_LOGIN_PASS': {
                 if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
@@ -662,6 +673,72 @@ async function handleInput(client, message, userId, text, userName) {
                 await sendStudentDashboard(message, session.data.loggedInClass, db.classes[session.data.loggedInClass].members[resetStudentId].name);
                 break;
             }
+
+            // --- REP UNLOCK / OTP FLOW ---
+            case 'STUDENT_LOGIN_OTP': {
+              if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
+              
+              const otpTargetId = session.data.loginTargetId;
+              const otpRecord = db.classes[session.data.loggedInClass].members[otpTargetId];
+              let otpAttempts = session.data.otpAttempts || 0;
+
+              if (input === otpRecord.resetOtp) {
+                  updateSessionState(userId, 'STUDENT_FORCE_NEW_PASS', session.data);
+                  await message.reply(`✅ *CODE ACCEPTED*\n\nLet's get your account fully recovered.\n\nPlease enter a *NEW Personal Password*:`);
+              } else {
+                  otpAttempts++;
+                  if (otpAttempts >= 3) {
+                      db.classes[session.data.loggedInClass].members[otpTargetId].locked = true;
+                      db.classes[session.data.loggedInClass].members[otpTargetId].pendingRepReset = false;
+                      
+                      db.classes[session.data.loggedInClass].issues.push({
+                          memberId: otpTargetId,
+                          name: otpRecord.name,
+                          reason: 'Failed Rep-Assigned OTP Code',
+                          timestamp: Date.now()
+                      });
+                      writeClassDB(db);
+                      
+                      updateSessionState(userId, 'MAIN_MENU');
+                      await message.reply(`🚨 *ACCOUNT LOCKED*\n\nYou failed the One-Time Code. Your account is locked again.\n\nType *99* to exit.`);
+                  } else {
+                      updateSessionState(userId, 'STUDENT_LOGIN_OTP', { ...session.data, otpAttempts });
+                      await message.reply(`❌ Incorrect Code. You have ${3 - otpAttempts} attempt(s) left:`);
+                  }
+              }
+              break;
+          }
+
+          case 'STUDENT_FORCE_NEW_PASS': {
+              if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
+              updateSessionState(userId, 'STUDENT_FORCE_NEW_PIN', { ...session.data, tempPass: input });
+              await message.reply(`✅ Password saved.\n\nNow, please create a *NEW 4-Digit Security PIN* (e.g., 1234):`);
+              break;
+          }
+
+          case 'STUDENT_FORCE_NEW_PIN': {
+              if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
+              if (!/^\d{4}$/.test(input.trim())) {
+                  await message.reply(`❌ Invalid format. Please enter exactly *4 digits* (e.g., 5824):`);
+                  return;
+              }
+              
+              const finalTargetId = session.data.loginTargetId;
+              const memberRef = db.classes[session.data.loggedInClass].members[finalTargetId];
+              
+              // Save new credentials and clear OTP locks
+              memberRef.password = session.data.tempPass;
+              memberRef.securityId = input.trim(); 
+              memberRef.pendingRepReset = false;
+              delete memberRef.resetOtp;
+              
+              writeClassDB(db);
+              
+              updateSessionState(userId, 'STUDENT_DASHBOARD', { ...session.data, currentStudentId: finalTargetId, studentName: memberRef.name });
+              await message.reply(`🎉 *RECOVERY COMPLETE!*\n\nYour new password and PIN are saved. Welcome back to your portal.`);
+              await sendStudentDashboard(message, session.data.loggedInClass, memberRef.name);
+              break;
+          }
 
             // --- STUDENT DASHBOARD ---
             case 'STUDENT_DASHBOARD': {

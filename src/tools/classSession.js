@@ -1,5 +1,5 @@
 const activeClassSessions = new Map();
-const SESSION_TIMEOUT_MS = 120 * 1000; // 2 minutes
+const SESSION_TIMEOUT_MS = 300 * 1000; // 5 minutes
 
 function createSession(userId, state = 'MAIN_MENU', data = {}) {
     if (activeClassSessions.has(userId)) {
