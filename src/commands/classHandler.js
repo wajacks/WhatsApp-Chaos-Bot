@@ -154,20 +154,168 @@ async function handleInput(client, message, userId, text, userName) {
                     await sendStudentGateway(message, targetClass);
                 }
                 break;
-            
-            // Placeholder states for Phase 3 & 4
+
+            // ==========================================
+            // PHASE 3: REP DASHBOARD & TIMETABLE WIZARD
+            // ==========================================
             case 'REP_DASHBOARD':
+                if (input === '0') {
+                    updateSessionState(userId, 'MAIN_MENU');
+                    await sendMainMenu(message);
+                    return;
+                }
+                if (input === '1') {
+                    updateSessionState(userId, 'REP_TIMETABLE_MENU', session.data);
+                    await message.reply(`📅 *TIMETABLE MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Current Timetable\n2. 🛠️ Run Timetable Wizard (Rebuild)\n\n0. 🔙 Back to Dashboard`);
+                } else if (input === '2') {
+                    updateSessionState(userId, 'REP_UPDATES_MENU', session.data);
+                    await message.reply(`📢 *UPDATES MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n\n0. 🔙 Back to Dashboard`);
+                } else if (['3', '4', '5'].includes(input)) {
+                    await message.reply(`🚧 This feature is coming in Phase 4 (Student Registrations & Issues).\nType *0* to go back.`);
+                } else {
+                    await message.reply(`❌ Invalid choice. Type 1-5, 0 to go back, or 99 to exit.`);
+                }
+                break;
+
+            case 'REP_TIMETABLE_MENU':
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                    await sendRepDashboard(message, session.data.loggedInClass);
+                    return;
+                }
+                if (input === '1') {
+                    const tt = db.classes[session.data.loggedInClass].timetable;
+                    let ttStr = `📅 *${session.data.loggedInClass} TIMETABLE*\n━━━━━━━━━━━━━━━━━━\n`;
+                    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+                    
+                    days.forEach(d => {
+                        ttStr += `*${d.toUpperCase()}*\n`;
+                        if (!tt[d] || tt[d].length === 0) {
+                            ttStr += `  Free Day 🏖️\n`;
+                        } else {
+                            tt[d].forEach(c => ttStr += `  ▪️ ${c.unit} @ ${c.time}\n`);
+                        }
+                        ttStr += `\n`;
+                    });
+                    await message.reply(ttStr + `(Type *0* to go back)`);
+                } else if (input === '2') {
+                    // Start Wizard - Clear existing timetable to rebuild fresh
+                    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+                    days.forEach(d => db.classes[session.data.loggedInClass].timetable[d] = []);
+                    writeClassDB(db);
+
+                    updateSessionState(userId, 'TIMETABLE_WIZARD', { ...session.data, dayIndex: 0 });
+                    await message.reply(
+                        `🛠️ *TIMETABLE WIZARD INITIATED*\n\n` +
+                        `We will build this day by day, starting with *SUNDAY*.\n\n` +
+                        `Enter classes one at a time using this exact format:\n` +
+                        `*Unit Name, Time* (e.g., Calculus, 08:00 AM)\n\n` +
+                        `Type *NEXT* when you are done adding classes for the current day.\n` +
+                        `Type *0* to abort wizard.`
+                    );
+                }
+                break;
+
+            case 'TIMETABLE_WIZARD':
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                    await sendRepDashboard(message, session.data.loggedInClass);
+                    return;
+                }
+
+                const daysList = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+                const currentDayStr = daysList[session.data.dayIndex];
+
+                if (input.toUpperCase() === 'NEXT' || input.toUpperCase() === 'DONE') {
+                    if (session.data.dayIndex >= 6) {
+                        // Wizard finished Saturday
+                        updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                        await message.reply(`🎉 *TIMETABLE COMPLETED!*\n\nAll 7 days have been configured successfully.`);
+                        await sendRepDashboard(message, session.data.loggedInClass);
+                    } else {
+                        // Move to next day
+                        const nextDayIdx = session.data.dayIndex + 1;
+                        updateSessionState(userId, 'TIMETABLE_WIZARD', { ...session.data, dayIndex: nextDayIdx });
+                        await message.reply(`✅ *${currentDayStr.toUpperCase()}* saved.\n\nMoving to 📅 *${daysList[nextDayIdx].toUpperCase()}*.\n\nEnter a class (*Unit, Time*) or type *NEXT* if there are no classes.`);
+                    }
+                    return;
+                }
+
+                // Format Validation
+                if (!input.includes(',')) {
+                    await message.reply(`❌ Invalid format.\n\nPlease use a comma to separate the unit and time.\nExample: *Programming, 10:00 AM*`);
+                    return;
+                }
+
+                const [unit, time] = input.split(',').map(s => s.trim());
+                db.classes[session.data.loggedInClass].timetable[currentDayStr].push({ unit, time });
+                writeClassDB(db);
+
+                await message.reply(`✅ Added *${unit}* at *${time}* on *${currentDayStr.toUpperCase()}*.\n\nEnter another class for ${currentDayStr.toUpperCase()}, or type *NEXT* to move to the next day.`);
+                break;
+
+            case 'REP_UPDATES_MENU':
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                    await sendRepDashboard(message, session.data.loggedInClass);
+                    return;
+                }
+                if (input === '1') {
+                    const updates = db.classes[session.data.loggedInClass].updates;
+                    if (updates.length === 0) {
+                        await message.reply(`📭 No updates have been posted yet.\n(Type *0* to go back)`);
+                        return;
+                    }
+                    
+                    let upStr = `📢 *CLASS UPDATES*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    updates.forEach((u, i) => {
+                        const dateObj = new Date(u.timestamp);
+                        // Convert to EAT (UTC+3) formatting for local context
+                        const timeString = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' });
+                        const dateString = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Africa/Nairobi' });
+                        
+                        // Highlight the latest one in bold
+                        if (i === updates.length - 1) {
+                            upStr += `🚨 *LATEST UPDATE [${dateString} - ${timeString}]*\n*${u.text}*\n\n`;
+                        } else {
+                            upStr += `▪️ [${dateString} - ${timeString}]\n${u.text}\n\n`;
+                        }
+                    });
+                    await message.reply(upStr + `(Type *0* to go back)`);
+                } else if (input === '2') {
+                    updateSessionState(userId, 'REP_ADD_UPDATE', session.data);
+                    await message.reply(`✍️ *POST NEW UPDATE*\n\nType your announcement below.\nIt will be timestamped automatically.\n\n(Type *0* to cancel)`);
+                } else if (input === '3') {
+                    db.classes[session.data.loggedInClass].updates = [];
+                    writeClassDB(db);
+                    await message.reply(`🗑️ Updates history cleared.\n(Type *0* to go back)`);
+                }
+                break;
+
+            case 'REP_ADD_UPDATE':
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_UPDATES_MENU', session.data);
+                    await message.reply(`📢 *UPDATES MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n\n0. 🔙 Back`);
+                    return;
+                }
+                
+                db.classes[session.data.loggedInClass].updates.push({
+                    text: input,
+                    timestamp: Date.now()
+                });
+                writeClassDB(db);
+                
+                updateSessionState(userId, 'REP_UPDATES_MENU', session.data);
+                await message.reply(`✅ *Update Posted Successfully!*\n\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n\n0. 🔙 Back`);
+                break;
+
+            // Leave the STUDENT_GATEWAY placeholder below it for Phase 4
             case 'STUDENT_GATEWAY':
-                await message.reply(`🛠️ Dashboards are under construction (Phase 3 & 4).\nType *0* to go back to main menu, or *99* to exit.`);
+                await message.reply(`🛠️ Student Gateway is under construction (Phase 4).\nType *0* to go back to main menu, or *99* to exit.`);
                 if (input === '0') {
                     updateSessionState(userId, 'MAIN_MENU');
                     await sendMainMenu(message);
                 }
-                break;
-
-            default:
-                await message.reply('⚠️ Session state error. Ending session.');
-                endSession(userId);
                 break;
         }
     } catch (error) {
