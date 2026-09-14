@@ -66,6 +66,10 @@ const { getHymn } = require('./src/tools/hymnal');
 const { sendHymnPianoAudio } = require('./src/tools/hymnalAudio');
 const { logMessage, getChatHistory } = require('./src/database/chatlog');
 
+// CLASS PORTAL:
+const { isUserInClassSession, endSession } = require('./src/tools/classSession');
+const classHandler = require('./src/commands/classHandler');
+
 // ============================================================
 // WEATHER RESPONSE BUILDER
 // ============================================================
@@ -439,7 +443,34 @@ client.on('message', async message => {
         const text = message.body ? message.body.trim() : '';
         const lowerText = text.toLowerCase();
 
-                // ====================================================
+        // ============================================================
+        // 🎓 CLASS PORTAL INTERCEPT (SESSION LOCKOUT)
+        // ============================================================
+        if (isUserInClassSession(senderId)) {
+            
+            // Universal Escape Hatch
+            if (text === '99') {
+                endSession(senderId);
+                await message.reply('🚪 You have safely logged out of the Class Portal.');
+                return;
+            }
+
+            // Block global bot commands while logged in
+            if (text.startsWith('!')) {
+                 await message.reply(
+                     '⚠️ You are currently in the Class Portal.\n\n' +
+                     'Type *99* to logout before using normal bot commands.'
+                 );
+                 return;
+            }
+
+            // Route their input directly to the class state machine (Phase 2)
+            await classHandler.handleInput(client, message, senderId, text, userName);
+            
+            return; // CRITICAL: Stop execution so they don't trigger regular commands
+        }
+
+        // ====================================================
         // 📖 BIBLE VERSE
         // ====================================================
 
@@ -1179,6 +1210,7 @@ client.on('message', async message => {
                 '- !pay <amount> — Pay another player.\n' +
                 '- !owner — Access the owner control panel (Owner only).\n' +
                 '- !verse <reference> — Get a Bible verse in English or Kiswahili.\n' +
+                '- !class — Access the class portal for TUM students.\n' +
                 '- !nyimbo <query> — Search for a hymn(swahili).\n' +
                 '- !contactowner — Get the contact card for the bot owner.\n' +
                 '- !ownercontact — Get the contact card for the bot owner.\n' +
@@ -1268,6 +1300,14 @@ client.on('message', async message => {
             return;
         }
 
+        // ====================================================
+        // CLASS PORTAL
+        // ====================================================
+        if (lowerText === '!class' || lowerText === '!classes') {
+            await classHandler.handleClassCommand(client, message, senderId, userName);
+            return;
+        }
+        
         // ====================================================
         // WEATHER COMMAND
         // ====================================================
