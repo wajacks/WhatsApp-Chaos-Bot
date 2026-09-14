@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const dbPath = path.join(__dirname, '../../../data/classdb.json');
+const dbPath = path.join(__dirname, '../../data/classdb.json');
 
 function readClassDB() {
     if (!fs.existsSync(dbPath)) {

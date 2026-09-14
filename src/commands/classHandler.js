@@ -23,10 +23,10 @@ async function handleInput(client, message, userId, text, userName) {
     const session = getSession(userId);
     if (!session) return;
 
-    const db = readClassDB();
     const input = text.trim();
 
     try {
+        const db = readClassDB();
         switch (session.state) {
             case 'MAIN_MENU':
                 if (input === '1') {
