@@ -24,9 +24,18 @@ function writeClassDB(data) {
     }
 }
 
+function resetClassDB() {
+  const dir = path.dirname(dbPath);
+  if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+  }
+  const initialData = { classes: {} };
+  fs.writeFileSync(dbPath, JSON.stringify(initialData, null, 2));
+}
+
 function classExists(className) {
     const db = readClassDB();
     return !!db.classes[className];
 }
 
-module.exports = { readClassDB, writeClassDB, classExists };
+module.exports = { readClassDB, writeClassDB, classExists , resetClassDB};

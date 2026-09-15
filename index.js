@@ -29,6 +29,8 @@ const {
     resetEconomy
 } = require('./src/database/db');
 
+const { resetClassDB } = require('./src/database/classdb');
+
 // ============================================================
 // COMMANDS
 // ============================================================
@@ -186,6 +188,9 @@ function getOwnerMenu() {
 
         '💥 *!owner reset*\n' +
         'Reset the entire economy.\n\n' +
+
+        '🏫 *!owner classreset*\n' +
+        'Wipe and reset all class portals and student records.\n\n' +
 
         '🔄 *!owner restart*\n' +
         'Restart Chaos Bot through PM2.\n\n' +
@@ -1425,6 +1430,31 @@ client.on('message', async message => {
                     await message.reply(
                         '❌ *ECONOMY RESET FAILED*\n\n' +
                         'An error occurred while resetting the economy.'
+                    );
+                }
+
+                return;
+            }
+
+            // --------------------------------------------
+            // !owner classreset
+            // --------------------------------------------
+
+            if (ownerCommand === 'classreset') {
+                try {
+                    resetClassDB();
+
+                    await message.reply(
+                        '💥 *CLASS PORTAL RESET SUCCESSFUL!*\n\n' +
+                        'All classes, registered student profiles, timetables, and audit logs have been completely wiped clean.\n\n' +
+                        '👑 *Executed by: Master Owner*'
+                    );
+                } catch (err) {
+                    console.error('Owner class reset error:', err);
+
+                    await message.reply(
+                        '❌ *CLASS RESET FAILED*\n\n' +
+                        'An error occurred while wiping the class database.'
                     );
                 }
 
