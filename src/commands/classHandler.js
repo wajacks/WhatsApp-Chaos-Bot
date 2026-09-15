@@ -9,25 +9,40 @@ async function handleClassCommand(client, message, userId, userName) {
 
 // Helper to send the Main Menu
 async function sendMainMenu(message) {
-  const menu = `████████╗ ██╗   ██╗ ███╗   ███╗\n` +
-              `╚══██╔══╝ ██║   ██║ ████╗ ████║\n` +
-              `   ██║    ██║   ██║ ██╔████╔██║\n` +
-              `   ██║    ██║   ██║ ██║╚██╔╝██║\n` +
-              `   ██║    ╚██████╔╝ ██║ ╚═╝ ██║\n` +
-              `   ╚═╝     ╚═════╝  ╚═╝     ╚═╝\n` +
-              `\n` +
-              `       🎓 *CLASS PORTAL GATEWAY* 🎓\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-              `        ⚡ *SELECT ACCESS* ⚡\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-              `🏫 *1.* View & Login to a Class\n` +
-              `🛠️ *2.* Create a New Class\n` +
-              `       *(Class Representatives)*\n` +
-              `━━━━━━━ ✦ ━━━━━━━\n` +
-              `🚪 *99.* Exit\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-              `💬 *Reply with a number to continue*`;
-            await message.reply(menu);
+  const menu = `╭──────────────────────────────╮
+│        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
+│                               
+│           \`CLASS PORTAL\`          
+│          \`GATEWAY HUB\`          
+│                               
+│   ❒ SYSTEM ☞『_*ONLINE*_』        
+│   ❒ ENGINE ☞『_*SECURE*_』        
+╰──────────────────────────────╯
+
+┌─── ░◈ _*GATEWAY*_ ◈░ ──────────────┐
+│
+│🏫 \`1\`
+│    ☞『_*View & Login to a Class*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🛠️ \`2\`
+│    ☞『_*Create a New Class (Reps)*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🚪 \`99\`
+│    ☞『_*Exit gateway*_』
+│
+└──────────────────────────────┘
+
+╭──────────────────────────────╮
+│                               
+│        👑░◈ _*PORTAL*_ ◈░        
+│                               
+│   💬 \`Reply with a number\`    
+│                               
+╰──────────────────────────────╯
+      ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
+      「 SECURE THE SYSTEM 」`;
+
+  await message.reply(menu);
 }
 
 // The core state router that processes raw text while logged in
@@ -501,39 +516,63 @@ async function handleInput(client, message, userId, text, userName) {
             // PHASE 4: STUDENT GATEWAY & SECURITY
             // ==========================================
             case 'STUDENT_GATEWAY': {
-                if (input === '0') {
-                    updateSessionState(userId, 'MAIN_MENU');
-                    await sendMainMenu(message);
-                    return;
-                }
-                if (input === '1') {
-                    // Login Process
-                    const members = db.classes[session.data.loggedInClass].members;
-                    const memberIds = Object.keys(members);
-                    
-                    if (memberIds.length === 0) {
-                        await message.reply(`⚠️ No students are registered in this class yet.\nType *0* to go back, or *2* to register.`);
-                        return;
+              if (input === '0') {
+                  updateSessionState(userId, 'MAIN_MENU');
+                  await sendMainMenu(message);
+                  return;
+              }
+              if (input === '1') {
+                  // Login Process
+                  const members = db.classes[session.data.loggedInClass].members;
+                  const memberIds = Object.keys(members);
+                  
+                  if (memberIds.length === 0) {
+                      await message.reply(`⚠️ No students are registered in this class yet.\nType *0* to go back, or *2* to register.`);
+                      return;
+                  }
+
+                  updateSessionState(userId, 'STUDENT_LOGIN_ADM', session.data);
+                  await message.reply(`🔑 *STUDENT LOGIN*\n\nEnter your *Admission Number*:\n\n(Type *0* to go back)`);
+
+              } else if (input === '2') {
+                  // ========================================================
+                  // GLOBAL SECURITY CHECK: Scan ALL classes in the database
+                  // ========================================================
+                  let registeredClassFound = null;
+                  let existingStudentName = null;
+
+                  for (const [className, classData] of Object.entries(db.classes)) {
+                    if (classData.members) {
+                        const matchedMember = Object.values(classData.members).find(
+                            m => m.phoneId === userId
+                        );
+                        if (matchedMember) {
+                            registeredClassFound = className;
+                            existingStudentName = matchedMember.name;
+                            break;
+                        }
                     }
-
-                    let memberList = `👥 *SELECT YOUR NAME*\n━━━━━━━━━━━━━━━━━━\n`;
-                    memberIds.forEach((mId, idx) => {
-                        memberList += `${idx + 1}. ${members[mId].name}\n`;
-                    });
-                    memberList += `\n*Reply with your number:*\n(Type *0* to go back)`;
-                    
-                    updateSessionState(userId, 'STUDENT_LOGIN_SELECT', { ...session.data, memberIds });
-                    await message.reply(memberList);
-
-                } else if (input === '2') {
-                    // Registration Process Step 1
-                    updateSessionState(userId, 'STUDENT_REG_NAME', session.data);
-                    await message.reply(`📝 *STUDENT REGISTRATION*\n\nEnter your *Full Name*:\n(Type *0* to cancel)`);
-                } else {
-                    await message.reply(`❌ Invalid choice. Type 1 or 2.`);
                 }
-                break;
-            }
+
+                  if (registeredClassFound) {
+                      await message.reply(
+                          `❌ *GLOBAL REGISTRATION BLOCKED*\n\n` +
+                          `Your WhatsApp number is already registered under *${existingStudentName}* in another class portal: *${registeredClassFound}*.\n\n` +
+                          `You are restricted to a single active student profile across the system.\n\n` +
+                          `(Type *0* to go back)`
+                      );
+                      return;
+                  }
+                  // ========================================================
+
+                  // Registration Process Step 1
+                  updateSessionState(userId, 'STUDENT_REG_NAME', session.data);
+                  await message.reply(`📝 *STUDENT REGISTRATION*\n\nEnter your *Full Name*:\n(Type *0* to cancel)`);
+              } else {
+                  await message.reply(`❌ Invalid choice. Type 1 or 2.`);
+              }
+              break;
+          }
 
             // --- REGISTRATION FLOW ---
             case 'STUDENT_REG_NAME': {
@@ -544,11 +583,25 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             case 'STUDENT_REG_ADM': {
-                if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
-                updateSessionState(userId, 'STUDENT_REG_PASS', { ...session.data, regAdm: input });
-                await message.reply(`✅ Admission No saved: *${input}*\n\nCreate a *Personal Password* for your portal login:\n(Make it secure but easy to remember!)`);
-                break;
-            }
+              if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
+              
+              const cleanAdm = input.trim().toUpperCase();
+              const members = db.classes[session.data.loggedInClass].members;
+
+              // SECURITY CHECK: Prevent duplicate admission numbers
+              const admissionTaken = Object.values(members).some(
+                  m => m.admission.toUpperCase() === cleanAdm
+              );
+              
+              if (admissionTaken) {
+                  await message.reply(`❌ *DUPLICATE ADMISSION*\n\nThe admission number *${input}* is already registered in this class database.\n\nIf this is your admission number, someone else has used it or you already registered. Use the login option.`);
+                  return;
+              }
+
+              updateSessionState(userId, 'STUDENT_REG_PASS', { ...session.data, regAdm: cleanAdm });
+              await message.reply(`✅ Admission No saved: *${cleanAdm}*\n\nCreate a *Personal Password* for your portal login:\n(Make it secure but easy to remember!)`);
+              break;
+          }
 
             case 'STUDENT_REG_PASS': {
               if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
@@ -846,72 +899,108 @@ async function handleInput(client, message, userId, text, userName) {
 
 // UI Helpers for Dashboards
 async function sendRepDashboard(message, className) {
-  const menu = `████████╗ ██╗   ██╗ ███╗   ███╗\n` +
-              `╚══██╔══╝ ██║   ██║ ████╗ ████║\n` +
-              `   ██║    ██║   ██║ ██╔████╔██║\n` +
-              `   ██║    ██║   ██║ ██║╚██╔╝██║\n` +
-              `   ██║    ╚██████╔╝ ██║ ╚═╝ ██║\n` +
-              `   ╚═╝     ╚═════╝  ╚═╝     ╚═╝\n` +
-              `\n` +
-              `        👑 *REP COMMAND CENTER* 👑\n` +
-              `        🏫 *${className}*\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-              `        ⚡ *CONTROL BOARD* ⚡\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-              `📅 *1.* Manage Timetable\n` +
-              `📢 *2.* Manage Updates\n` +
-              `👥 *3.* Class Members\n` +
-              `🚨 *4.* Resolve Issues\n` +
-              `📜 *5.* View Logs\n` +
-              `━━━━━━━ 👑 ━━━━━━━\n` +
-              `🔙 *0.* Back to Main Menu\n` +
-              `🚪 *99.* Logout\n` +
-              `\n` +
-              `🟢 </> *REP ACCESS: VERIFIED*`;
+  const menu = `╭──────────────────────────────╮
+│        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
+│                               
+│         \`REP COMMAND\`         
+│           \`[ ${className} ]\`         
+│                               
+│   👑 LEVEL ☞『_*AUTHORIZED*_』    
+╰──────────────────────────────╯
 
-await message.reply(menu);
+┌─── ░◈ _*CONTROL BOARD*_ ◈░ ───────┐
+│
+│📅 \`1\`
+│    ☞『_*Manage Timetable*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│📢 \`2\`
+│    ☞『_*Manage Updates*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│👥 \`3\`
+│    ☞『_*Class Members*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🚨 \`4\`
+│    ☞『_*Resolve Issues*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│📜 \`5\`
+│    ☞『_*View Audit Logs*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🔙 \`0\`
+│    ☞『_*Back to Main Menu*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🚪 \`99\`
+│    ☞『_*Logout*_』
+│
+└──────────────────────────────┘
+      ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
+      「 CONTROL THE CHAOS 」`;
+
+  await message.reply(menu);
 }
 
 async function sendStudentGateway(message, className) {
-  const menu = `🎨🔥 *CHAOS STUDENT PORTAL* 🔥🎨\n` +
-                `╭━━━━━━━━━━━━━━━━━━━━━━╮\n` +
-                `┃ 🎓 *${className}* ┃\n` +
-                `╰━━━━━━━━━━━━━━━━━━━━━━╯\n` +
-                `━━━━━━━ ✦ ━━━━━━━\n` +
-                `      *CHOOSE YOUR MOVE*\n` +
-                `━━━━━━━ ✦ ━━━━━━━\n` +
-                `🔑 *1.* Login (Registered)\n` +
-                `📝 *2.* Register (First Time)\n` +
-                `━━━━━━━ ⚡ ━━━━━━━\n` +
-                `🔙 *0.* Back to Main Menu\n` +
-                `🚪 *99.* Logout`;
-await message.reply(menu);
+  const menu = `╭──────────────────────────────╮
+│        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
+│                               
+│          \`STUDENT PORTAL\`         
+│           \`[ ${className} ]\`         
+│                               
+│   ❒ ACCESS ☞『_*PENDING*_』       
+╰──────────────────────────────╯
+
+┌─── ░◈ _*AUTHENTICATION*_ ◈░ ──────┐
+│
+│🔑 \`1\`
+│    ☞『_*Login (Already Registered)*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│📝 \`2\`
+│    ☞『_*Register (First Time)*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🔙 \`0\`
+│    ☞『_*Back to Main Menu*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🚪 \`99\`
+│    ☞『_*Logout*_』
+│
+└──────────────────────────────┘
+      ⚡ _*TUM*_ × _*CHAOS*_ ⚡`;
+
+  await message.reply(menu);
 }
 
 async function sendStudentDashboard(message, className, studentName) {
-  const menu = `╔═══ 🎨 *C H A O S* 🎨 ═══╗\n` +
-             `║     ⚡ *STUDENT ACCESS* ⚡     ║\n` +
-             `╚════════════════════════╝\n` +
-             `┌─[ 👤 *IDENTITY* ]─────────┐\n` +
-             `│ Student :: ${studentName}\n` +
-             `│ Class   :: ${className}\n` +
-             `└─────────────────────────┘\n` +
-             `\n` +
-             `━━━━━━━ 💥 ━━━━━━━\n` +
-             `       *SELECT OPTION*\n` +
-             `━━━━━━━ 💥 ━━━━━━━\n` +
-             `📅  *1*  Today's Classes\n` +
-             `🗓️  *2*  Full Timetable\n` +
-             `📢  *3*  Updates\n` +
-             `👥  *4*  Classmates\n` +
-             `─────── ⚡ ───────\n` +
-             `🔙  *0*   Back to Main Menu\n` +
-             `🚪  *99*  Logout\n` +
-             `\n` +
-             `╭──────────────────────╮\n` +
-             `│ </> *CONNECTION_SECURED* │\n` +
-             `│          🟢 ONLINE        │\n` +
-             `╰──────────────────────╯`;
+  const menu = `╭──────────────────────────────╮
+│        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
+│                               
+│           \`STUDENT HUB\`          
+│           \`[ ${className} ]\`         
+│                               
+│   👤 USER ☞『_*${studentName}*_』 
+╰──────────────────────────────╯
+
+┌─── ░◈ _*PORTAL FEED*_ ◈░ ──────────┐
+│
+│📅 \`1\`
+│    ☞『_*View Today's Classes*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🗓️ \`2\`
+│    ☞『_*View Full Timetable*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│📢 \`3\`
+│    ☞『_*View Updates*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│👥 \`4\`
+│    ☞『_*View Classmates*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🔙 \`0\`
+│    ☞『_*Back to Main Menu*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🚪 \`99\`
+│    ☞『_*Logout*_』
+│
+└──────────────────────────────┘
+      ⚡ _*TUM*_ × _*CHAOS*_ ⚡`;
+
   await message.reply(menu);
 }
 
