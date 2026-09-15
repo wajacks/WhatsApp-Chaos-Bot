@@ -9,13 +9,25 @@ async function handleClassCommand(client, message, userId, userName) {
 
 // Helper to send the Main Menu
 async function sendMainMenu(message) {
-    const menu = `🎓 *CLASS PORTAL GATEWAY*\n` +
-                 `━━━━━━━━━━━━━━━━━━\n` +
-                 `1. 🏫 View & Login to a Class\n` +
-                 `2. 🛠️ Create a New Class (Class Reps)\n\n` +
-                 `99. 🚪 Exit\n\n` +
-                 `*Reply with a number:*`;
-    await message.reply(menu);
+  const menu = `████████╗ ██╗   ██╗ ███╗   ███╗\n` +
+              `╚══██╔══╝ ██║   ██║ ████╗ ████║\n` +
+              `   ██║    ██║   ██║ ██╔████╔██║\n` +
+              `   ██║    ██║   ██║ ██║╚██╔╝██║\n` +
+              `   ██║    ╚██████╔╝ ██║ ╚═╝ ██║\n` +
+              `   ╚═╝     ╚═════╝  ╚═╝     ╚═╝\n` +
+              `\n` +
+              `       🎓 *CLASS PORTAL GATEWAY* 🎓\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `        ⚡ *SELECT ACCESS* ⚡\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `🏫 *1.* View & Login to a Class\n` +
+              `🛠️ *2.* Create a New Class\n` +
+              `       *(Class Representatives)*\n` +
+              `━━━━━━━ ✦ ━━━━━━━\n` +
+              `🚪 *99.* Exit\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `💬 *Reply with a number to continue*`;
+            await message.reply(menu);
 }
 
 // The core state router that processes raw text while logged in
@@ -539,39 +551,47 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             case 'STUDENT_REG_PASS': {
-                if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
-                updateSessionState(userId, 'STUDENT_REG_SEC', { ...session.data, regPass: input });
-                await message.reply(`✅ Password saved.\n\n🛡️ *SECURITY QUESTION*\nIn case you forget your password, what is your *National ID Number*?`);
-                break;
-            }
+              if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
+              updateSessionState(userId, 'STUDENT_REG_SEC_Q', { ...session.data, regPass: input });
+              await message.reply(`✅ Password saved.\n\n🛡️ *SECURITY RECOVERY*\nPlease type a custom *Security Question* (e.g., What is my pet's name?, What is my favorite movie?).\n\nYou will be asked this if you forget your password:`);
+              break;
+          }
 
-            case 'STUDENT_REG_SEC': {
-                if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
-                
-                // Save to Database
-                const newMemberId = `std_${Date.now()}`;
-                db.classes[session.data.loggedInClass].members[newMemberId] = {
-                    name: session.data.regName,
-                    admission: session.data.regAdm,
-                    password: session.data.regPass,
-                    securityId: input,
-                    locked: false,
-                    phoneId: userId
-                };
-                
-                // Add to Class Logs
-                db.classes[session.data.loggedInClass].logs.push({
-                    text: `New Registration: ${session.data.regName} (${session.data.regAdm})`,
-                    timestamp: Date.now()
-                });
-                
-                writeClassDB(db);
-                
-                updateSessionState(userId, 'STUDENT_DASHBOARD', { ...session.data, currentStudentId: newMemberId, studentName: session.data.regName });
-                await message.reply(`🎉 *REGISTRATION COMPLETE!*\n\nWelcome to the ${session.data.loggedInClass} portal, ${session.data.regName}.`);
-                await sendStudentDashboard(message, session.data.loggedInClass, session.data.regName);
-                break;
-            }
+          case 'STUDENT_REG_SEC_Q': {
+              if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
+              updateSessionState(userId, 'STUDENT_REG_SEC_A', { ...session.data, secQuestion: input });
+              await message.reply(`✅ Question saved: *${input}*\n\nNow, type the *Answer* to your question:\n(Keep it simple and easy to remember!)`);
+              break;
+          }
+
+          case 'STUDENT_REG_SEC_A': {
+              if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
+              
+              // Save to Database
+              const newMemberId = `std_${Date.now()}`;
+              db.classes[session.data.loggedInClass].members[newMemberId] = {
+                  name: session.data.regName,
+                  admission: session.data.regAdm,
+                  password: session.data.regPass,
+                  securityQuestion: session.data.secQuestion,
+                  securityAnswer: input.trim().toLowerCase(), // Save as lowercase for easy matching
+                  locked: false,
+                  phoneId: userId
+              };
+              
+              // Add to Class Logs
+              db.classes[session.data.loggedInClass].logs.push({
+                  text: `New Registration: ${session.data.regName} (${session.data.regAdm})`,
+                  timestamp: Date.now()
+              });
+              
+              writeClassDB(db);
+              
+              updateSessionState(userId, 'STUDENT_DASHBOARD', { ...session.data, currentStudentId: newMemberId, studentName: session.data.regName });
+              await message.reply(`🎉 *REGISTRATION COMPLETE!*\n\nWelcome to the ${session.data.loggedInClass} portal, ${session.data.regName}.`);
+              await sendStudentDashboard(message, session.data.loggedInClass, session.data.regName);
+              break;
+          }
 
             // --- LOGIN FLOW ---
             case 'STUDENT_LOGIN_SELECT': {
@@ -621,10 +641,10 @@ async function handleInput(client, message, userId, text, userName) {
                 } else {
                     attempts++;
                     if (attempts >= 3) {
-                        // 3 Strikes - Go to Security Question
-                        updateSessionState(userId, 'STUDENT_LOGIN_SEC', { ...session.data, secAttempts: 0 });
-                        await message.reply(`🚨 *TOO MANY FAILED ATTEMPTS*\n\nTo verify your identity, please enter your *National ID Number* (Security Question):`);
-                    } else {
+                      // 3 Strikes - Go to Security Question
+                      updateSessionState(userId, 'STUDENT_LOGIN_SEC', { ...session.data, secAttempts: 0 });
+                      await message.reply(`🚨 *TOO MANY FAILED ATTEMPTS*\n\nTo verify your identity, please answer your security question:\n\n❓ *${studentRecord.securityQuestion}*`);
+                  } else {
                         updateSessionState(userId, 'STUDENT_LOGIN_PASS', { ...session.data, attempts });
                         await message.reply(`❌ Incorrect Password.\nYou have ${3 - attempts} attempt(s) left.\nTry again, or type *0* to go back.`);
                     }
@@ -633,35 +653,36 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             case 'STUDENT_LOGIN_SEC': {
-                const secStudentId = session.data.loginTargetId;
-                const secRecord = db.classes[session.data.loggedInClass].members[secStudentId];
-                let secAttempts = session.data.secAttempts || 0;
+              const secStudentId = session.data.loginTargetId;
+              const secRecord = db.classes[session.data.loggedInClass].members[secStudentId];
+              let secAttempts = session.data.secAttempts || 0;
 
-                if (input === secRecord.securityId) {
-                    updateSessionState(userId, 'STUDENT_RESET_PASS', session.data);
-                    await message.reply(`✅ *IDENTITY VERIFIED*\n\nPlease enter a *NEW* Personal Password for your account:`);
-                } else {
-                    secAttempts++;
-                    if (secAttempts >= 2) {
-                        // Total Lockout
-                        db.classes[session.data.loggedInClass].members[secStudentId].locked = true;
-                        db.classes[session.data.loggedInClass].issues.push({
-                            memberId: secStudentId,
-                            name: secRecord.name,
-                            reason: 'Failed Security Verification',
-                            timestamp: Date.now()
-                        });
-                        writeClassDB(db);
-                        
-                        updateSessionState(userId, 'MAIN_MENU');
-                        await message.reply(`🚨 *ACCOUNT LOCKED*\n\nYou failed the security verification. An issue has been raised with your Class Rep. You cannot login until they resolve it.\n\nType *99* to exit.`);
-                    } else {
-                        updateSessionState(userId, 'STUDENT_LOGIN_SEC', { ...session.data, secAttempts });
-                        await message.reply(`❌ Incorrect ID Number. You have 1 attempt left before your account is locked:`);
-                    }
-                }
-                break;
-            }
+              // Compare input in lowercase to make it forgiving (e.g. "Fluffy" vs "fluffy")
+              if (input.trim().toLowerCase() === secRecord.securityAnswer) {
+                  updateSessionState(userId, 'STUDENT_RESET_PASS', session.data);
+                  await message.reply(`✅ *IDENTITY VERIFIED*\n\nPlease enter a *NEW* Personal Password for your account:`);
+              } else {
+                  secAttempts++;
+                  if (secAttempts >= 2) {
+                      // Total Lockout
+                      db.classes[session.data.loggedInClass].members[secStudentId].locked = true;
+                      db.classes[session.data.loggedInClass].issues.push({
+                          memberId: secStudentId,
+                          name: secRecord.name,
+                          reason: 'Failed Custom Security Question',
+                          timestamp: Date.now()
+                      });
+                      writeClassDB(db);
+                      
+                      updateSessionState(userId, 'MAIN_MENU');
+                      await message.reply(`🚨 *ACCOUNT LOCKED*\n\nYou failed the security verification. An issue has been raised with your Class Rep. You cannot login until they resolve it.\n\nType *99* to exit.`);
+                  } else {
+                      updateSessionState(userId, 'STUDENT_LOGIN_SEC', { ...session.data, secAttempts });
+                      await message.reply(`❌ Incorrect Answer. You have 1 attempt left before your account is locked:`);
+                  }
+              }
+              break;
+          }
 
             case 'STUDENT_RESET_PASS': {
                 const resetStudentId = session.data.loginTargetId;
@@ -710,35 +731,39 @@ async function handleInput(client, message, userId, text, userName) {
           }
 
           case 'STUDENT_FORCE_NEW_PASS': {
-              if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
-              updateSessionState(userId, 'STUDENT_FORCE_NEW_PIN', { ...session.data, tempPass: input });
-              await message.reply(`✅ Password saved.\n\nNow, please create a *NEW 4-Digit Security PIN* (e.g., 1234):`);
-              break;
-          }
+            if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
+            updateSessionState(userId, 'STUDENT_FORCE_NEW_SEC_Q', { ...session.data, tempPass: input });
+            await message.reply(`✅ Password saved.\n\nNow, please type a *NEW Custom Security Question* (e.g., What is my favorite food?):`);
+            break;
+        }
 
-          case 'STUDENT_FORCE_NEW_PIN': {
-              if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
-              if (!/^\d{4}$/.test(input.trim())) {
-                  await message.reply(`❌ Invalid format. Please enter exactly *4 digits* (e.g., 5824):`);
-                  return;
-              }
-              
-              const finalTargetId = session.data.loginTargetId;
-              const memberRef = db.classes[session.data.loggedInClass].members[finalTargetId];
-              
-              // Save new credentials and clear OTP locks
-              memberRef.password = session.data.tempPass;
-              memberRef.securityId = input.trim(); 
-              memberRef.pendingRepReset = false;
-              delete memberRef.resetOtp;
-              
-              writeClassDB(db);
-              
-              updateSessionState(userId, 'STUDENT_DASHBOARD', { ...session.data, currentStudentId: finalTargetId, studentName: memberRef.name });
-              await message.reply(`🎉 *RECOVERY COMPLETE!*\n\nYour new password and PIN are saved. Welcome back to your portal.`);
-              await sendStudentDashboard(message, session.data.loggedInClass, memberRef.name);
-              break;
-          }
+        case 'STUDENT_FORCE_NEW_SEC_Q': {
+            if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
+            updateSessionState(userId, 'STUDENT_FORCE_NEW_SEC_A', { ...session.data, newSecQuestion: input });
+            await message.reply(`✅ Question saved: *${input}*\n\nNow, type the *Answer* to that question:`);
+            break;
+        }
+
+        case 'STUDENT_FORCE_NEW_SEC_A': {
+            if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
+            
+            const finalTargetId = session.data.loginTargetId;
+            const memberRef = db.classes[session.data.loggedInClass].members[finalTargetId];
+            
+            // Save new credentials and clear OTP locks
+            memberRef.password = session.data.tempPass;
+            memberRef.securityQuestion = session.data.newSecQuestion;
+            memberRef.securityAnswer = input.trim().toLowerCase();
+            memberRef.pendingRepReset = false;
+            delete memberRef.resetOtp;
+            
+            writeClassDB(db);
+            
+            updateSessionState(userId, 'STUDENT_DASHBOARD', { ...session.data, currentStudentId: finalTargetId, studentName: memberRef.name });
+            await message.reply(`🎉 *RECOVERY COMPLETE!*\n\nYour new password and security question are saved. Welcome back to your portal.`);
+            await sendStudentDashboard(message, session.data.loggedInClass, memberRef.name);
+            break;
+        }
 
             // --- STUDENT DASHBOARD ---
             case 'STUDENT_DASHBOARD': {
@@ -821,39 +846,73 @@ async function handleInput(client, message, userId, text, userName) {
 
 // UI Helpers for Dashboards
 async function sendRepDashboard(message, className) {
-    const menu = `👑 *REP DASHBOARD: ${className}*\n` +
-                 `━━━━━━━━━━━━━━━━━━\n` +
-                 `1. 📅 Manage Timetable\n` +
-                 `2. 📢 Manage Updates\n` +
-                 `3. 👥 Class Members\n` +
-                 `4. 🚨 Resolve Issues\n` +
-                 `5. 📜 View Logs\n\n` +
-                 `0. 🔙 Back to Main Menu\n` +
-                 `99. 🚪 Logout`;
-    await message.reply(menu);
+  const menu = `████████╗ ██╗   ██╗ ███╗   ███╗\n` +
+              `╚══██╔══╝ ██║   ██║ ████╗ ████║\n` +
+              `   ██║    ██║   ██║ ██╔████╔██║\n` +
+              `   ██║    ██║   ██║ ██║╚██╔╝██║\n` +
+              `   ██║    ╚██████╔╝ ██║ ╚═╝ ██║\n` +
+              `   ╚═╝     ╚═════╝  ╚═╝     ╚═╝\n` +
+              `\n` +
+              `        👑 *REP COMMAND CENTER* 👑\n` +
+              `        🏫 *${className}*\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `        ⚡ *CONTROL BOARD* ⚡\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `📅 *1.* Manage Timetable\n` +
+              `📢 *2.* Manage Updates\n` +
+              `👥 *3.* Class Members\n` +
+              `🚨 *4.* Resolve Issues\n` +
+              `📜 *5.* View Logs\n` +
+              `━━━━━━━ 👑 ━━━━━━━\n` +
+              `🔙 *0.* Back to Main Menu\n` +
+              `🚪 *99.* Logout\n` +
+              `\n` +
+              `🟢 </> *REP ACCESS: VERIFIED*`;
+
+await message.reply(menu);
 }
 
 async function sendStudentGateway(message, className) {
-    const menu = `🏫 *STUDENT PORTAL: ${className}*\n` +
-                 `━━━━━━━━━━━━━━━━━━\n` +
-                 `1. 🔑 Login (Already Registered)\n` +
-                 `2. 📝 Register (First Time)\n\n` +
-                 `0. 🔙 Back to Main Menu\n` +
-                 `99. 🚪 Logout`;
-    await message.reply(menu);
+  const menu = `🎨🔥 *CHAOS STUDENT PORTAL* 🔥🎨\n` +
+                `╭━━━━━━━━━━━━━━━━━━━━━━╮\n` +
+                `┃ 🎓 *${className}* ┃\n` +
+                `╰━━━━━━━━━━━━━━━━━━━━━━╯\n` +
+                `━━━━━━━ ✦ ━━━━━━━\n` +
+                `      *CHOOSE YOUR MOVE*\n` +
+                `━━━━━━━ ✦ ━━━━━━━\n` +
+                `🔑 *1.* Login (Registered)\n` +
+                `📝 *2.* Register (First Time)\n` +
+                `━━━━━━━ ⚡ ━━━━━━━\n` +
+                `🔙 *0.* Back to Main Menu\n` +
+                `🚪 *99.* Logout`;
+await message.reply(menu);
 }
 
 async function sendStudentDashboard(message, className, studentName) {
-    const menu = `🏫 *${className} PORTAL*\n` +
-                 `👤 Student: ${studentName}\n` +
-                 `━━━━━━━━━━━━━━━━━━\n` +
-                 `1. 📅 View Today's Classes\n` +
-                 `2. 🗓️ View Full Timetable\n` +
-                 `3. 📢 View Updates\n` +
-                 `4. 👥 View Classmates\n\n` +
-                 `0. 🔙 Back to Main Menu\n` +
-                 `99. 🚪 Logout`;
-    await message.reply(menu);
+  const menu = `╔═══ 🎨 *C H A O S* 🎨 ═══╗\n` +
+             `║     ⚡ *STUDENT ACCESS* ⚡     ║\n` +
+             `╚════════════════════════╝\n` +
+             `┌─[ 👤 *IDENTITY* ]─────────┐\n` +
+             `│ Student :: ${studentName}\n` +
+             `│ Class   :: ${className}\n` +
+             `└─────────────────────────┘\n` +
+             `\n` +
+             `━━━━━━━ 💥 ━━━━━━━\n` +
+             `       *SELECT OPTION*\n` +
+             `━━━━━━━ 💥 ━━━━━━━\n` +
+             `📅  *1*  Today's Classes\n` +
+             `🗓️  *2*  Full Timetable\n` +
+             `📢  *3*  Updates\n` +
+             `👥  *4*  Classmates\n` +
+             `─────── ⚡ ───────\n` +
+             `🔙  *0*   Back to Main Menu\n` +
+             `🚪  *99*  Logout\n` +
+             `\n` +
+             `╭──────────────────────╮\n` +
+             `│ </> *CONNECTION_SECURED* │\n` +
+             `│          🟢 ONLINE        │\n` +
+             `╰──────────────────────╯`;
+  await message.reply(menu);
 }
 
 module.exports = {
