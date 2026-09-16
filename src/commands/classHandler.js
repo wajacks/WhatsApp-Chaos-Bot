@@ -993,11 +993,24 @@ async function handleInput(client, message, userId, text, userName) {
                     let viewStr = `⏳ *UPCOMING DEADLINES*\n━━━━━━━━━━━━━━━━━━\n\n`;
                     assessments.forEach(a => {
                         const timeDiffMs = a.timestamp - now;
-                        const days = Math.floor(timeDiffMs / (1000 * 60 * 60 * 24));
-                        const hours = Math.floor((timeDiffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                        
-                        let countdown = days > 0 ? `${days} Days, ${hours} Hours` : `${hours} Hours`;
-                        if (days === 0 && hours === 0) countdown = `Less than 1 Hour!`;
+                        let countdown = "";
+
+                        if (timeDiffMs <= 0) {
+                            countdown = "⚠️ Deadline Passed";
+                        } else {
+                            const days = Math.floor(timeDiffMs / (1000 * 60 * 60 * 24));
+                            const hours = Math.floor((timeDiffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                            const minutes = Math.floor((timeDiffMs % (1000 * 60 * 60)) / (1000 * 60));
+                            const seconds = Math.floor((timeDiffMs % (1000 * 60)) / 1000);
+                            
+                            let parts = [];
+                            if (days > 0) parts.push(`${days}d`);
+                            if (hours > 0 || days > 0) parts.push(`${hours}h`);
+                            parts.push(`${minutes}m`);
+                            parts.push(`${seconds}s`);
+                            
+                            countdown = parts.join(' ');
+                        }
                         
                         viewStr += `${a.icon} *[${a.type}] ${a.unit}*\n`;
                         viewStr += `📝 Details: ${a.details}\n`;
@@ -1562,7 +1575,6 @@ async function handleInput(client, message, userId, text, userName) {
         }
 
             // --- STUDENT DASHBOARD ---
-            // --- STUDENT DASHBOARD ---
             case 'STUDENT_DASHBOARD': {
                 if (input === '0') {
                     updateSessionState(userId, 'MAIN_MENU');
@@ -1622,11 +1634,24 @@ async function handleInput(client, message, userId, text, userName) {
                     let viewStr = `⏳ *YOUR UPCOMING DEADLINES*\n━━━━━━━━━━━━━━━━━━\n\n`;
                     assessments.forEach(a => {
                         const timeDiffMs = a.timestamp - now;
-                        const days = Math.floor(timeDiffMs / (1000 * 60 * 60 * 24));
-                        const hours = Math.floor((timeDiffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                        
-                        let countdown = days > 0 ? `${days} Days, ${hours} Hours` : `${hours} Hours`;
-                        if (days === 0 && hours === 0) countdown = `Less than 1 Hour!`;
+                        let countdown = "";
+
+                        if (timeDiffMs <= 0) {
+                            countdown = "⚠️ Deadline Passed";
+                        } else {
+                            const days = Math.floor(timeDiffMs / (1000 * 60 * 60 * 24));
+                            const hours = Math.floor((timeDiffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                            const minutes = Math.floor((timeDiffMs % (1000 * 60 * 60)) / (1000 * 60));
+                            const seconds = Math.floor((timeDiffMs % (1000 * 60)) / 1000);
+                            
+                            let parts = [];
+                            if (days > 0) parts.push(`${days}d`);
+                            if (hours > 0 || days > 0) parts.push(`${hours}h`);
+                            parts.push(`${minutes}m`);
+                            parts.push(`${seconds}s`);
+                            
+                            countdown = parts.join(' ');
+                        }
                         
                         viewStr += `${a.icon} *[${a.type}] ${a.unit}*\n`;
                         viewStr += `📝 Details: ${a.details}\n`;
