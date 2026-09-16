@@ -12,6 +12,7 @@ const axios = require('axios');
 const googleTTS = require('google-tts-api');
 const { EdgeTTS } = require('node-edge-tts');
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
+const readline = require('readline');
 const qrcode = require('qrcode-terminal');
 
 // ============================================================
@@ -277,21 +278,76 @@ const SPEAK_COOLDOWN_MS = 8000;    // 8 seconds for !speak (TTS)
 // WHATSAPP CLIENT
 // ============================================================
 
-const client = new Client({
-    authStrategy: new LocalAuth({
-        dataPath: './data/session'
-    }),
-    puppeteer: {
-        headless: true,
-        protocolTimeout: 1200000,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--js-flags=--max-old-space-size=2048'
-        ]
+// Create a readline interface for terminal input
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
+console.log('============================================================');
+console.log('🤖 INITIALIZING CHAOS BOT SETUP');
+console.log('============================================================');
+
+rl.question('Select authentication method:\n  [1] QR Code (Scan with camera)\n  [2] Phone Pairing Code (Type 8-character text code)\nEnter choice (1 or 2): ', (methodChoice) => {
+    
+    let clientOptions = {
+        authStrategy: new LocalAuth({
+            dataPath: './data/session'
+        }),
+        puppeteer: {
+            headless: true,
+            protocolTimeout: 1200000,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--js-flags=--max-old-space-size=2048'
+            ]
+        }
+    };
+
+    if (methodChoice.trim() === '2') {
+        rl.question('Enter your bot phone number (include country code, NO "+" sign, e.g., 2547XXXXXXXX): ', (phoneNumber) => {
+            rl.close();
+            clientOptions.pairWithPhoneNumber = {
+                phoneNumber: phoneNumber.trim(),
+                showNotification: true
+            };
+            initializeChaosBot(clientOptions);
+        });
+    } else {
+        rl.close();
+        initializeChaosBot(clientOptions);
     }
 });
+
+function initializeChaosBot(options) {
+    const client = new Client(options);
+
+    // ============================================================
+    // QR & CLIENT EVENTS
+    // ============================================================
+
+    client.on('code', (code) => {
+        console.log('\n============================================================');
+        console.log('🔑 PHONE PAIRING CODE:', code);
+        console.log('Type this code into WhatsApp on your phone under Linked Devices.\n');
+    });
+
+    client.on('qr', qr => {
+        console.log('\n============================================================');
+        console.log('Scan this QR code with WhatsApp:\n');
+        qrcode.generate(qr, { small: true });
+    });
+
+    client.on('ready', () => {
+        console.log('\nCHAOS BOT by Chriss IS ONLINE!');
+        console.log('Waiting for group and private messages...\n');
+    });
+
+    client.on('authenticated', () => {
+        console.log('WhatsApp authenticated!');
+    });
 
 // ============================================================
 // JID / ID NORMALIZATION
@@ -399,24 +455,6 @@ function getContactJid(contact) {
     return getCanonicalJid(contact);
 }
 
-// ============================================================
-// QR & CLIENT EVENTS
-// ============================================================
-
-client.on('qr', qr => {
-    console.log('\n============================================================');
-    console.log('Scan this QR code with WhatsApp:\n');
-    qrcode.generate(qr, { small: true });
-});
-
-client.on('ready', () => {
-    console.log('\nCHAOS BOT by Chriss IS ONLINE!');
-    console.log('Waiting for group and private messages...\n');
-});
-
-client.on('authenticated', () => {
-    console.log('WhatsApp authenticated!');
-});
 
 // ============================================================
 // MESSAGE HANDLER
@@ -2827,3 +2865,4 @@ client.on('message', async message => {
 // ============================================================
 
 client.initialize();
+}
