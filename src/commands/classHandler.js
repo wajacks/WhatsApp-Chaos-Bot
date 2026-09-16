@@ -1,6 +1,8 @@
 const { readClassDB, writeClassDB, classExists, isUserAlreadyRep } = require('../database/classdb');
 const { createSession, updateSessionState, getSession, endSession } = require('../tools/classSession');
 
+let lastApplicantUserId = null;
+
 // Entry point triggered by !class
 async function handleClassCommand(client, message, userId, userName) {
     createSession(userId, 'MAIN_MENU');
@@ -126,7 +128,6 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             // WIZARD STEP 2: LINK & SUBMIT
-            // WIZARD STEP 2: LINK & SUBMIT
             case 'APP_LINK': {
                 if (input === '0') { updateSessionState(userId, 'MAIN_MENU'); await sendMainMenu(message); return; }
                 
@@ -145,6 +146,7 @@ async function handleInput(client, message, userId, text, userName) {
                 
                 try {
                     await client.sendMessage(ownerJid, appSummary);
+                    lastApplicantUserId = userId;
                 } catch (e) {
                     console.warn("[CLASS PORTAL] Could not send application to owner.", e);
                 }
@@ -1816,8 +1818,67 @@ async function handleAttendance(message, userId, client) {
     return true;
 }
 
+/**
+ * Allows the owner to type "accept" or "reject <reason>" directly in DMs
+ */
+async function handleOwnerPlaintextResponse(client, message, text, lowerText) {
+    if (lowerText === 'accept' || lowerText.startsWith('reject')) {
+        if (!lastApplicantUserId) {
+            await message.reply('⚠️ No recent class rep application found in memory to process.');
+            return true; // Handled (prevents bot from treating it as an AI prompt or normal command)
+        }
+
+        const action = lowerText.split(/\s+/)[0];
+        const targetJid = lastApplicantUserId;
+        const db = readClassDB();
+
+        if (action === 'accept') {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; 
+            let code = 'REP-';
+            for (let i = 0; i < 5; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            
+            if (!db.repCodes) db.repCodes = [];
+            db.repCodes.push(code);
+            writeClassDB(db);
+
+            try {
+                await client.sendMessage(
+                    targetJid, 
+                    `🎉 *APPLICATION APPROVED!*\n━━━━━━━━━━━━━━━━━━\n\nYour request to become a Class Representative has been verified and accepted.\n\n🎟️ *Your Authorization Code:* \`${code}\`\n\nTo setup your class:\n1. Type \`!class\`\n2. Select *Create a New Class*\n3. Enter your code when prompted.`
+                );
+            } catch (e) {
+                console.warn('[CLASS PORTAL] Could not send code to applicant DMs:', e);
+            }
+            
+            await message.reply(`✅ *APPLICATION ACCEPTED*\n\nThe auth code \`${code}\` has been generated and delivered automatically to the applicant.`);
+            lastApplicantUserId = null; // Clear memory after processing
+            return true;
+            
+        } else if (action === 'reject') {
+            const reason = text.slice(6).trim() || 'Failed security verification checks.';
+            
+            try {
+                await client.sendMessage(
+                    targetJid, 
+                    `❌ *APPLICATION REJECTED*\n━━━━━━━━━━━━━━━━━━\n\nYour request to create a Class Portal was denied by the administrators.\n\n*Reason:* ${reason}`
+                );
+            } catch (e) {
+                console.warn('[CLASS PORTAL] Could not send rejection to applicant DMs:', e);
+            }
+            
+            await message.reply(`✅ *APPLICATION REJECTED*\n\nThe rejection notice has been delivered to the applicant.`);
+            lastApplicantUserId = null; // Clear memory after processing
+            return true;
+        }
+    }
+    return false;
+}
+
 module.exports = {
     handleClassCommand,
     handleInput,
-    handleAttendance
+    handleAttendance,
+    handleOwnerPlaintextResponse
 };

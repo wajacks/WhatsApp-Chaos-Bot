@@ -494,6 +494,14 @@ client.on('message', async message => {
         const text = message.body ? message.body.trim() : '';
         const lowerText = text.toLowerCase();
 
+        // ====================================================
+        // 👑 OWNER: DIRECT PLAIN-TEXT APPLICATION INTERCEPT
+        // ====================================================
+        if (isOwner(senderId) && !isGroup) {
+            const handled = await classHandler.handleOwnerPlaintextResponse(client, message, text, lowerText);
+            if (handled) return; // Stops normal bot commands or AI from triggering
+        }
+
         // ============================================================
         // 🎓 CLASS PORTAL INTERCEPT (SESSION LOCKOUT)
         // ============================================================
