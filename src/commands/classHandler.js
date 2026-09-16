@@ -1,4 +1,4 @@
-const { readClassDB, writeClassDB, classExists } = require('../database/classdb');
+const { readClassDB, writeClassDB, classExists, isUserAlreadyRep } = require('../database/classdb');
 const { createSession, updateSessionState, getSession, endSession } = require('../tools/classSession');
 
 // Entry point triggered by !class
@@ -74,12 +74,107 @@ async function handleInput(client, message, userId, text, userName) {
                     await message.reply(classList);
                 } 
                 else if (input === '2') {
-                    updateSessionState(userId, 'CREATE_CLASS_NAME');
-                    await message.reply(`🛠️ *CREATE A NEW CLASS*\n\nEnter your class name and year in this exact format:\n*Course/Year* (e.g., BSIT/2024)\n\n(Type *0* to go back)`);
+                    // SECURITY: Check if they are already a rep
+                    if (isUserAlreadyRep(userId)) {
+                        await message.reply(`❌ *ACCESS DENIED*\n\nYou have already created and manage a class portal. Reps are strictly limited to one class.\n\n(Type *0* to go back)`);
+                        return;
+                    }
+                    
+                    updateSessionState(userId, 'CREATE_CLASS_GATEWAY');
+                    await message.reply(
+                        `🛠️ *CLASS REP ONBOARDING*\n━━━━━━━━━━━━━━━━━━\n\n` +
+                        `To create a class portal, you must be an authorized Class Representative.\n\n` +
+                        `1. 🎟️ I have an Authorization Code\n` +
+                        `2. 📝 Apply for a Code\n\n` +
+                        `(Type *0* to go back)`
+                    );
                 } 
                 else {
                     await message.reply('❌ Invalid choice. Reply with 1, 2, or 99 to exit.');
                 }
+                break;
+            }
+
+            // NEW STATE: CHOOSE TO ENTER CODE OR APPLY
+            case 'CREATE_CLASS_GATEWAY': {
+                if (input === '0') {
+                    updateSessionState(userId, 'MAIN_MENU');
+                    await sendMainMenu(message);
+                    return;
+                }
+                
+                if (input === '1') {
+                    updateSessionState(userId, 'CREATE_CLASS_AUTH');
+                    await message.reply(`🔐 *AUTHORIZATION REQUIRED*\n\nPlease enter the *One-Time Authorization Code* provided by the Master Owner:\n\n(Type *0* to go back)`);
+                } 
+                else if (input === '2') {
+                    updateSessionState(userId, 'APP_CLASS');
+                    await message.reply(`📝 *REP APPLICATION (Step 1 of 2)*\n━━━━━━━━━━━━━━━━━━\n\nEnter your *Target Class & Year* (e.g., BSIT/2024):\n\n(Type *0* to cancel)`);
+                } 
+                else {
+                    await message.reply('❌ Invalid choice. Reply 1, 2, or 0 to go back.');
+                }
+                break;
+            }
+
+            // WIZARD STEP 1: CLASS
+            case 'APP_CLASS': {
+                if (input === '0') { updateSessionState(userId, 'MAIN_MENU'); await sendMainMenu(message); return; }
+                updateSessionState(userId, 'APP_LINK', { ...session.data, appClass: input.toUpperCase() });
+                await message.reply(`✅ Class saved: *${input.toUpperCase()}*\n\n📝 *REP APPLICATION (Step 2 of 2)*\n\nPaste the *WhatsApp Group Invite Link* for your class.\n\n⚠️ *CRITICAL:* Please ensure you are ready to accept join requests so the admin can verify your group!`);
+                break;
+            }
+
+            // WIZARD STEP 2: LINK & SUBMIT
+            // WIZARD STEP 2: LINK & SUBMIT
+            case 'APP_LINK': {
+                if (input === '0') { updateSessionState(userId, 'MAIN_MENU'); await sendMainMenu(message); return; }
+                
+                // 1. Send Application to Owner
+                const ownerJid = '254111659469@c.us'; // Your Master Owner Number
+                
+                // Formatted specifically so the bot can extract the ID when you reply to it
+                const appSummary = `📩 *NEW CLASS REP APPLICATION*\n━━━━━━━━━━━━━━━━━━\n` +
+                                   `👤 *WA Profile:* ${userName}\n` +
+                                   `🏫 *Class:* ${session.data.appClass}\n` +
+                                   `🔗 *Link:* ${input}\n\n` +
+                                   `📱 *User ID:* \`${userId}\`\n━━━━━━━━━━━━━━━━━━\n` +
+                                   `👉 *Swipe right to reply to this message with:*\n` +
+                                   `*accept* (to approve & send code)\n` +
+                                   `*reject <reason>* (to deny)`;
+                
+                try {
+                    await client.sendMessage(ownerJid, appSummary);
+                } catch (e) {
+                    console.warn("[CLASS PORTAL] Could not send application to owner.", e);
+                }
+
+                // 2. Wrap up with the Applicant
+                updateSessionState(userId, 'MAIN_MENU');
+                await message.reply(`🎉 *APPLICATION SUBMITTED!*\n\nYour application has been safely transmitted to the system administrators.\n\n⏳ *NEXT STEPS:*\n1. An admin will use your link to verify you in the group.\n2. You will receive a direct message with your Authorization Code once approved!\n\n*(Returning to Main Menu...)*`);
+                await sendMainMenu(message);
+                break;
+            }
+
+            // NEW STATE: VERIFY THE AUTH CODE
+            case 'CREATE_CLASS_AUTH': {
+                if (input === '0') {
+                    updateSessionState(userId, 'MAIN_MENU');
+                    await sendMainMenu(message);
+                    return;
+                }
+                
+                const cleanInput = input.trim().toUpperCase();
+                
+                // Validate against the database array
+                if (!db.repCodes || !db.repCodes.includes(cleanInput)) {
+                    await message.reply(`❌ *INVALID CODE*\n\nThe authorization code is incorrect, already used, or expired.\n\nPlease try again or type *0* to go back.`);
+                    return;
+                }
+                
+                // Code is valid! We keep it in session memory and consume it ONLY when the class is successfully created.
+                updateSessionState(userId, 'CREATE_CLASS_NAME', { authCode: cleanInput });
+                await message.reply(`✅ *AUTHORIZATION ACCEPTED*\n\n🛠️ *CREATE A NEW CLASS*\n\nEnter your class name and year in this exact format:\n*Course/Year* (e.g., BSIT/2024)\n\n(Type *0* to cancel)`);
                 break;
             }
 
@@ -102,8 +197,7 @@ async function handleInput(client, message, userId, text, userName) {
                     return;
                 }
 
-                // Move to next state, temporarily saving the class name in the session data
-                updateSessionState(userId, 'CREATE_CLASS_PASS', { pendingClassName: className });
+                updateSessionState(userId, 'CREATE_CLASS_PASS', { ...session.data, pendingClassName: className });
                 await message.reply(`✅ Class Name Accepted: *${className}*\n\n🔒 Now, create a *Class Password* for this portal.\n(This is the password you will share with your students to enter).`);
                 break;
             }
@@ -115,18 +209,28 @@ async function handleInput(client, message, userId, text, userName) {
                     return;
                 }
 
+                // SECURITY: Double check the code wasn't used by someone else while they were typing
+                if (!db.repCodes || !db.repCodes.includes(session.data.authCode)) {
+                    await message.reply(`❌ *AUTHORIZATION EXPIRED*\n\nYour code was just used by someone else or revoked by the system. Class creation failed.\n\nType *0* to go back.`);
+                    return;
+                }
+
+                // CONSUME THE CODE: Remove it from the database permanently
+                db.repCodes = db.repCodes.filter(c => c !== session.data.authCode);
+
                 const newClassName = session.data.pendingClassName;
                 
                 // Write the new class to the database
                 db.classes[newClassName] = {
-                    repName: userName, // Automatically captures their WhatsApp Name
-                    repId: userId,     // Their hidden internal ID (safe from usernames update)
+                    repName: userName, 
+                    repId: userId,     
                     classPassword: input,
                     timetable: { sunday: [], monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [] },
                     updates: [],
-                    members: {}, // Student data will go here
+                    members: {}, 
                     issues: [],
-                    logs: []
+                    logs: [],
+                    assessments: []
                 };
                 writeClassDB(db);
 
