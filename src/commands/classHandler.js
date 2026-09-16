@@ -274,6 +274,14 @@ async function handleInput(client, message, userId, text, userName) {
                     writeClassDB(db);
 
                     await message.reply(report + `\n\n(Type *0* to go back to Dashboard)`);
+                } else if (input === '8') {
+                    // Initialize the assessments array if it doesn't exist for older classes
+                    if (!db.classes[session.data.loggedInClass].assessments) {
+                        db.classes[session.data.loggedInClass].assessments = [];
+                        writeClassDB(db);
+                    }
+                    updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
+                    await message.reply(`📚 *DEADLINES & ASSESSMENTS*\n━━━━━━━━━━━━━━━━━━\n1. ➕ Add New Deadline\n2. 👁️ View Active Deadlines\n3. 🗑️ Delete a Deadline\n4. 🚨 Send Panic Blast (Reminder)\n\n0. 🔙 Back to Dashboard`);
                 } else {
                     await message.reply(`❌ Invalid choice. Type 1-7, 0 to go back, or 99 to exit.`);
                 }
@@ -737,6 +745,261 @@ async function handleInput(client, message, userId, text, userName) {
         }
             
             // ==========================================
+            // PHASE 6: CAT & ASSIGNMENT TRACKER
+            // ==========================================
+            case 'REP_DEADLINES_MENU': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                    await sendRepDashboard(message, session.data.loggedInClass);
+                    return;
+                }
+                
+                let assessments = db.classes[session.data.loggedInClass].assessments || [];
+                const now = Date.now();
+                
+                // AUTO-PRUNING: Silently remove deadlines that have passed
+                const originalLength = assessments.length;
+                assessments = assessments.filter(a => a.timestamp > now);
+                if (assessments.length !== originalLength) {
+                    db.classes[session.data.loggedInClass].assessments = assessments;
+                    writeClassDB(db);
+                }
+
+                if (input === '1') {
+                    updateSessionState(userId, 'REP_DEADLINES_ADD_TYPE', session.data);
+                    await message.reply(`➕ *ADD NEW DEADLINE (Step 1 of 4)*\n\nWhat type of assessment is this?\nReply with the number:\n\n1. 🔴 CAT / Exam\n2. 📘 Assignment\n3. 👥 Group Project\n\n0. 🔙 Cancel`);
+                } else if (input === '2') {
+                    if (assessments.length === 0) {
+                        await message.reply(`🎉 No active deadlines right now!\n(Type *0* to go back)`);
+                        return;
+                    }
+                    
+                    // Sort by closest deadline first
+                    assessments.sort((a, b) => a.timestamp - b.timestamp);
+                    
+                    let viewStr = `⏳ *UPCOMING DEADLINES*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    assessments.forEach(a => {
+                        const timeDiffMs = a.timestamp - now;
+                        const days = Math.floor(timeDiffMs / (1000 * 60 * 60 * 24));
+                        const hours = Math.floor((timeDiffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        
+                        let countdown = days > 0 ? `${days} Days, ${hours} Hours` : `${hours} Hours`;
+                        if (days === 0 && hours === 0) countdown = `Less than 1 Hour!`;
+                        
+                        viewStr += `${a.icon} *[${a.type}] ${a.unit}*\n`;
+                        viewStr += `📝 Details: ${a.details}\n`;
+                        viewStr += `⏰ Due In: *${countdown}*\n\n`;
+                    });
+                    
+                    await message.reply(viewStr + `(Type *0* to go back)`);
+                } else if (input === '3') {
+                    if (assessments.length === 0) {
+                        await message.reply(`📭 No active deadlines to delete.\n(Type *0* to go back)`);
+                        return;
+                    }
+                    
+                    let delStr = `🗑️ *DELETE A DEADLINE*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    assessments.forEach((a, i) => {
+                        delStr += `${i + 1}. [${a.type}] ${a.unit}\n`;
+                    });
+                    delStr += `\n*Reply with the number to delete:*\n(Type *0* to cancel)`;
+                    
+                    updateSessionState(userId, 'REP_DEADLINES_REMOVE', session.data);
+                    await message.reply(delStr);
+                } else if (input === '4') {
+                    if (assessments.length === 0) {
+                        await message.reply(`📭 No active deadlines to broadcast.\n(Type *0* to go back)`);
+                        return;
+                    }
+                    
+                    let panicStr = `🚨 *PANIC BLAST SELECTION*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    assessments.forEach((a, i) => {
+                        panicStr += `${i + 1}. [${a.type}] ${a.unit}\n`;
+                    });
+                    panicStr += `\n*Reply with the number to send an URGENT warning to all students:*\n(Type *0* to cancel)`;
+                    
+                    updateSessionState(userId, 'REP_DEADLINES_PANIC', session.data);
+                    await message.reply(panicStr);
+                } else {
+                    await message.reply(`❌ Invalid choice.`);
+                }
+                break;
+            }
+
+            // WIZARD STEP 1: TYPE
+            case 'REP_DEADLINES_ADD_TYPE': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
+                    await message.reply(`📚 *DEADLINES & ASSESSMENTS*\n━━━━━━━━━━━━━━━━━━\n1. ➕ Add New Deadline\n2. 👁️ View Active Deadlines\n3. 🗑️ Delete a Deadline\n4. 🚨 Send Panic Blast\n\n0. 🔙 Back`);
+                    return;
+                }
+                
+                let type, icon;
+                if (input === '1') { type = 'CAT'; icon = '🔴'; }
+                else if (input === '2') { type = 'ASSIGNMENT'; icon = '📘'; }
+                else if (input === '3') { type = 'PROJECT'; icon = '👥'; }
+                else { await message.reply(`❌ Invalid choice. Reply 1, 2, or 3.`); return; }
+                
+                updateSessionState(userId, 'REP_DEADLINES_ADD_UNIT', { ...session.data, newDeadline: { type, icon } });
+                await message.reply(`✅ Type Selected: *${type}*\n\n➕ *ADD NEW DEADLINE (Step 2 of 4)*\n\nWhat is the *Unit Name*?\n(e.g., Database Systems)\n\n0. 🔙 Cancel`);
+                break;
+            }
+
+            // WIZARD STEP 2: UNIT
+            case 'REP_DEADLINES_ADD_UNIT': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
+                    await message.reply(`📚 Returning to Deadlines Menu... Type 6 to open again.`);
+                    return;
+                }
+                
+                const newDeadline = session.data.newDeadline;
+                newDeadline.unit = input;
+                
+                updateSessionState(userId, 'REP_DEADLINES_ADD_DESC', { ...session.data, newDeadline });
+                await message.reply(`✅ Unit Saved: *${input}*\n\n➕ *ADD NEW DEADLINE (Step 3 of 4)*\n\nEnter the task details or submission link.\n(e.g., Chapter 4 PDF due on portal)\n\n0. 🔙 Cancel`);
+                break;
+            }
+
+            // WIZARD STEP 3: DETAILS
+            case 'REP_DEADLINES_ADD_DESC': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
+                    await message.reply(`📚 Returning to Deadlines Menu... Type 6 to open again.`);
+                    return;
+                }
+                
+                const newDeadline = session.data.newDeadline;
+                newDeadline.details = input;
+                
+                updateSessionState(userId, 'REP_DEADLINES_ADD_DATE', { ...session.data, newDeadline });
+                await message.reply(`✅ Details Saved.\n\n➕ *ADD NEW DEADLINE (Step 4 of 4)*\n\nWhen is this due? Use this exact format:\n*DD/MM/YYYY, HH:MM*\n\nExample for 2:30 PM on Oct 15: *15/10/2026, 14:30*\n\n0. 🔙 Cancel`);
+                break;
+            }
+
+            // WIZARD STEP 4: PARSE DATE & SAVE
+            case 'REP_DEADLINES_ADD_DATE': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
+                    await message.reply(`📚 Returning to Deadlines Menu... Type 6 to open again.`);
+                    return;
+                }
+                
+                // Parse DD/MM/YYYY, HH:MM
+                const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4}),\s*(\d{2}):(\d{2})$/;
+                const match = input.match(dateRegex);
+                
+                if (!match) {
+                    await message.reply(`❌ Invalid Format.\n\nPlease strictly use: *DD/MM/YYYY, HH:MM*\nExample: *15/10/2026, 14:30*`);
+                    return;
+                }
+                
+                const [_, day, month, year, hour, minute] = match;
+                // JS Dates use 0-indexed months (0 = Jan)
+                const dueTimestamp = new Date(year, month - 1, day, hour, minute).getTime();
+                
+                if (dueTimestamp < Date.now()) {
+                    await message.reply(`❌ That date is in the past! Please enter a future due date.\n\nFormat: *DD/MM/YYYY, HH:MM*`);
+                    return;
+                }
+                
+                const newDeadline = session.data.newDeadline;
+                newDeadline.timestamp = dueTimestamp;
+                
+                db.classes[session.data.loggedInClass].assessments.push(newDeadline);
+                writeClassDB(db);
+                
+                updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
+                await message.reply(`🎉 *DEADLINE CREATED!*\n\nIt is now actively counting down for all students.\n\n1. ➕ Add New Deadline\n2. 👁️ View Active Deadlines\n3. 🗑️ Delete a Deadline\n4. 🚨 Send Panic Blast\n\n0. 🔙 Back`);
+                break;
+            }
+
+            // DELETE DEADLINE
+            case 'REP_DEADLINES_REMOVE': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
+                    await message.reply(`📚 Returning to Deadlines Menu... Type 6 to open again.`);
+                    return;
+                }
+                
+                const assessments = db.classes[session.data.loggedInClass].assessments;
+                const selectedIdx = parseInt(input) - 1;
+                
+                if (isNaN(selectedIdx) || selectedIdx < 0 || selectedIdx >= assessments.length) {
+                    await message.reply(`❌ Invalid selection. Reply with a valid number.`);
+                    return;
+                }
+                
+                assessments.splice(selectedIdx, 1);
+                writeClassDB(db);
+                
+                updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
+                await message.reply(`✅ Deadline Deleted successfully.\n\n0. 🔙 Back to Deadlines Menu`);
+                break;
+            }
+
+            // PANIC BLAST (BROADCAST DEADLINE)
+            case 'REP_DEADLINES_PANIC': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
+                    await message.reply(`📚 Returning to Deadlines Menu... Type 6 to open again.`);
+                    return;
+                }
+                
+                const assessments = db.classes[session.data.loggedInClass].assessments;
+                const selectedIdx = parseInt(input) - 1;
+                
+                if (isNaN(selectedIdx) || selectedIdx < 0 || selectedIdx >= assessments.length) {
+                    await message.reply(`❌ Invalid selection. Reply with a valid number.`);
+                    return;
+                }
+                
+                const targetDeadline = assessments[selectedIdx];
+                const timeDiffMs = targetDeadline.timestamp - Date.now();
+                const days = Math.floor(timeDiffMs / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((timeDiffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                let countdown = days > 0 ? `${days} Days, ${hours} Hours` : `${hours} Hours`;
+                
+                const members = db.classes[session.data.loggedInClass].members;
+                const memberIds = Object.keys(members);
+                let blastStatus = "";
+
+                if (memberIds.length > 0) {
+                    await message.reply(`🚀 *INITIATING PANIC BLAST*\n\nSending direct messages to ${memberIds.length} registered students...\n\nPlease wait a moment.`);
+
+                    let sentCount = 0;
+                    let failedCount = 0;
+                    let successList = "";
+                    let failList = "";
+
+                    for (let mId of memberIds) {
+                        const student = members[mId];
+                        try {
+                            await client.sendMessage(
+                                student.phoneId,
+                                `🚨 *DEADLINE WARNING* 🚨\n\n🏫 Class: *${session.data.loggedInClass}*\n\n${targetDeadline.icon} *[${targetDeadline.type}] ${targetDeadline.unit}*\n📝 Details: ${targetDeadline.details}\n⏰ *DUE IN: ${countdown}*\n\n_(Submitted by Rep: ${db.classes[session.data.loggedInClass].repName})_`
+                            );
+                            sentCount++;
+                            successList += `▪️ ${student.name} (${student.admission})\n`;
+                        } catch (e) {
+                            failedCount++;
+                            failList += `▪️ ${student.name} (${student.admission})\n`;
+                        }
+                    }
+
+                    blastStatus = `✅ *PANIC BLAST COMPLETE*\n🟢 Delivered: ${sentCount}\n🔴 Failed: ${failedCount}\n\n`;
+                    if (sentCount > 0) blastStatus += `*✅ DELIVERED TO:*\n${successList}\n`;
+                    if (failedCount > 0) blastStatus += `*❌ FAILED TO DELIVER:*\n${failList}\n`;
+
+                } else {
+                    blastStatus = `⚠️ *NO BROADCAST*\nNo students are currently registered to receive this warning.\n\n`;
+                }
+
+                updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
+                await message.reply(`${blastStatus}✅ *Panic Blast Processed!*\n\n0. 🔙 Back to Deadlines Menu`);
+                break;
+            }
+            // ==========================================
             // PHASE 4: STUDENT GATEWAY & SECURITY
             // ==========================================
             case 'STUDENT_GATEWAY': {
@@ -1167,6 +1430,9 @@ async function sendRepDashboard(message, className) {
   ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
   │🛑 \`7\`
   │    ☞『_*Close & View Roll Call*_』
+  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+  │🛑 \`8\`
+  │    ☞『_*Manage CAT/ASSIGNMENTS*_』
   ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
   │🔙 \`0\`
   │    ☞『_*Back to Main Menu*_』

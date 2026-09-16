@@ -30,7 +30,6 @@ const {
     resetEconomy
 } = require('./src/database/db');
 
-const { resetClassDB } = require('./src/database/classdb');
 
 // ============================================================
 // COMMANDS
@@ -70,9 +69,11 @@ const { sendHymnPianoAudio } = require('./src/tools/hymnalAudio');
 const { logMessage, getChatHistory } = require('./src/database/chatlog');
 
 // CLASS PORTAL:
+const { resetClassDB } = require('./src/database/classdb');
 const { isUserInClassSession, endSession } = require('./src/tools/classSession');
 const classHandler = require('./src/commands/classHandler');
 const { handleAttendance } = require('./src/commands/classHandler');
+const { startDeadlineMonitor } = require('./src/tools/classSession');
 
 // ============================================================
 // WEATHER RESPONSE BUILDER
@@ -346,6 +347,7 @@ function initializeChaosBot(options) {
     client.on('ready', () => {
         console.log('\nCHAOS BOT by Chriss IS ONLINE!');
         console.log('Waiting for group and private messages...\n');
+        startDeadlineMonitor(client);
     });
 
     client.on('authenticated', () => {
