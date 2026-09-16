@@ -286,46 +286,43 @@ const rl = readline.createInterface({
     output: process.stdout
 });
 
-
-// Initialize directly so PM2 doesn't hang
-initializeChaosBot(clientOptions);
+// ============================================================
+// WHATSAPP CLIENT
+// ============================================================
 
 console.log('============================================================');
 console.log('🤖 INITIALIZING CHAOS BOT SETUP');
 console.log('============================================================');
 
-rl.question('Select authentication method:\n  [1] QR Code (Scan with camera)\n  [2] Phone Pairing Code (Type 8-character text code)\nEnter choice (1 or 2): ', (methodChoice) => {
-    
-    let clientOptions = {
-        authStrategy: new LocalAuth({
-            dataPath: './data/session'
-        }),
-        puppeteer: {
-            headless: true,
-            protocolTimeout: 6000000,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--js-flags=--max-old-space-size=2048'
-            ]
-        }
-    };
-
-    if (methodChoice.trim() === '2') {
-        rl.question('Enter your bot phone number (include country code, NO "+" sign, e.g., 2547XXXXXXXX): ', (phoneNumber) => {
-            rl.close();
-            clientOptions.pairWithPhoneNumber = {
-                phoneNumber: phoneNumber.trim(),
-                showNotification: true
-            };
-            initializeChaosBot(clientOptions);
-        });
-    } else {
-        rl.close();
-        initializeChaosBot(clientOptions);
+const clientOptions = {
+    authStrategy: new LocalAuth({
+        dataPath: './data/session'
+    }),
+    puppeteer: {
+        headless: true,
+        protocolTimeout: 6000000,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--js-flags=--max-old-space-size=2048'
+        ]
     }
-});
+};
+
+// Check if a pairing number was provided in the .env file
+if (process.env.PAIRING_NUMBER) {
+    console.log(`[AUTH] Requesting Pairing Code for: ${process.env.PAIRING_NUMBER}`);
+    clientOptions.pairWithPhoneNumber = {
+        phoneNumber: process.env.PAIRING_NUMBER.trim(),
+        showNotification: true
+    };
+} else {
+    console.log("[AUTH] No pairing number detected in .env. Defaulting to QR Code...");
+}
+
+// Initialize directly (PM2 safe)
+initializeChaosBot(clientOptions);
 
 function initializeChaosBot(options) {
     const client = new Client(options);
