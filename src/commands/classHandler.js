@@ -619,63 +619,69 @@ async function handleInput(client, message, userId, text, userName) {
             // PHASE 4: STUDENT GATEWAY & SECURITY
             // ==========================================
             case 'STUDENT_GATEWAY': {
-              if (input === '0') {
-                  updateSessionState(userId, 'MAIN_MENU');
-                  await sendMainMenu(message);
-                  return;
-              }
-              if (input === '1') {
-                  // Login Process
-                  const members = db.classes[session.data.loggedInClass].members;
-                  const memberIds = Object.keys(members);
-                  
-                  if (memberIds.length === 0) {
-                      await message.reply(`⚠️ No students are registered in this class yet.\nType *0* to go back, or *2* to register.`);
-                      return;
-                  }
-
-                  updateSessionState(userId, 'STUDENT_LOGIN_ADM', session.data);
-                  await message.reply(`🔑 *STUDENT LOGIN*\n\nEnter your *Admission Number*:\n\n(Type *0* to go back)`);
-
-              } else if (input === '2') {
-                  // ========================================================
-                  // GLOBAL SECURITY CHECK: Scan ALL classes in the database
-                  // ========================================================
-                  let registeredClassFound = null;
-                  let existingStudentName = null;
-
-                  for (const [className, classData] of Object.entries(db.classes)) {
-                    if (classData.members) {
-                        const matchedMember = Object.values(classData.members).find(
-                            m => m.phoneId === userId
-                        );
-                        if (matchedMember) {
-                            registeredClassFound = className;
-                            existingStudentName = matchedMember.name;
-                            break;
-                        }
-                    }
+                if (input === '0') {
+                    updateSessionState(userId, 'MAIN_MENU');
+                    await sendMainMenu(message);
+                    return;
                 }
-
-                  if (registeredClassFound) {
-                      await message.reply(
-                          `❌ *GLOBAL REGISTRATION BLOCKED*\n\n` +
-                          `Your WhatsApp number is already registered under *${existingStudentName}* in another class portal: *${registeredClassFound}*.\n\n` +
-                          `You are restricted to a single active student profile across the system.\n\n` +
-                          `(Type *0* to go back)`
-                      );
-                      return;
+                if (input === '1') {
+                    // Login Process
+                    const members = db.classes[session.data.loggedInClass].members;
+                    const memberIds = Object.keys(members);
+                    
+                    if (memberIds.length === 0) {
+                        await message.reply(`⚠️ No students are registered in this class yet.\nType *0* to go back, or *2* to register.`);
+                        return;
+                    }
+  
+                    let memberList = `👥 *SELECT YOUR NAME*\n━━━━━━━━━━━━━━━━━━\n`;
+                    memberIds.forEach((mId, idx) => {
+                        memberList += `${idx + 1}. ${members[mId].name}\n`;
+                    });
+                    memberList += `\n*Reply with your number:*\n(Type *0* to go back)`;
+                    
+                    updateSessionState(userId, 'STUDENT_LOGIN_SELECT', { ...session.data, memberIds });
+                    await message.reply(memberList);
+  
+                } else if (input === '2') {
+                    // ========================================================
+                    // GLOBAL SECURITY CHECK: Scan ALL classes in the database
+                    // ========================================================
+                    let registeredClassFound = null;
+                    let existingStudentName = null;
+  
+                    for (const [className, classData] of Object.entries(db.classes)) {
+                      if (classData.members) {
+                          const matchedMember = Object.values(classData.members).find(
+                              m => m.phoneId === userId
+                          );
+                          if (matchedMember) {
+                              registeredClassFound = className;
+                              existingStudentName = matchedMember.name;
+                              break;
+                          }
+                      }
                   }
-                  // ========================================================
-
-                  // Registration Process Step 1
-                  updateSessionState(userId, 'STUDENT_REG_NAME', session.data);
-                  await message.reply(`📝 *STUDENT REGISTRATION*\n\nEnter your *Full Name*:\n(Type *0* to cancel)`);
-              } else {
-                  await message.reply(`❌ Invalid choice. Type 1 or 2.`);
-              }
-              break;
-          }
+  
+                    if (registeredClassFound) {
+                        await message.reply(
+                            `❌ *GLOBAL REGISTRATION BLOCKED*\n\n` +
+                            `Your WhatsApp number is already registered under *${existingStudentName}* in another class portal: *${registeredClassFound}*.\n\n` +
+                            `You are restricted to a single active student profile across the system.\n\n` +
+                            `(Type *0* to go back)`
+                        );
+                        return;
+                    }
+                    // ========================================================
+  
+                    // Registration Process Step 1
+                    updateSessionState(userId, 'STUDENT_REG_NAME', session.data);
+                    await message.reply(`📝 *STUDENT REGISTRATION*\n\nEnter your *Full Name*:\n(Type *0* to cancel)`);
+                } else {
+                    await message.reply(`❌ Invalid choice. Type 1 or 2.`);
+                }
+                break;
+            }
 
             // --- REGISTRATION FLOW ---
             case 'STUDENT_REG_NAME': {
