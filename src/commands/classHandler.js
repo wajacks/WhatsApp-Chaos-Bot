@@ -418,29 +418,38 @@ async function handleInput(client, message, userId, text, userName) {
                     await sendRepDashboard(message, session.data.loggedInClass);
                     return;
                 }
+                
                 if (input === '1') {
+                    const ONE_DAY = 24 * 60 * 60 * 1000;
+                    const now = Date.now();
+                    
+                    // Filter out updates older than 24 hours (and safely handle any old updates missing a timestamp)
+                    db.classes[session.data.loggedInClass].updates = db.classes[session.data.loggedInClass].updates.filter(u => u.timestamp && (now - u.timestamp < ONE_DAY));
+                    writeClassDB(db);
+
                     const updates = db.classes[session.data.loggedInClass].updates;
                     if (updates.length === 0) {
-                        await message.reply(`📭 No updates have been posted yet.\n(Type *0* to go back)`);
+                        await message.reply(`📭 No active updates from the last 24 hours.\n(Type *0* to go back)`);
                         return;
                     }
                     
-                    let upStr = `📢 *CLASS UPDATES*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    let upStr = `📢 *24H CLASS UPDATES*\n━━━━━━━━━━━━━━━━━━\n\n`;
                     updates.forEach((u, i) => {
                         const dateObj = new Date(u.timestamp);
                         const timeString = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' });
-                        const dateString = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Africa/Nairobi' });
                         
                         if (i === updates.length - 1) {
-                            upStr += `🚨 *LATEST UPDATE [${dateString} - ${timeString}]*\n*${u.text}*\n\n`;
+                            upStr += `🚨 *LATEST UPDATE [${timeString}]*\n*${u.text}*\n\n`;
                         } else {
-                            upStr += `▪️ [${dateString} - ${timeString}]\n${u.text}\n\n`;
+                            upStr += `▪️ [${timeString}]\n${u.text}\n\n`;
                         }
                     });
                     await message.reply(upStr + `(Type *0* to go back)`);
+                    
                 } else if (input === '2') {
                     updateSessionState(userId, 'REP_ADD_UPDATE', session.data);
                     await message.reply(`✍️ *POST NEW UPDATE*\n\nType your announcement below.\nIt will be timestamped automatically.\n\n(Type *0* to cancel)`);
+                    
                 } else if (input === '3') {
                     db.classes[session.data.loggedInClass].updates = [];
                     writeClassDB(db);
@@ -456,14 +465,38 @@ async function handleInput(client, message, userId, text, userName) {
                     return;
                 }
                 
+                // Save the new update
                 db.classes[session.data.loggedInClass].updates.push({
                     text: input,
                     timestamp: Date.now()
                 });
                 writeClassDB(db);
                 
+                // Initiate DM Blast to all students
+                const members = db.classes[session.data.loggedInClass].members;
+                const memberIds = Object.keys(members);
+                
+                if (memberIds.length > 0) {
+                    await message.reply(`🚀 *BROADCASTING UPDATE*\n\nSending direct messages to ${memberIds.length} registered students...\n\nPlease wait a moment.`);
+                    
+                    let sentCount = 0;
+                    for (let mId of memberIds) {
+                        const student = members[mId];
+                        try {
+                            await client.sendMessage(
+                                student.phoneId, 
+                                `📢 *URGENT CLASS ANNOUNCEMENT*\n\n🏫 Class: *${session.data.loggedInClass}*\n👑 Rep: *${db.classes[session.data.loggedInClass].repName}*\n\n${input}\n\n_(This update will disappear from your portal in 24 hours)_`
+                            );
+                            sentCount++;
+                        } catch (e) {
+                            console.warn(`[CLASS PORTAL] Could not send update DM to ${student.name}`);
+                        }
+                    }
+                    await message.reply(`✅ *BLAST COMPLETE*\n\nSuccessfully sent the update to ${sentCount} students.`);
+                }
+                
                 updateSessionState(userId, 'REP_UPDATES_MENU', session.data);
-                await message.reply(`✅ *Update Posted Successfully!*\n\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n\n0. 🔙 Back`);
+                await message.reply(`✅ *Update Posted & Saved!*\n\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n\n0. 🔙 Back`);
                 break;
             }
 
@@ -970,17 +1003,24 @@ async function handleInput(client, message, userId, text, userName) {
 
                 } else if (input === '3') {
                     // View Updates
+                    const ONE_DAY = 24 * 60 * 60 * 1000;
+                    const now = Date.now();
+                    
+                    // Filter out updates older than 24 hours and save DB
+                    sDb.updates = sDb.updates.filter(u => now - u.timestamp < ONE_DAY);
+                    writeClassDB(db);
+
                     if (sDb.updates.length === 0) {
-                        await message.reply(`📭 No updates from the Class Rep.\n(Type *0* to go back)`);
+                        await message.reply(`📭 No active updates from the Class Rep in the last 24 hours.\n(Type *0* to go back)`);
                         return;
                     }
-                    let upStr = `📢 *CLASS UPDATES*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    
+                    let upStr = `📢 *24H CLASS UPDATES*\n━━━━━━━━━━━━━━━━━━\n\n`;
                     sDb.updates.forEach((u, i) => {
                         const dObj = new Date(u.timestamp);
                         const tStr = dObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' });
-                        const dStr = dObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Africa/Nairobi' });
-                        if (i === sDb.updates.length - 1) upStr += `🚨 *LATEST [${dStr} - ${tStr}]*\n*${u.text}*\n\n`;
-                        else upStr += `▪️ [${dStr} - ${tStr}]\n${u.text}\n\n`;
+                        if (i === sDb.updates.length - 1) upStr += `🚨 *LATEST [${tStr}]*\n*${u.text}*\n\n`;
+                        else upStr += `▪️ [${tStr}]\n${u.text}\n\n`;
                     });
                     await message.reply(upStr + `(Type *0* to go back)`);
 
