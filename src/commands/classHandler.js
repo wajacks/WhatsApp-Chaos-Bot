@@ -1743,13 +1743,14 @@ async function sendStudentDashboard(message, className, studentName) {
 │    ☞『_*View Full Timetable*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │📢 \`3\`
-│    ☞『_*View Updates*_』
+│    ☞『_*View CAT/ASSIGN Deadlines*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │👥 \`4\`
-│    ☞『_*View Classmates*_』
+│    ☞『_*View Updates*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │👥 \`5\`
 │    ☞『_*View Classmates*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🔙 \`0\`
 │    ☞『_*Back to Main Menu*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
