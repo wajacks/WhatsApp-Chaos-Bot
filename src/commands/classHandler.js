@@ -1312,6 +1312,7 @@ async function handleInput(client, message, userId, text, userName) {
         }
 
             // --- STUDENT DASHBOARD ---
+            // --- STUDENT DASHBOARD ---
             case 'STUDENT_DASHBOARD': {
                 if (input === '0') {
                     updateSessionState(userId, 'MAIN_MENU');
@@ -1353,6 +1354,38 @@ async function handleInput(client, message, userId, text, userName) {
                     await message.reply(ttFull + `(Type *0* to go back)`);
 
                 } else if (input === '3') {
+                    // View Upcoming Deadlines
+                    let assessments = sDb.assessments || [];
+                    const now = Date.now();
+                    
+                    // Filter out past deadlines
+                    assessments = assessments.filter(a => a.timestamp > now);
+                    
+                    if (assessments.length === 0) {
+                        await message.reply(`🎉 *NO UPCOMING DEADLINES!*\n\nYou are all caught up.\n\n(Type *0* to go back)`);
+                        return;
+                    }
+                    
+                    // Sort so the most urgent is at the top
+                    assessments.sort((a, b) => a.timestamp - b.timestamp);
+                    
+                    let viewStr = `⏳ *YOUR UPCOMING DEADLINES*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    assessments.forEach(a => {
+                        const timeDiffMs = a.timestamp - now;
+                        const days = Math.floor(timeDiffMs / (1000 * 60 * 60 * 24));
+                        const hours = Math.floor((timeDiffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        
+                        let countdown = days > 0 ? `${days} Days, ${hours} Hours` : `${hours} Hours`;
+                        if (days === 0 && hours === 0) countdown = `Less than 1 Hour!`;
+                        
+                        viewStr += `${a.icon} *[${a.type}] ${a.unit}*\n`;
+                        viewStr += `📝 Details: ${a.details}\n`;
+                        viewStr += `⏰ Due In: *${countdown}*\n\n`;
+                    });
+                    
+                    await message.reply(viewStr + `(Type *0* to go back)`);
+
+                } else if (input === '4') {
                     // View Updates
                     const ONE_DAY = 24 * 60 * 60 * 1000;
                     const now = Date.now();
@@ -1375,7 +1408,7 @@ async function handleInput(client, message, userId, text, userName) {
                     });
                     await message.reply(upStr + `(Type *0* to go back)`);
 
-                } else if (input === '4') {
+                } else if (input === '5') {
                     // View Classmates
                     const classMates = Object.keys(sDb.members);
                     if (classMates.length === 0) {
@@ -1385,8 +1418,9 @@ async function handleInput(client, message, userId, text, userName) {
                     let cmStr = `👥 *YOUR CLASSMATES*\n━━━━━━━━━━━━━━━━━━\n`;
                     classMates.forEach(mId => cmStr += `▪️ ${sDb.members[mId].name}\n`);
                     await message.reply(cmStr + `\n(Type *0* to go back)`);
+
                 } else {
-                    await message.reply(`❌ Invalid choice. Type 1-4, 0 to go back, or 99 to exit.`);
+                    await message.reply(`❌ Invalid choice. Type 1-5, 0 to go back, or 99 to exit.`);
                 }
                 break;
             }
@@ -1501,6 +1535,8 @@ async function sendStudentDashboard(message, className, studentName) {
 │👥 \`4\`
 │    ☞『_*View Classmates*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│👥 \`5\`
+│    ☞『_*View Classmates*_』
 │🔙 \`0\`
 │    ☞『_*Back to Main Menu*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ

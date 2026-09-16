@@ -129,5 +129,5 @@ module.exports = {
     getSession,
     endSession,
     isUserInClassSession,
-    artDeadlineMonitor
+    startDeadlineMonitor
 };
