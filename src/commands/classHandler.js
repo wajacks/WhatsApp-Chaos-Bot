@@ -223,7 +223,8 @@ async function handleInput(client, message, userId, text, userName) {
                 // Write the new class to the database
                 db.classes[newClassName] = {
                     repName: userName, 
-                    repId: userId,     
+                    repId: userId,
+                    assistantReps: [],     
                     classPassword: input,
                     timetable: { sunday: [], monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [] },
                     updates: [],
@@ -277,10 +278,14 @@ async function handleInput(client, message, userId, text, userName) {
                 }
 
                 // Password Correct! Route them based on who they are
-                if (userId === classData.repId) {
-                    // They are the Class Rep
-                    updateSessionState(userId, 'REP_DASHBOARD', { loggedInClass: targetClass });
-                    await message.reply(`✅ *Access Granted*\nWelcome back, Class Rep ${classData.repName}!`);
+                const isMainRep = userId === classData.repId;
+                const isAssistant = classData.assistantReps && classData.assistantReps.includes(userId);
+
+                if (isMainRep || isAssistant) {
+                    // They are the Class Rep or Assistant Rep
+                    updateSessionState(userId, 'REP_DASHBOARD', { loggedInClass: targetClass, isMainRep });
+                    const roleTitle = isMainRep ? 'Class Rep' : 'Assistant Rep';
+                    await message.reply(`✅ *Access Granted*\nWelcome back, ${roleTitle} ${userName}!`);
                     await sendRepDashboard(message, targetClass);
                 } else {
                     // They are a Student
@@ -308,7 +313,12 @@ async function handleInput(client, message, userId, text, userName) {
                     await message.reply(`📢 *UPDATES MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n4. 🔔 Remind Update\n\n0. 🔙 Back to Dashboard`);
                 } else if (input === '3') {
                     updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
-                    await message.reply(`👥 *CLASS MEMBERS*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View All Members\n2. 🗑️ Remove a Member (Intruder)\n\n0. 🔙 Back to Dashboard`);
+                    let menuTxt = `👥 *CLASS MEMBERS*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View All Members\n2. 🗑️ Remove a Member\n`;
+                    if (session.data.isMainRep) {
+                        menuTxt += `3. 🎖️ Promote to Assistant Rep\n4. 🔻 Revoke Assistant Rep\n`;
+                    }
+                    menuTxt += `\n0. 🔙 Back to Dashboard`;
+                    await message.reply(menuTxt);
                 } else if (input === '4') {
                     updateSessionState(userId, 'REP_ISSUES_MENU', session.data);
                     await message.reply(`🚨 *ISSUES DESK*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Locked Accounts\n2. 🔓 Resolve / Unlock an Account\n\n0. 🔙 Back to Dashboard`);
@@ -704,40 +714,68 @@ async function handleInput(client, message, userId, text, userName) {
             // PHASE 5: REP MEMBERS & ISSUES MANAGEMENT
             // ==========================================
             case 'REP_MEMBERS_MENU': {
-              if (input === '0') {
-                  updateSessionState(userId, 'REP_DASHBOARD', session.data);
-                  await sendRepDashboard(message, session.data.loggedInClass);
-                  return;
-              }
-              const members = db.classes[session.data.loggedInClass].members;
-              const mIds = Object.keys(members);
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                    await sendRepDashboard(message, session.data.loggedInClass);
+                    return;
+                }
+                const members = db.classes[session.data.loggedInClass].members;
+                const mIds = Object.keys(members);
 
-              if (input === '1') {
-                  if (mIds.length === 0) {
-                      await message.reply(`📭 No students registered yet.\n(Type *0* to go back)`);
-                      return;
-                  }
-                  let mList = `👥 *REGISTERED STUDENTS*\n━━━━━━━━━━━━━━━━━━\n`;
-                  mIds.forEach(id => {
-                      const m = members[id];
-                      mList += `▪️ *${m.name}* (${m.admission})\n`;
-                  });
-                  await message.reply(mList + `\n(Type *0* to go back)`);
-              } else if (input === '2') {
-                  if (mIds.length === 0) {
-                      await message.reply(`📭 No students to remove.\n(Type *0* to go back)`);
-                      return;
-                  }
-                  let mList = `🗑️ *REMOVE A STUDENT*\n━━━━━━━━━━━━━━━━━━\n`;
-                  mIds.forEach((id, idx) => {
-                      mList += `${idx + 1}. ${members[id].name} (${members[id].admission})\n`;
-                  });
-                  mList += `\n*Reply with the number to REMOVE them:*\n(Type *0* to cancel)`;
-                  updateSessionState(userId, 'REP_MEMBERS_REMOVE', { ...session.data, memberIds: mIds });
-                  await message.reply(mList);
-              }
-              break;
-          }
+                if (input === '1') {
+                    if (mIds.length === 0) {
+                        await message.reply(`📭 No students registered yet.\n(Type *0* to go back)`);
+                        return;
+                    }
+                    let mList = `👥 *REGISTERED STUDENTS (${mIds.length})*\n━━━━━━━━━━━━━━━━━━\n`;
+                    mIds.forEach((id, idx) => {
+                        const m = members[id];
+                        const isAsst = db.classes[session.data.loggedInClass].assistantReps?.includes(m.phoneId);
+                        mList += `${idx + 1}. ${m.name} (${m.admission}) ${isAsst ? '⭐ *[Asst]*' : ''}\n`;
+                    });
+                    await message.reply(mList + `\n(Type *0* to go back)`);
+                } else if (input === '2') {
+                    if (mIds.length === 0) {
+                        await message.reply(`📭 No students to remove.\n(Type *0* to go back)`);
+                        return;
+                    }
+                    let mList = `🗑️ *REMOVE A STUDENT*\n━━━━━━━━━━━━━━━━━━\n`;
+                    mIds.forEach((id, idx) => {
+                        mList += `${idx + 1}. ${members[id].name} (${members[id].admission})\n`;
+                    });
+                    mList += `\n*Reply with the number to REMOVE them:*\n(Type *0* to cancel)`;
+                    updateSessionState(userId, 'REP_MEMBERS_REMOVE', { ...session.data, memberIds: mIds });
+                    await message.reply(mList);
+                } else if (input === '3' && session.data.isMainRep) {
+                    if (mIds.length === 0) {
+                        await message.reply(`📭 No registered students to promote.\n(Type *0* to go back)`);
+                        return;
+                    }
+                    let mList = `🎖️ *PROMOTE TO ASSISTANT*\n━━━━━━━━━━━━━━━━━━\n`;
+                    mIds.forEach((id, idx) => {
+                        const isAsst = db.classes[session.data.loggedInClass].assistantReps?.includes(members[id].phoneId);
+                        mList += `${idx + 1}. ${members[id].name} (${members[id].admission}) ${isAsst ? '⭐ *(Already Asst)*' : ''}\n`;
+                    });
+                    mList += `\n*Reply with the number to PROMOTE them:*\n(Type *0* to cancel)`;
+                    updateSessionState(userId, 'REP_MEMBERS_PROMOTE', { ...session.data, memberIds: mIds });
+                    await message.reply(mList);
+                } else if (input === '4' && session.data.isMainRep) {
+                    const assistants = db.classes[session.data.loggedInClass].assistantReps || [];
+                    if (assistants.length === 0) {
+                        await message.reply(`📭 You do not have any active Assistant Reps to revoke.\n(Type *0* to go back)`);
+                        return;
+                    }
+                    let mList = `🔻 *REVOKE ASSISTANT*\n━━━━━━━━━━━━━━━━━━\n`;
+                    const asstIds = mIds.filter(id => assistants.includes(members[id].phoneId));
+                    asstIds.forEach((id, idx) => {
+                        mList += `${idx + 1}. ${members[id].name} (${members[id].admission})\n`;
+                    });
+                    mList += `\n*Reply with the number to REVOKE them:*\n(Type *0* to cancel)`;
+                    updateSessionState(userId, 'REP_MEMBERS_REVOKE', { ...session.data, asstIds });
+                    await message.reply(mList);
+                }
+                break;
+            }
 
           case 'REP_MEMBERS_REMOVE': {
               if (input === '0') {
@@ -769,6 +807,75 @@ async function handleInput(client, message, userId, text, userName) {
               await message.reply(`✅ *${targetName}* has been removed from the class.\n\n1. 👁️ View All Members\n2. 🗑️ Remove a Member\n\n0. 🔙 Back`);
               break;
           }
+
+          case 'REP_MEMBERS_PROMOTE': {
+            if (input === '0') {
+                updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
+                await message.reply(`👥 *CLASS MEMBERS*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View All Members\n2. 🗑️ Remove a Member\n3. 🎖️ Promote to Assistant Rep\n4. 🔻 Revoke Assistant Rep\n\n0. 🔙 Back`);
+                return;
+            }
+            const selectedIdx = parseInt(input) - 1;
+            const mIds = session.data.memberIds;
+            
+            if (isNaN(selectedIdx) || selectedIdx < 0 || selectedIdx >= mIds.length) {
+                await message.reply(`❌ Invalid selection. Reply with a valid number.`);
+                return;
+            }
+            
+            const targetId = mIds[selectedIdx];
+            const targetStudent = db.classes[session.data.loggedInClass].members[targetId];
+            
+            if (!db.classes[session.data.loggedInClass].assistantReps) {
+                db.classes[session.data.loggedInClass].assistantReps = [];
+            }
+            
+            if (db.classes[session.data.loggedInClass].assistantReps.includes(targetStudent.phoneId)) {
+                await message.reply(`⚠️ *${targetStudent.name}* is already an Assistant Rep!\n\n(Type *0* to go back)`);
+                return;
+            }
+            
+            db.classes[session.data.loggedInClass].assistantReps.push(targetStudent.phoneId);
+            db.classes[session.data.loggedInClass].logs.push({ 
+                text: `Promoted Assistant: ${targetStudent.name}`, 
+                timestamp: Date.now() 
+            });
+            writeClassDB(db);
+
+            updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
+            await message.reply(`✅ *${targetStudent.name}* has been promoted to Assistant Rep!\nThey can now login to the Rep Dashboard using the Class Password.\n\n0. 🔙 Back`);
+            break;
+        }
+
+        case 'REP_MEMBERS_REVOKE': {
+            if (input === '0') {
+                updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
+                await message.reply(`👥 *CLASS MEMBERS*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View All Members\n2. 🗑️ Remove a Member\n3. 🎖️ Promote to Assistant Rep\n4. 🔻 Revoke Assistant Rep\n\n0. 🔙 Back`);
+                return;
+            }
+            const selectedIdx = parseInt(input) - 1;
+            const asstIds = session.data.asstIds;
+            
+            if (isNaN(selectedIdx) || selectedIdx < 0 || selectedIdx >= asstIds.length) {
+                await message.reply(`❌ Invalid selection. Reply with a valid number.`);
+                return;
+            }
+            
+            const targetId = asstIds[selectedIdx];
+            const targetStudent = db.classes[session.data.loggedInClass].members[targetId];
+            
+            let assistants = db.classes[session.data.loggedInClass].assistantReps || [];
+            db.classes[session.data.loggedInClass].assistantReps = assistants.filter(phone => phone !== targetStudent.phoneId);
+            
+            db.classes[session.data.loggedInClass].logs.push({ 
+                text: `Revoked Assistant: ${targetStudent.name}`, 
+                timestamp: Date.now() 
+            });
+            writeClassDB(db);
+
+            updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
+            await message.reply(`✅ *${targetStudent.name}* has been demoted back to a regular student.\n\n0. 🔙 Back`);
+            break;
+        }
 
           case 'REP_ISSUES_MENU': {
               if (input === '0') {
