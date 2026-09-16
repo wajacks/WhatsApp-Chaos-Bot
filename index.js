@@ -275,15 +275,29 @@ const DRAW_COOLDOWN_MS = 15000;    // 15 seconds for !draw (DALL-E 3 is heavy)
 const ANALYZE_COOLDOWN_MS = 10000; // 10 seconds for !analyze (GPT-4o Vision)
 const SPEAK_COOLDOWN_MS = 8000;    // 8 seconds for !speak (TTS)
 
+
 // ============================================================
 // WHATSAPP CLIENT
 // ============================================================
 
-// Create a readline interface for terminal input
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-});
+const clientOptions = {
+    authStrategy: new LocalAuth({
+        dataPath: './data/session' // <--- It will automatically use your saved session here!
+    }),
+    puppeteer: {
+        headless: true,
+        protocolTimeout: 1200000,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--js-flags=--max-old-space-size=2048'
+        ]
+    }
+};
+
+// Initialize directly so PM2 doesn't hang
+initializeChaosBot(clientOptions);
 
 console.log('============================================================');
 console.log('🤖 INITIALIZING CHAOS BOT SETUP');
