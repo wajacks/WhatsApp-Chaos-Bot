@@ -201,7 +201,7 @@ async function handleInput(client, message, userId, text, userName) {
                     await message.reply(`📅 *TIMETABLE MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Current Timetable\n2. 🛠️ Run Timetable Wizard (Rebuild)\n\n0. 🔙 Back to Dashboard`);
                 } else if (input === '2') {
                     updateSessionState(userId, 'REP_UPDATES_MENU', session.data);
-                    await message.reply(`📢 *UPDATES MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n\n0. 🔙 Back to Dashboard`);
+                    await message.reply(`📢 *UPDATES MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n4. 🔔 Remind Update\n\n0. 🔙 Back to Dashboard`);
                 } else if (input === '3') {
                     updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
                     await message.reply(`👥 *CLASS MEMBERS*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View All Members\n2. 🗑️ Remove a Member (Intruder)\n\n0. 🔙 Back to Dashboard`);
@@ -454,14 +454,102 @@ async function handleInput(client, message, userId, text, userName) {
                     db.classes[session.data.loggedInClass].updates = [];
                     writeClassDB(db);
                     await message.reply(`🗑️ Updates history cleared.\n(Type *0* to go back)`);
+                } else if (input === '4') {
+                const ONE_DAY = 24 * 60 * 60 * 1000;
+                const now = Date.now();
+                
+                // Filter out old updates first
+                db.classes[session.data.loggedInClass].updates = db.classes[session.data.loggedInClass].updates.filter(u => u.timestamp && (now - u.timestamp < ONE_DAY));
+                writeClassDB(db);
+
+                const updates = db.classes[session.data.loggedInClass].updates;
+                if (updates.length === 0) {
+                    await message.reply(`📭 No active updates available to remind.\n(Type *0* to go back)`);
+                    return;
                 }
+
+                let remStr = `🔔 *SELECT UPDATE TO REMIND*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                updates.forEach((u, i) => {
+                    const dateObj = new Date(u.timestamp);
+                    const timeString = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' });
+                    remStr += `${i + 1}. [${timeString}]\n${u.text}\n\n`;
+                });
+                remStr += `*Reply with the number of the update to broadcast:*\n(Type *0* to cancel)`;
+
+                updateSessionState(userId, 'REP_REMIND_UPDATE_SELECT', session.data);
+                await message.reply(remStr);
+            }
+                break;
+            }
+
+            case 'REP_REMIND_UPDATE_SELECT': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_UPDATES_MENU', session.data);
+                    await message.reply(`📢 *UPDATES MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n4. 🔔 Remind Update\n\n0. 🔙 Back`);
+                    return;
+                }
+
+                const updates = db.classes[session.data.loggedInClass].updates;
+                const selectedIdx = parseInt(input) - 1;
+
+                if (isNaN(selectedIdx) || selectedIdx < 0 || selectedIdx >= updates.length) {
+                    await message.reply(`❌ Invalid selection. Reply with a valid number.`);
+                    return;
+                }
+
+                const targetUpdate = updates[selectedIdx].text;
+                
+                // Initiate DM Blast
+                const members = db.classes[session.data.loggedInClass].members;
+                const memberIds = Object.keys(members);
+                let blastStatus = "";
+
+                if (memberIds.length > 0) {
+                    await message.reply(`🚀 *BROADCASTING REMINDER*\n\nSending direct messages to ${memberIds.length} registered students...\n\nPlease wait a moment.`);
+
+                    let sentCount = 0;
+                    let failedCount = 0;
+                    let successList = "";
+                    let failList = "";
+
+                    for (let mId of memberIds) {
+                        const student = members[mId];
+                        try {
+                            await client.sendMessage(
+                                student.phoneId,
+                                `🔔 *REMINDER: CLASS ANNOUNCEMENT*\n\n🏫 Class: *${session.data.loggedInClass}*\n👑 Rep: *${db.classes[session.data.loggedInClass].repName}*\n\n${targetUpdate}\n\n_(This is a reminder of an active update)_`
+                            );
+                            sentCount++;
+                            successList += `▪️ ${student.name} (${student.admission})\n`;
+                        } catch (e) {
+                            console.warn(`[CLASS PORTAL] Could not send reminder DM to ${student.name}`);
+                            failedCount++;
+                            failList += `▪️ ${student.name} (${student.admission})\n`;
+                        }
+                    }
+
+                    blastStatus = `✅ *REMINDER BLAST COMPLETE*\n🟢 Delivered: ${sentCount}\n🔴 Failed: ${failedCount}\n\n`;
+
+                    if (sentCount > 0) {
+                        blastStatus += `*✅ DELIVERED TO:*\n${successList}\n`;
+                    }
+                    if (failedCount > 0) {
+                        blastStatus += `*❌ FAILED TO DELIVER:*\n${failList}\n`;
+                    }
+
+                } else {
+                    blastStatus = `⚠️ *NO BROADCAST*\nNo students are currently registered to receive this reminder.\n\n`;
+                }
+
+                updateSessionState(userId, 'REP_UPDATES_MENU', session.data);
+                await message.reply(`${blastStatus}✅ *Reminder Processed!*\n\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n4. 🔔 Remind Update\n\n0. 🔙 Back`);
                 break;
             }
 
             case 'REP_ADD_UPDATE': {
                 if (input === '0') {
                     updateSessionState(userId, 'REP_UPDATES_MENU', session.data);
-                    await message.reply(`📢 *UPDATES MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n\n0. 🔙 Back`);
+                    await message.reply(`📢 *UPDATES MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n4. 🔔 Remind Update\n\n0. 🔙 Back to Dashboard`);
                     return;
                 }
                 
