@@ -39,6 +39,7 @@ if [ ! -f .env ]; then
     read -p "Enter your OpenWeatherMap API Key (OPENWEATHERMAP_API_KEY): " user_weather_key
     read -p "Enter your Azure OpenAI Key (AZURE_OPENAI_KEY): " user_azure_key
     read -p "Enter your Azure OpenAI Endpoint (AZURE_OPENAI_ENDPOINT): " user_azure_endpoint
+    read -p "Enter Bot Phone Number for Pairing (or press Enter to use QR Code): " user_pairing_number
     
     cat <<EOF > .env
 # WhatsApp Chaos Bot Configuration
@@ -48,6 +49,9 @@ OPENWEATHERMAP_API_KEY=${user_weather_key}
 # Azure OpenAI (Handles !analyze Vision and !ai Chat Fallback)
 AZURE_OPENAI_KEY=${user_azure_key}
 AZURE_OPENAI_ENDPOINT=${user_azure_endpoint}
+
+# WhatsApp Authentication (Leave blank to default to QR Code)
+PAIRING_NUMBER=${user_pairing_number}
 
 # Model Deployments
 AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4o-mini
