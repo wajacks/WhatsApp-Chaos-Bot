@@ -202,20 +202,19 @@ async function handleInput(client, message, userId, text, userName) {
                 } else if (input === '2') {
                     updateSessionState(userId, 'REP_UPDATES_MENU', session.data);
                     await message.reply(`📢 *UPDATES MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n\n0. 🔙 Back to Dashboard`);
-                  } else if (input === '3') {
+                } else if (input === '3') {
                     updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
                     await message.reply(`👥 *CLASS MEMBERS*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View All Members\n2. 🗑️ Remove a Member (Intruder)\n\n0. 🔙 Back to Dashboard`);
                 } else if (input === '4') {
                     updateSessionState(userId, 'REP_ISSUES_MENU', session.data);
                     await message.reply(`🚨 *ISSUES DESK*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Locked Accounts\n2. 🔓 Resolve / Unlock an Account\n\n0. 🔙 Back to Dashboard`);
                 } else if (input === '5') {
-                    // View Logs (No sub-menu needed, just show and stay in Dashboard)
+                    // View Logs
                     const logs = db.classes[session.data.loggedInClass].logs || [];
                     if (logs.length === 0) {
                         await message.reply(`📭 No logs available yet.\n\n(Type *0* to go back)`);
                     } else {
                         let logStr = `📜 *CLASS AUDIT LOGS*\n━━━━━━━━━━━━━━━━━━\n`;
-                        // Show last 10 logs
                         logs.slice(-10).forEach(l => {
                             const dateObj = new Date(l.timestamp);
                             const tStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' });
@@ -224,9 +223,113 @@ async function handleInput(client, message, userId, text, userName) {
                         });
                         await message.reply(logStr + `\n(Type *0* to go back)`);
                     }
+                } else if (input === '6') {
+                    // Start Roll Call
+                    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+                    const todayIdx = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Nairobi"})).getDay();
+                    const todayStr = days[todayIdx];
+                    const todayClasses = db.classes[session.data.loggedInClass].timetable[todayStr];
+
+                    if (!todayClasses || todayClasses.length === 0) {
+                        await message.reply(`🏖️ There are no classes on the timetable for today (*${todayStr.toUpperCase()}*).\n\nUpdate the timetable first, or type *0* to go back.`);
+                        return;
+                    }
+
+                    let rcStr = `✅ *SELECT CLASS FOR ROLL CALL*\n━━━━━━━━━━━━━━━━━━\nToday is *${todayStr.toUpperCase()}*.\n\n`;
+                    todayClasses.forEach((c, idx) => {
+                        rcStr += `${idx + 1}. *${c.unit}* (@ ${c.time})\n`;
+                    });
+                    rcStr += `\n*Reply with the number of the class:*\n(Type *0* to cancel)`;
+
+                    updateSessionState(userId, 'REP_ROLLCALL_SELECT', { ...session.data, todayClasses, todayStr });
+                    await message.reply(rcStr);
+                } else if (input === '7') {
+                    // Close & View Roll Call
+                    const activeRC = db.classes[session.data.loggedInClass].activeRollCall;
+                    
+                    if (!activeRC) {
+                        await message.reply(`❌ There is no active roll call to close.\n\n(Type *0* to go back)`);
+                        return;
+                    }
+
+                    const attendees = Object.values(activeRC.attendees);
+                    let report = `🛑 *ROLL CALL CLOSED*\n━━━━━━━━━━━━━━━━━━\n📚 Unit: *${activeRC.unit}*\n📅 Date: *${activeRC.date}*\n👥 Total Present: *${attendees.length}*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    
+                    if (attendees.length === 0) {
+                        report += `No students marked themselves present. 📭`;
+                    } else {
+                        attendees.forEach((student, idx) => {
+                            report += `${idx + 1}. ${student.name} (${student.regNo}) - [${student.timestamp}]\n`;
+                        });
+                    }
+
+                    // Log the roll call in audit logs
+                    db.classes[session.data.loggedInClass].logs.push({
+                        text: `Roll Call Completed: ${activeRC.unit} (${attendees.length} present)`,
+                        timestamp: Date.now()
+                    });
+
+                    // Remove active roll call from memory
+                    delete db.classes[session.data.loggedInClass].activeRollCall;
+                    writeClassDB(db);
+
+                    await message.reply(report + `\n\n(Type *0* to go back to Dashboard)`);
                 } else {
-                    await message.reply(`❌ Invalid choice. Type 1-5, 0 to go back, or 99 to exit.`);
+                    await message.reply(`❌ Invalid choice. Type 1-7, 0 to go back, or 99 to exit.`);
                 }
+                break;
+            }
+
+            case 'REP_ROLLCALL_SELECT': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                    await sendRepDashboard(message, session.data.loggedInClass);
+                    return;
+                }
+
+                const selectedIdx = parseInt(input) - 1;
+                const todayClasses = session.data.todayClasses;
+
+                if (isNaN(selectedIdx) || selectedIdx < 0 || selectedIdx >= todayClasses.length) {
+                    await message.reply(`❌ Invalid selection. Reply with a valid number.`);
+                    return;
+                }
+
+                const targetUnit = todayClasses[selectedIdx].unit;
+                const members = db.classes[session.data.loggedInClass].members;
+                const memberIds = Object.keys(members);
+
+                if (memberIds.length === 0) {
+                    await message.reply(`⚠️ You cannot start a roll call because no students are registered in this class yet.\n\n(Type *0* to go back)`);
+                    return;
+                }
+
+                // Open the register in the database
+                db.classes[session.data.loggedInClass].activeRollCall = {
+                    unit: targetUnit,
+                    date: new Date().toLocaleDateString("en-US", {timeZone: "Africa/Nairobi"}),
+                    attendees: {}
+                };
+                writeClassDB(db);
+
+                // Initiate DM Blast
+                await message.reply(`🚀 *ROLL CALL INITIATED*\n\nSending direct messages to ${memberIds.length} registered students for *${targetUnit}*...\n\nPlease wait a moment.`);
+
+                let sentCount = 0;
+                for (let mId of memberIds) {
+                    const student = members[mId];
+                    try {
+                        // Custom prompt asking if they are present for that particular class
+                        await client.sendMessage(student.phoneId, `📢 *URGENT: ROLL CALL*\n\n🏫 Class: *${session.data.loggedInClass}*\n\nAre you present for *${targetUnit}*?\n\nReply directly to this message with the word:\n*PRESENT*`);
+                        sentCount++;
+                    } catch (e) {
+                        console.warn(`[CLASS PORTAL] Could not send roll call DM to ${student.name}`);
+                    }
+                }
+
+                updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                await message.reply(`✅ *BLAST COMPLETE*\n\nSuccessfully sent roll call DMs to ${sentCount} students.\n\nSelect Option *7* in your dashboard to view the list and close the attendance.`);
+                await sendRepDashboard(message, session.data.loggedInClass);
                 break;
             }
 
@@ -899,44 +1002,50 @@ async function handleInput(client, message, userId, text, userName) {
 
 // UI Helpers for Dashboards
 async function sendRepDashboard(message, className) {
-  const menu = `╭──────────────────────────────╮
-│        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
-│                               
-│         \`REP COMMAND\`         
-│           \`[ ${className} ]\`         
-│                               
-│   👑 LEVEL ☞『_*AUTHORIZED*_』    
-╰──────────────────────────────╯
-
-┌─── ░◈ _*CONTROL BOARD*_ ◈░ ───────┐
-│
-│📅 \`1\`
-│    ☞『_*Manage Timetable*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│📢 \`2\`
-│    ☞『_*Manage Updates*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│👥 \`3\`
-│    ☞『_*Class Members*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🚨 \`4\`
-│    ☞『_*Resolve Issues*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│📜 \`5\`
-│    ☞『_*View Audit Logs*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🔙 \`0\`
-│    ☞『_*Back to Main Menu*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🚪 \`99\`
-│    ☞『_*Logout*_』
-│
-└──────────────────────────────┘
-      ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
-      「 CONTROL THE CHAOS 」`;
-
-  await message.reply(menu);
-}
+    const menu = `╭──────────────────────────────╮
+  │        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
+  │                               
+  │         \`REP COMMAND\`         
+  │           \`[ ${className} ]\`         
+  │                               
+  │   👑 LEVEL ☞『_*AUTHORIZED*_』    
+  ╰──────────────────────────────╯
+  
+  ┌─── ░◈ _*CONTROL BOARD*_ ◈░ ───────┐
+  │
+  │📅 \`1\`
+  │    ☞『_*Manage Timetable*_』
+  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+  │📢 \`2\`
+  │    ☞『_*Manage Updates*_』
+  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+  │👥 \`3\`
+  │    ☞『_*Class Members*_』
+  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+  │🚨 \`4\`
+  │    ☞『_*Resolve Issues*_』
+  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+  │📜 \`5\`
+  │    ☞『_*View Audit Logs*_』
+  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+  │✅ \`6\`
+  │    ☞『_*Start Roll Call*_』
+  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+  │🛑 \`7\`
+  │    ☞『_*Close & View Roll Call*_』
+  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+  │🔙 \`0\`
+  │    ☞『_*Back to Main Menu*_』
+  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+  │🚪 \`99\`
+  │    ☞『_*Logout*_』
+  │
+  └──────────────────────────────┘
+        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
+        「 CONTROL THE CHAOS 」`;
+  
+    await message.reply(menu);
+  }
 
 async function sendStudentGateway(message, className) {
   const menu = `╭──────────────────────────────╮
@@ -1004,7 +1113,64 @@ async function sendStudentDashboard(message, className, studentName) {
   await message.reply(menu);
 }
 
+/**
+ * Intercepts 'PRESENT' messages in DMs and logs attendance
+ */
+async function handleAttendance(message, userId, client) {
+    const text = message.body ? message.body.trim().toLowerCase() : '';
+    if (text !== 'present') return false; // Ignore if they didn't say present
+
+    const db = readClassDB();
+    let studentClass = null;
+    let studentData = null;
+
+    // 1. Find which class this student belongs to
+    for (const className in db.classes) {
+        if (db.classes[className].members) {
+            const memberObj = Object.values(db.classes[className].members).find(m => m.phoneId === userId);
+            if (memberObj) {
+                studentClass = className;
+                studentData = memberObj;
+                break;
+            }
+        }
+    }
+
+    if (!studentClass) return false; 
+
+    const activeRC = db.classes[studentClass].activeRollCall;
+    
+    // 2. Check if a roll call is actually running for their class
+    if (!activeRC) {
+        await message.reply("❌ There is no active roll call for your class right now.");
+        return true; 
+    }
+
+    // 3. Find their internal ID to check if they already signed in
+    const memberId = Object.keys(db.classes[studentClass].members).find(
+        key => db.classes[studentClass].members[key].phoneId === userId
+    );
+
+    if (activeRC.attendees[memberId]) {
+        await message.reply(`⚠️ You are already marked present for *${activeRC.unit}*.`);
+        return true; 
+    }
+
+    // 4. Mark them present
+    activeRC.attendees[memberId] = {
+        name: studentData.name,
+        regNo: studentData.admission,
+        timestamp: new Date().toLocaleTimeString("en-US", {timeZone: "Africa/Nairobi"})
+    };
+
+    writeClassDB(db);
+
+    await message.reply(`✅ *ATTENDANCE CONFIRMED*\n\nName: *${studentData.name}*\nUnit: *${activeRC.unit}*\nStatus: *PRESENT* 🟢`);
+    return true;
+}
+
 module.exports = {
     handleClassCommand,
-    handleInput
+    handleInput,
+    handleAttendance
 };

@@ -72,6 +72,7 @@ const { logMessage, getChatHistory } = require('./src/database/chatlog');
 // CLASS PORTAL:
 const { isUserInClassSession, endSession } = require('./src/tools/classSession');
 const classHandler = require('./src/commands/classHandler');
+const { handleAttendance } = require('./src/commands/classHandler');
 
 // ============================================================
 // WEATHER RESPONSE BUILDER
@@ -296,7 +297,7 @@ rl.question('Select authentication method:\n  [1] QR Code (Scan with camera)\n  
         }),
         puppeteer: {
             headless: true,
-            protocolTimeout: 1200000,
+            protocolTimeout: 6000000,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -622,6 +623,14 @@ client.on('message', async message => {
 
         // Record message for the catch-up feature
         logMessage(chatId, userName, text);
+
+        // ====================================================
+        // CLASS ROLL CALL DIRECT MESSAGE LISTENER
+        // ====================================================
+        if (!isGroup && lowerText === 'present') {
+            const wasHandledAsAttendance = await handleAttendance(message, senderId, client);
+            if (wasHandledAsAttendance) return;
+        }
 
         // ====================================================
         // MAFIA PRIVATE NIGHT COMMANDS & REPLIES
