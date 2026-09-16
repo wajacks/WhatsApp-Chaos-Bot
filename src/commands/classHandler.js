@@ -1078,7 +1078,7 @@ async function handleInput(client, message, userId, text, userName) {
             case 'REP_DEADLINES_ADD_DESC': {
                 if (input === '0') {
                     updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
-                    await message.reply(`📚 Returning to Deadlines Menu... Type 6 to open again.`);
+                    await message.reply(`📚 Returning to Deadlines Menu....`);
                     return;
                 }
                 
@@ -1091,28 +1091,65 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             // WIZARD STEP 4: PARSE DATE & SAVE
+            // WIZARD STEP 4: PARSE DATE & SAVE
             case 'REP_DEADLINES_ADD_DATE': {
                 if (input === '0') {
                     updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
-                    await message.reply(`📚 Returning to Deadlines Menu... Type 6 to open again.`);
+                    await message.reply(`📚 Returning to Deadlines Menu...`);
                     return;
                 }
                 
-                // Parse DD/MM/YYYY, HH:MM
-                const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4}),\s*(\d{2}):(\d{2})$/;
+                // Flexible regex: allows 1 or 2 digits for day, month, hour, and minute (e.g., 9:5 or 09:05)
+                const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4}),\s*(\d{1,2}):(\d{1,2})$/;
                 const match = input.match(dateRegex);
                 
                 if (!match) {
-                    await message.reply(`❌ Invalid Format.\n\nPlease strictly use: *DD/MM/YYYY, HH:MM*\nExample: *15/10/2026, 14:30*`);
+                    await message.reply(`❌ Invalid Format.\n\nPlease use: *DD/MM/YYYY, HH:MM*\nExample: *5/10/2026, 14:5* or *15/10/2026, 14:30*`);
                     return;
                 }
                 
-                const [_, day, month, year, hour, minute] = match;
-                // JS Dates use 0-indexed months (0 = Jan)
-                const dueTimestamp = new Date(year, month - 1, day, hour, minute).getTime();
+                const [_, dayStr, monthStr, yearStr, hourStr, minuteStr] = match;
+                const day = parseInt(dayStr, 10);
+                const month = parseInt(monthStr, 10);
+                const year = parseInt(yearStr, 10);
+                const hour = parseInt(hourStr, 10);
+                const minute = parseInt(minuteStr, 10);
+                
+                // Strict Range Validations
+                if (month < 1 || month > 12) {
+                    await message.reply(`❌ Invalid month (*${month}*). Months must be between 1 and 12.`);
+                    return;
+                }
+                if (day < 1 || day > 31) {
+                    await message.reply(`❌ Invalid day (*${day}*). Days must be between 1 and 31.`);
+                    return;
+                }
+                if (hour < 0 || hour > 23) {
+                    await message.reply(`❌ Invalid hour (*${hour}*). Hours must be between 0 and 23 in 24-hour format.`);
+                    return;
+                }
+                if (minute < 0 || minute > 59) {
+                    await message.reply(`❌ Invalid minute (*${minute}*). Minutes must be between 0 and 59.`);
+                    return;
+                }
+                
+                // Automatically format single digits with leading zeros (e.g., 9 -> 09)
+                const pDay = String(day).padStart(2, '0');
+                const pMonth = String(month).padStart(2, '0');
+                const pHour = String(hour).padStart(2, '0');
+                const pMin = String(minute).padStart(2, '0');
+
+                // Explicitly parse using East Africa Time (+03:00)
+                const isoString = `${year}-${pMonth}-${pDay}T${pHour}:${pMin}:00+03:00`;
+                const dueTimestamp = new Date(isoString).getTime();
+                
+                if (isNaN(dueTimestamp)) {
+                    await message.reply(`❌ Invalid date combination (such as an invalid day for that month, e.g., February 30th). Please check and try again.`);
+                    return;
+                }
                 
                 if (dueTimestamp < Date.now()) {
-                    await message.reply(`❌ That date is in the past! Please enter a future due date.\n\nFormat: *DD/MM/YYYY, HH:MM*`);
+                    await message.reply(`❌ That date is in the past! Please enter a future due date.`);
                     return;
                 }
                 
@@ -1131,7 +1168,7 @@ async function handleInput(client, message, userId, text, userName) {
             case 'REP_DEADLINES_REMOVE': {
                 if (input === '0') {
                     updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
-                    await message.reply(`📚 Returning to Deadlines Menu... Type 6 to open again.`);
+                    await message.reply(`📚 Returning to Deadlines Menu....`);
                     return;
                 }
                 
@@ -1155,7 +1192,7 @@ async function handleInput(client, message, userId, text, userName) {
             case 'REP_DEADLINES_PANIC': {
                 if (input === '0') {
                     updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
-                    await message.reply(`📚 Returning to Deadlines Menu... Type 6 to open again.`);
+                    await message.reply(`📚 Returning to Deadlines Menu...`);
                     return;
                 }
                 
