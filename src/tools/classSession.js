@@ -53,9 +53,8 @@ function isUserInClassSession(userId) {
 }
 
 function startDeadlineMonitor(client) {
-    console.log("[CLASS PORTAL] ⏳ Auto-Deadline Monitor Started...");
+    console.log("[CLASS PORTAL] ⏳ Dual-Stage Auto-Deadline Monitor Started...");
     
-    // Run this check every 5 minutes (300,000 ms)
     setInterval(async () => {
         const db = readClassDB();
         const now = Date.now();
@@ -68,42 +67,95 @@ function startDeadlineMonitor(client) {
             for (let i = 0; i < classData.assessments.length; i++) {
                 const a = classData.assessments[i];
                 const timeRemaining = a.timestamp - now;
+                // --- NEW: ZERO HOUR DETECTION & AUTO-CLEANUP ---
+                if (timeRemaining <= 0) {
+                    dbChanged = true;
+                    
+                    const alertHeader = `🛑 *DEADLINE REACHED* 🛑\nTime is up for your ${a.type}!`;
+                    const messageBody = `${alertHeader}\n\n🏫 Class: *${className}*\n${a.icon} *[${a.type}] ${a.unit}*\n📝 Details: ${a.details}\n\n_(This deadline has now been closed and removed from your portal)_`;
 
-                // 1. Define custom urgency thresholds based on task type
-                let warningThresholdMs = 0;
-                let timeText = "";
+                    // Broadcast to all students
+                    const members = classData.members || {};
+                    for (const mId in members) {
+                        try {
+                            await client.sendMessage(members[mId].phoneId, messageBody);
+                        } catch (e) {
+                            console.warn(`[CLASS PORTAL] Failed to send zero-hour warning to ${members[mId].name}`);
+                        }
+                    }
+                    console.log(`[CLASS PORTAL] 🛑 Zero-Hour reached for ${className}: ${a.unit}. Deleting from database.`);
+                    
+                    // Delete it from the array permanently
+                    classData.assessments.splice(i, 1);
+                    i--; // Adjust index so we don't skip the next item in the loop
+                    continue; 
+                }
+                // -----------------------------------------------
 
-                if (a.type === 'CAT') {
-                    warningThresholdMs = 24 * 60 * 60 * 1000; // 24 Hours
-                    timeText = "24 Hours";
-                } else if (a.type === 'PROJECT') {
-                    warningThresholdMs = 12 * 60 * 60 * 1000; // 12 Hours
-                    timeText = "12 Hours";
-                } else if (a.type === 'ASSIGNMENT') {
-                    warningThresholdMs = 2 * 60 * 60 * 1000;  // 2 Hours
-                    timeText = "2 Hours";
+                // Handle legacy deadlines from the old system gracefully
+                if (a.hasAutoWarned && a.hasWarnedStage1 === undefined) {
+                    a.hasWarnedStage1 = true;
                 }
 
-                // 2. Check if we have crossed this specific deadline's threshold
-                if (timeRemaining > 0 && timeRemaining <= warningThresholdMs && !a.hasAutoWarned) {
-                    
-                    // Mark as warned so we don't spam
-                    a.hasAutoWarned = true;
+                // 1. Define Dual-Stage Thresholds based on task type
+                let stage1Ms = 0, stage2Ms = 0;
+                
+                if (a.type === 'CAT') {
+                    stage1Ms = 24 * 60 * 60 * 1000; // 24 Hours
+                    stage2Ms = 12 * 60 * 60 * 1000; // 12 Hours
+                } else if (a.type === 'PROJECT') {
+                    stage1Ms = 12 * 60 * 60 * 1000; // 12 Hours
+                    stage2Ms = 6 * 60 * 60 * 1000;  // 6 Hours
+                } else if (a.type === 'ASSIGNMENT') {
+                    stage1Ms = 2 * 60 * 60 * 1000;  // 2 Hours
+                    stage2Ms = 1 * 60 * 60 * 1000;  // 1 Hour
+                }
+
+                let triggerAlert = false;
+
+                // 2. Evaluate logic (Check Stage 2 first for extreme urgency)
+                if (timeRemaining <= stage2Ms && !a.hasWarnedStage2) {
+                    a.hasWarnedStage2 = true;
+                    a.hasWarnedStage1 = true; // Lock stage 1 just in case it was skipped
+                    triggerAlert = true;
+                } 
+                else if (timeRemaining <= stage1Ms && timeRemaining > stage2Ms && !a.hasWarnedStage1) {
+                    a.hasWarnedStage1 = true;
+                    triggerAlert = true;
+                }
+
+                if (triggerAlert) {
                     dbChanged = true;
 
-                    // 3. Customize the psychological impact of the message
+                    // Calculate precise dynamic time
+                    const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
+                    const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+                    
+                    let exactTimeLeft = "";
+                    if (days > 0) exactTimeLeft += `${days}d `;
+                    if (hours > 0 || days > 0) exactTimeLeft += `${hours}h `;
+                    exactTimeLeft += `${minutes}m`;
+
+                    // 3. Customize Psychological Impact
                     let alertHeader = "";
                     if (a.type === 'CAT') {
-                        alertHeader = `🚨 *URGENT EXAM WARNING* 🚨\nTime to study! Your CAT is exactly ${timeText} away!`;
+                        alertHeader = a.hasWarnedStage2 
+                            ? `🚨 *FINAL EXAM WARNING* 🚨\nZero hour approaching! Your CAT is exactly ${exactTimeLeft} away!`
+                            : `🚨 *EXAM HEADS-UP* 🚨\nTime to study! Your CAT is exactly ${exactTimeLeft} away!`;
                     } else if (a.type === 'PROJECT') {
-                        alertHeader = `👥 *PROJECT DEADLINE* 👥\nWrap up those final touches! Your Group Project is due in ${timeText}!`;
+                        alertHeader = a.hasWarnedStage2
+                            ? `👥 *FINAL PROJECT DEADLINE* 👥\nWrap up those final touches! Your Group Project is due in ${exactTimeLeft}!`
+                            : `👥 *PROJECT REMINDER* 👥\nKeep working! Your Group Project is due in ${exactTimeLeft}.`;
                     } else if (a.type === 'ASSIGNMENT') {
-                        alertHeader = `⏳ *SUBMISSION REMINDER* ⏳\nFinal call! Your Assignment is due in ${timeText}!`;
+                        alertHeader = a.hasWarnedStage2
+                            ? `⏳ *FINAL SUBMISSION WARNING* ⏳\nLast chance! Your Assignment is due in ${exactTimeLeft}!`
+                            : `⏳ *SUBMISSION REMINDER* ⏳\nHeads up! Your Assignment is due in ${exactTimeLeft}.`;
                     }
 
                     const messageBody = `${alertHeader}\n\n🏫 Class: *${className}*\n${a.icon} *[${a.type}] ${a.unit}*\n📝 Details: ${a.details}\n\n_(This is an automated system reminder)_`;
 
-                    // Broadcast to all registered students
+                    // Broadcast
                     const members = classData.members || {};
                     for (const mId in members) {
                         try {
@@ -112,14 +164,10 @@ function startDeadlineMonitor(client) {
                             console.warn(`[CLASS PORTAL] Failed to send auto-warning to ${members[mId].name}`);
                         }
                     }
-                    console.log(`[CLASS PORTAL] 🚨 Auto-Warning deployed for ${className}: ${a.unit} (${timeText} threshold)`);
                 }
             }
         }
-
-        if (dbChanged) {
-            writeClassDB(db);
-        }
+        if (dbChanged) writeClassDB(db);
     }, 300000); // 5 minutes
 }
 

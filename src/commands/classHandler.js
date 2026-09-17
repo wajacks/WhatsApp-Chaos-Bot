@@ -1104,7 +1104,6 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             // WIZARD STEP 4: PARSE DATE & SAVE
-            // WIZARD STEP 4: PARSE DATE & SAVE
             case 'REP_DEADLINES_ADD_DATE': {
                 if (input === '0') {
                     updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
@@ -1168,12 +1167,58 @@ async function handleInput(client, message, userId, text, userName) {
                 
                 const newDeadline = session.data.newDeadline;
                 newDeadline.timestamp = dueTimestamp;
+
+                // --- NEW: MULTI-STAGE URGENCY DETECTION & MUTING ---
+                const timeDiffMs = dueTimestamp - Date.now();
+                
+                let stage1Ms = 0, stage2Ms = 0;
+                if (newDeadline.type === 'CAT') {
+                    stage1Ms = 24 * 60 * 60 * 1000;
+                    stage2Ms = 12 * 60 * 60 * 1000;
+                } else if (newDeadline.type === 'PROJECT') {
+                    stage1Ms = 12 * 60 * 60 * 1000;
+                    stage2Ms = 6 * 60 * 60 * 1000;
+                } else if (newDeadline.type === 'ASSIGNMENT') {
+                    stage1Ms = 2 * 60 * 60 * 1000;
+                    stage2Ms = 1 * 60 * 60 * 1000;
+                }
+
+                // Initialize flags cleanly
+                newDeadline.hasWarnedStage1 = false;
+                newDeadline.hasWarnedStage2 = false;
+
+                if (timeDiffMs <= stage2Ms) {
+                    // Extreme urgency (mute BOTH background stages to prevent spam)
+                    newDeadline.hasWarnedStage1 = true;
+                    newDeadline.hasWarnedStage2 = true;
+                } else if (timeDiffMs <= stage1Ms) {
+                    // Moderate urgency (mute stage 1 only, let stage 2 run automatically later)
+                    newDeadline.hasWarnedStage1 = true;
+                }
+                
+                // Keep the old flag synced for database stability
+                newDeadline.hasAutoWarned = newDeadline.hasWarnedStage1;
+                // ---------------------------------------------------
                 
                 db.classes[session.data.loggedInClass].assessments.push(newDeadline);
                 writeClassDB(db);
                 
                 updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
-                await message.reply(`🎉 *DEADLINE CREATED!*\n\nIt is now actively counting down for all students.\n\n1. ➕ Add New Deadline\n2. 👁️ View Active Deadlines\n3. 🗑️ Delete a Deadline\n4. 🚨 Send Panic Blast\n\n0. 🔙 Back`);
+
+                // --- DYNAMIC SUCCESS MESSAGE ---
+                let replyMsg = `🎉 *DEADLINE CREATED!*\n\n`;
+                
+                if (timeDiffMs <= stage2Ms) {
+                    replyMsg += `⚠️ *EXTREME URGENCY DETECTED:*\nThis deadline is critically close. All automated background reminders have been muted to prevent spam.\n\n👉 *Use Option 4 (Panic Blast) right now to notify students immediately!*\n\n`;
+                } else if (timeDiffMs <= stage1Ms) {
+                    replyMsg += `⚠️ *MODERATE URGENCY DETECTED:*\nThe first automated reminder was bypassed because the deadline is close. The *final* automated reminder will still fire when it gets extremely close.\n\n👉 *Use Option 4 (Panic Blast) right now if you want to notify students of this addition immediately!*\n\n`;
+                } else {
+                    replyMsg += `It is now actively counting down. The system will automatically send two phased reminders to students as it gets close.\n\n`;
+                }
+
+                replyMsg += `1. ➕ Add New Deadline\n2. 👁️ View Active Deadlines\n3. 🗑️ Delete a Deadline\n4. 🚨 Send Panic Blast\n\n0. 🔙 Back`;
+                
+                await message.reply(replyMsg);
                 break;
             }
 
