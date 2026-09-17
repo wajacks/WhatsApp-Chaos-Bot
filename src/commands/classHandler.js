@@ -398,9 +398,156 @@ async function handleInput(client, message, userId, text, userName) {
                     }
                     updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
                     await message.reply(`📚 *DEADLINES & ASSESSMENTS*\n━━━━━━━━━━━━━━━━━━\n1. ➕ Add New Deadline\n2. 👁️ View Active Deadlines\n3. 🗑️ Delete a Deadline\n4. 🚨 Send Panic Blast (Reminder)\n\n0. 🔙 Back to Dashboard`);
+                } else if (input === '9') {
+                    // Initialize syndicates array if it doesn't exist
+                    if (!db.classes[session.data.loggedInClass].syndicates) {
+                        db.classes[session.data.loggedInClass].syndicates = [];
+                        writeClassDB(db);
+                    }
+                    updateSessionState(userId, 'REP_SYNDICATE_MENU', session.data);
+                    await message.reply(`🎲 *SYNDICATE MAKER*\n━━━━━━━━━━━━━━━━━━\n1. 🎲 Generate New Groups\n2. 👁️ View Active Groups\n3. 🚀 Broadcast Groups to Class\n4. 🗑️ Clear All Groups\n\n0. 🔙 Back to Dashboard`);
                 } else {
-                    await message.reply(`❌ Invalid choice. Type 1-7, 0 to go back, or 99 to exit.`);
+                    await message.reply(`❌ Invalid choice. Type 1-9, 0 to go back, or 99 to exit.`);
                 }
+                break;
+            }
+
+            // ==========================================
+            // PHASE 7: SYNDICATE MAKER (GROUP RANDOMIZER)
+            // ==========================================
+            case 'REP_SYNDICATE_MENU': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                    await sendRepDashboard(message, session.data.loggedInClass);
+                    return;
+                }
+
+                let syndicates = db.classes[session.data.loggedInClass].syndicates || [];
+
+                if (input === '1') {
+                    const memberCount = Object.keys(db.classes[session.data.loggedInClass].members).length;
+                    if (memberCount < 2) {
+                        await message.reply(`⚠️ Not enough students registered to form groups. You need at least 2 students.\n\n(Type *0* to go back)`);
+                        return;
+                    }
+                    updateSessionState(userId, 'REP_SYNDICATE_SIZE', session.data);
+                    await message.reply(`🎲 *GENERATE NEW GROUPS*\n\nThere are currently *${memberCount}* students registered in this class.\n\nHow many students should be in each group?\n(Reply with a number, e.g., *4* or *5*)\n\n0. 🔙 Cancel`);
+                
+                } else if (input === '2') {
+                    if (syndicates.length === 0) {
+                        await message.reply(`📭 No groups have been generated yet.\n(Type *0* to go back)`);
+                        return;
+                    }
+
+                    let viewStr = `👥 *ACTIVE SYNDICATES*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    syndicates.forEach((group, i) => {
+                        viewStr += `*GROUP ${i + 1}*\n`;
+                        group.forEach(student => {
+                            viewStr += `▪️ ${student.name} (${student.admission})\n`;
+                        });
+                        viewStr += `\n`;
+                    });
+                    
+                    await message.reply(viewStr + `(Type *0* to go back)`);
+                
+                } else if (input === '3') {
+                    if (syndicates.length === 0) {
+                        await message.reply(`📭 No groups to broadcast.\n(Type *0* to go back)`);
+                        return;
+                    }
+
+                    const members = db.classes[session.data.loggedInClass].members;
+                    const memberIds = Object.keys(members);
+                    
+                    await message.reply(`🚀 *BROADCASTING GROUPS*\n\nSending the group lists to all ${memberIds.length} registered students...\n\nPlease wait.`);
+                    
+                    // Format the message
+                    let broadcastMsg = `🎲 *OFFICIAL CLASS GROUPS* 🎲\n\n🏫 Class: *${session.data.loggedInClass}*\n👑 Assigned by: *${db.classes[session.data.loggedInClass].repName}*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    syndicates.forEach((group, i) => {
+                        broadcastMsg += `*GROUP ${i + 1}*\n`;
+                        group.forEach(student => broadcastMsg += `▪️ ${student.name}\n`);
+                        broadcastMsg += `\n`;
+                    });
+
+                    // Send the blast
+                    let sentCount = 0;
+                    for (let mId of memberIds) {
+                        try {
+                            await client.sendMessage(members[mId].phoneId, broadcastMsg);
+                            sentCount++;
+                        } catch (e) {
+                            console.warn(`[CLASS PORTAL] Failed to send groups to ${members[mId].name}`);
+                        }
+                    }
+
+                    await message.reply(`✅ *BLAST COMPLETE*\n\nSuccessfully sent group lists to ${sentCount} students.\n\n(Type *0* to go back)`);
+
+                } else if (input === '4') {
+                    db.classes[session.data.loggedInClass].syndicates = [];
+                    writeClassDB(db);
+                    await message.reply(`🗑️ All groups have been cleared and deleted from the database.\n\n(Type *0* to go back)`);
+                } else {
+                    await message.reply(`❌ Invalid choice.`);
+                }
+                break;
+            }
+
+            case 'REP_SYNDICATE_SIZE': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_SYNDICATE_MENU', session.data);
+                    await message.reply(`🎲 Returning to Syndicate Menu...`);
+                    return;
+                }
+
+                const groupSize = parseInt(input.trim(), 10);
+                const membersObj = db.classes[session.data.loggedInClass].members;
+                const memberIds = Object.keys(membersObj);
+
+                if (isNaN(groupSize) || groupSize < 2) {
+                    await message.reply(`❌ Invalid size. A group must have at least 2 members. Try again:`);
+                    return;
+                }
+
+                if (groupSize >= memberIds.length) {
+                    await message.reply(`❌ Group size cannot be larger than the total number of students (${memberIds.length}). Try again:`);
+                    return;
+                }
+
+                // 1. Shuffle the Member IDs using Fisher-Yates Algorithm
+                let shuffledIds = [...memberIds];
+                for (let i = shuffledIds.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffledIds[i], shuffledIds[j]] = [shuffledIds[j], shuffledIds[i]];
+                }
+
+                // 2. Chunk into groups
+                const newSyndicates = [];
+                for (let i = 0; i < shuffledIds.length; i += groupSize) {
+                    const groupIds = shuffledIds.slice(i, i + groupSize);
+                    
+                    // Map IDs back to minimal student objects to save in the DB
+                    const mappedGroup = groupIds.map(id => ({
+                        id: id,
+                        name: membersObj[id].name,
+                        admission: membersObj[id].admission
+                    }));
+                    
+                    newSyndicates.push(mappedGroup);
+                }
+
+                // 3. Save to database
+                db.classes[session.data.loggedInClass].syndicates = newSyndicates;
+                
+                // Add to audit logs
+                db.classes[session.data.loggedInClass].logs.push({
+                    text: `Generated ${newSyndicates.length} random groups (Size: ${groupSize})`,
+                    timestamp: Date.now()
+                });
+
+                writeClassDB(db);
+
+                updateSessionState(userId, 'REP_SYNDICATE_MENU', session.data);
+                await message.reply(`🎉 *GROUPS SUCCESSFULLY GENERATED!*\n\nCreated *${newSyndicates.length}* groups of approximately *${groupSize}* students each.\n\nReply with *2* to view them, or *3* to broadcast them immediately to the class.\n\n0. 🔙 Back`);
                 break;
             }
 
@@ -1754,52 +1901,44 @@ async function handleInput(client, message, userId, text, userName) {
 // UI Helpers for Dashboards
 async function sendRepDashboard(message, className) {
     const menu = `╭──────────────────────────────╮
-  │        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
-  │                               
-  │         \`REP COMMAND\`         
-  │           \`[ ${className} ]\`         
-  │                               
-  │   👑 LEVEL ☞『_*AUTHORIZED*_』    
-  ╰──────────────────────────────╯
-  
-  ┌─── ░◈ _*CONTROL BOARD*_ ◈░ ───────┐
-  │
-  │📅 \`1\`
-  │    ☞『_*Manage Timetable*_』
-  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-  │📢 \`2\`
-  │    ☞『_*Manage Updates*_』
-  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-  │👥 \`3\`
-  │    ☞『_*Class Members*_』
-  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-  │🚨 \`4\`
-  │    ☞『_*Resolve Issues*_』
-  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-  │📜 \`5\`
-  │    ☞『_*View Audit Logs*_』
-  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-  │✅ \`6\`
-  │    ☞『_*Start Roll Call*_』
-  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-  │🛑 \`7\`
-  │    ☞『_*Close & View Roll Call*_』
-  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-  │🛑 \`8\`
-  │    ☞『_*Manage CAT/ASSIGNMENTS*_』
-  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-  │🔙 \`0\`
-  │    ☞『_*Back to Main Menu*_』
-  ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-  │🚪 \`99\`
-  │    ☞『_*Logout*_』
-  │
-  └──────────────────────────────┘
+│        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
+│                               
+│         \`REP COMMAND\`         
+│           \`[ ${className} ]\`         
+│                               
+│   👑 LEVEL ☞『_*AUTHORIZED*_』    
+╰──────────────────────────────╯
+
+┌─── ░◈ _*CONTROL BOARD*_ ◈░ ───────┐
+│
+│📅 \`1\` ☞『_*Manage Timetable*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│📢 \`2\` ☞『_*Manage Updates*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│👥 \`3\` ☞『_*Class Members*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🚨 \`4\` ☞『_*Resolve Issues*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│📜 \`5\` ☞『_*View Audit Logs*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│✅ \`6\` ☞『_*Start Roll Call*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🛑 \`7\` ☞『_*Close Roll Call*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│📚 \`8\` ☞『_*Manage Deadlines*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🎲 \`9\` ☞『_*Syndicate Maker*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🔙 \`0\` ☞『_*Main Menu*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🚪 \`99\` ☞『_*Logout*_』
+│
+└──────────────────────────────┘
         ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
         「 CONTROL THE CHAOS 」`;
-  
+
     await message.reply(menu);
-  }
+}
 
 async function sendStudentGateway(message, className) {
   const menu = `╭──────────────────────────────╮
