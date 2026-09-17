@@ -3,6 +3,8 @@ const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+const IS_VIDEO_UNDER_MAINTENANCE = true;
+
 // Active video requests store: Map<userChatId, { targetQuery, timeoutId }>
 const pendingVideoRequests = new Map();
 
@@ -17,6 +19,16 @@ const pendingAudioQualityRequests = new Map();
  */
 async function handleVideoCommand(message) {
     try {
+        if (IS_VIDEO_UNDER_MAINTENANCE) {
+            await message.reply(
+                '⚠️ *SYSTEM MAINTENANCE NOTICE*\n\n' +
+                'Video and media download services are temporarily offline for updates and cookie re-calibration.\n\n' +
+                '🛠️ *Status:* Under Active Maintenance\n' +
+                '📢 *Notice:* Check back later once the system is patched!'
+            );
+            return;
+        }
+
         const text = message.body.replace('!video', '').trim();
         const chatId = message.from;
 

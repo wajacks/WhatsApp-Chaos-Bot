@@ -2,10 +2,21 @@ const { MessageMedia } = require('whatsapp-web.js');
 const path = require('path');
 const fs = require('fs');
 
+const IS_SONG_UNDER_MAINTENANCE = true;
+
 let shuffledPlaylist = [];
 
 async function handleSongCommand(message) {
     try {
+        if (IS_SONG_UNDER_MAINTENANCE) {
+            await message.reply(
+                '⚠️ *SYSTEM MAINTENANCE NOTICE*\n\n' +
+                'Random song services are temporarily offline for updates and cookie re-calibration.\n\n' +
+                '🛠️ *Status:* Under Active Maintenance\n' +
+                '📢 *Notice:* Check back later once the system is patched!'
+            );
+            return;
+        }
         const assetsDir = path.join(__dirname, '../assets');
 
         // Read all files in the assets folder and filter for .ogg files
