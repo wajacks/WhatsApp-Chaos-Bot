@@ -12,9 +12,6 @@ const pendingAudioFormatRequests = new Map();
 // Active audio quality selection steps: Map<userChatId, { targetQuery, isVoiceNote, timeoutId }>
 const pendingAudioQualityRequests = new Map();
 
-// Active oversize file approvals: Map<userChatId, { filePath, fileSizeMB, timeoutId }>
-const pendingOversizeApprovals = new Map();
-
 /**
  * Main entry point for !video command
  */
@@ -49,7 +46,7 @@ async function handleVideoCommand(message) {
             `1️⃣ *360p* (Fast / Small file size)\n` +
             `2️⃣ *480p* (Balanced quality)\n` +
             `3️⃣ *720p* (High Quality)\n` +
-            `4️⃣ *1080p* (Full HD - Usually sent as Document)\n` +
+            `4️⃣ *1080p* (Full HD - Capped/Optimized)\n` +
             `5️⃣ *Audio Only* (MP3 / Voice Note Options)\n\n` +
             `\t\t‧₊˚🖇️✩ ₊˚🎧⊹♡\n` +
             `_Reply with \`1\`, \`2\`, \`3\`, \`4\`, or \`5\`_\n\n` +
@@ -71,42 +68,7 @@ async function handleVideoQualityReply(message) {
     const selection = message.body.trim().toLowerCase();
 
     // ----------------------------------------------------
-    // 1. Check for Pending Oversized File Decision (Y / N)
-    // ----------------------------------------------------
-    if (pendingOversizeApprovals.has(chatId)) {
-        const approvalData = pendingOversizeApprovals.get(chatId);
-
-        if (selection === 'y' || selection === 'yes' || selection === '1') {
-            clearTimeout(approvalData.timeoutId);
-            pendingOversizeApprovals.delete(chatId);
-
-            await message.reply('📄 *Sending as Document...* Please wait while the file uploads.');
-
-            try {
-                const media = MessageMedia.fromFilePath(approvalData.filePath);
-                await message.client.sendMessage(message.from, media, {
-                    sendMediaAsDocument: true
-                });
-            } catch (err) {
-                console.error('Error sending oversized document:', err);
-                await message.reply('❌ Upload failed. The file was too large for Puppeteer to process.');
-            } finally {
-                cleanupFilePath(approvalData.filePath);
-            }
-            return true;
-
-        } else if (selection === 'n' || selection === 'no' || selection === '2') {
-            clearTimeout(approvalData.timeoutId);
-            pendingOversizeApprovals.delete(chatId);
-
-            cleanupFilePath(approvalData.filePath);
-            await message.reply('🗑️ Request cancelled. File deleted from server.');
-            return true;
-        }
-    }
-
-    // ----------------------------------------------------
-    // 2. Initial Main Menu Selection (1, 2, 3, 4, 5)
+    // 1. Initial Main Menu Selection (1, 2, 3, 4, 5)
     // ----------------------------------------------------
     if (pendingVideoRequests.has(chatId)) {
         const validChoices = ['1', '2', '3', '4', '5'];
@@ -139,12 +101,12 @@ async function handleVideoQualityReply(message) {
             return true;
         }
 
-        // Handles standard video options (1 = 360p, 2 = 480p, 3 = 720p, 4 = 1080p Auto-Document)
+        // Handles standard video options (1 = 360p, 2 = 480p, 3 = 720p, 4 = 1080p)
         const qualityMap = {
-            '1': { height: 360,  label: '360p',  audioOnly: false, sendAsDocument: false },
-            '2': { height: 480,  label: '480p',  audioOnly: false, sendAsDocument: false },
-            '3': { height: 720,  label: '720p',  audioOnly: false, sendAsDocument: false },
-            '4': { height: 1080, label: '1080p', audioOnly: false, sendAsDocument: true }
+            '1': { height: 360,  label: '360p',  audioOnly: false },
+            '2': { height: 480,  label: '480p',  audioOnly: false },
+            '3': { height: 720,  label: '720p',  audioOnly: false },
+            '4': { height: 1080, label: '1080p', audioOnly: false }
         };
 
         const chosenOption = qualityMap[selection];
@@ -167,7 +129,7 @@ async function handleVideoQualityReply(message) {
     }
 
     // ----------------------------------------------------
-    // 3. Audio Step 1: Format Selection (1 = Voice Note, 2 = MP3)
+    // 2. Audio Step 1: Format Selection (1 = Voice Note, 2 = MP3)
     // ----------------------------------------------------
     if (pendingAudioFormatRequests.has(chatId)) {
         if (!['1', '2'].includes(selection)) return false;
@@ -202,7 +164,7 @@ async function handleVideoQualityReply(message) {
     }
 
     // ----------------------------------------------------
-    // 4. Audio Step 2: Bitrate Selection (1 = 320k, 2 = 192k, 3 = 128k)
+    // 3. Audio Step 2: Bitrate Selection (1 = 320k, 2 = 192k, 3 = 128k)
     // ----------------------------------------------------
     if (pendingAudioQualityRequests.has(chatId)) {
         if (!['1', '2', '3'].includes(selection)) return false;
@@ -247,7 +209,7 @@ async function handleVideoQualityReply(message) {
 }
 
 /**
- * Executes yt-dlp download and handles file delivery
+ * Executes yt-dlp download and handles file delivery with a strict 50MB size guardrail
  */
 function processMediaInBackground(message, targetQuery, chosenOption, cookiesPath, requestDir) {
     const outputTemplate = path.join(requestDir, '%(title)s.%(ext)s');
@@ -269,7 +231,6 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
 
     exec(ytDlpCmd, { maxBuffer: 50 * 1024 * 1024 }, async (error) => {
         let downloadedFilePath = null;
-        let isOversizedPending = false; // Flag to prevent early cleanup
 
         try {
             if (error) {
@@ -289,36 +250,15 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
             downloadedFilePath = path.join(requestDir, validFiles[0]);
             const stats = fs.statSync(downloadedFilePath);
             const fileSizeInMB = stats.size / (1024 * 1024);
-            const chatId = message.from;
 
-            // Handle oversized files (> 60 MB) for video requests (unless 1080p auto-document is set)
-            if (fileSizeInMB > 60 && !chosenOption.audioOnly && !chosenOption.sendAsDocument) {
-                console.log(`[OVERSIZE] Video file size is ${fileSizeInMB.toFixed(2)} MB. Prompting user.`);
-                
-                isOversizedPending = true;
-
-                const timeoutId = setTimeout(() => {
-                    if (pendingOversizeApprovals.has(chatId)) {
-                        cleanupFilePath(downloadedFilePath);
-                        pendingOversizeApprovals.delete(chatId);
-                    }
-                }, 2 * 60 * 1000);
-
-                pendingOversizeApprovals.set(chatId, {
-                    filePath: downloadedFilePath,
-                    fileSizeMB: fileSizeInMB,
-                    timeoutId
-                });
-
-                const oversizePrompt = 
-                    `⚠️ *Large File Notice*\n\n` +
-                    `The requested video is *${fileSizeInMB.toFixed(1)} MB*, which exceeds standard WhatsApp media stream limits (60MB).\n\n` +
-                    `Do you want me to send it as a *Document* instead?\n\n` +
-                    `Reply with:\n` +
-                    `*Y* — Yes, send as Document\n` +
-                    `*N* — No, cancel request`;
-
-                await message.reply(oversizePrompt);
+            // HARD CAP GUARDRAIL: Block video files over 50MB from crashing Puppeteer
+            if (fileSizeInMB > 50 && !chosenOption.audioOnly) {
+                console.log(`[OVERSIZE BLOCKED] File size was ${fileSizeInMB.toFixed(2)} MB. Purging download.`);
+                await message.reply(
+                    `❌ *File Too Large (${fileSizeInMB.toFixed(1)} MB)*\n\n` +
+                    `Files over 50MB overwhelm WhatsApp Web and cause Puppeteer to freeze.\n` +
+                    `Please choose *1️⃣ (360p)* or *2️⃣ (480p)* to download a smaller, safe version!`
+                );
                 return;
             }
 
@@ -337,11 +277,6 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
                     );
                     await message.client.sendMessage(message.from, mp3Media);
                 }
-            } else if (chosenOption.sendAsDocument) {
-                // Auto-send 1080p as Document file
-                await message.client.sendMessage(message.from, media, {
-                    sendMediaAsDocument: true
-                });
             } else {
                 await message.client.sendMessage(message.from, media);
             }
@@ -350,10 +285,7 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
             console.error('Error processing or sending media:', err);
             await message.reply('❌ Media downloaded, but failed to send it over WhatsApp.');
         } finally {
-            // Delete folder ONLY if not waiting for an oversize Y/N response
-            if (!isOversizedPending) {
-                cleanupFilePath(downloadedFilePath || requestDir);
-            }
+            cleanupFilePath(downloadedFilePath || requestDir);
         }
     });
 }
