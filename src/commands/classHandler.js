@@ -319,7 +319,7 @@ async function handleInput(client, message, userId, text, userName) {
                     if (session.data.isMainRep) {
                         menuTxt += `3. 🎖️ Promote to Assistant Rep\n4. 🔻 Revoke Assistant Rep\n`;
                     }
-                    menuTxt += `\n0. 🔙 Back to Dashboard`;
+                    menuTxt += `5. 👻 View Ghost List (Attendance)\n\n0. 🔙 Back to Dashboard`;
                     await message.reply(menuTxt);
                 } else if (input === '4') {
                     updateSessionState(userId, 'REP_ISSUES_MENU', session.data);
@@ -406,6 +406,9 @@ async function handleInput(client, message, userId, text, userName) {
                     }
                     updateSessionState(userId, 'REP_SYNDICATE_MENU', session.data);
                     await message.reply(`🎲 *SYNDICATE MAKER*\n━━━━━━━━━━━━━━━━━━\n1. 🎲 Generate New Groups\n2. 👁️ View Active Groups\n3. 🚀 Broadcast Groups to Class\n4. 🗑️ Clear All Groups\n\n0. 🔙 Back to Dashboard`);
+                } else if (input === '10') {
+                    updateSessionState(userId, 'REP_WHISPER_MENU', session.data);
+                    await message.reply(`🤫 *WHISPER INBOX*\n━━━━━━━━━━━━━━━━━━\n1. 📥 View Unread Whispers\n2. ✍️ Reply to a Whisper\n3. 🗑️ Clear Inbox\n\n0. 🔙 Back to Dashboard`);
                 } else {
                     await message.reply(`❌ Invalid choice. Type 1-9, 0 to go back, or 99 to exit.`);
                 }
@@ -922,6 +925,33 @@ async function handleInput(client, message, userId, text, userName) {
                     mList += `\n*Reply with the number to REVOKE them:*\n(Type *0* to cancel)`;
                     updateSessionState(userId, 'REP_MEMBERS_REVOKE', { ...session.data, asstIds });
                     await message.reply(mList);
+                } else if (input === '5') {
+                    // 👻 THE GHOST TRACKER
+                    if (mIds.length === 0) {
+                        await message.reply(`📭 No students to track.\n(Type *0* to go back)`);
+                        return;
+                    }
+                    
+                    const classData = db.classes[session.data.loggedInClass];
+                    const totalSessions = classData.totalRollCalls || 0;
+                    if (totalSessions === 0) {
+                        await message.reply(`⚠️ You haven't run any Roll Calls yet!\n\n(Type *0* to go back)`);
+                        return;
+                    }
+
+                    let ghostStr = `👻 *THE GHOST LIST (ATTENDANCE)* 👻\nTotal Sessions: ${totalSessions}\n━━━━━━━━━━━━━━━━━━\n`;
+                    
+                    // Sort students by lowest attendance first
+                    const sortedStudents = mIds.map(id => members[id]).sort((a, b) => (a.attendedClasses || 0) - (b.attendedClasses || 0));
+                    
+                    sortedStudents.forEach(m => {
+                        const attended = m.attendedClasses || 0;
+                        const percentage = Math.round((attended / totalSessions) * 100);
+                        const icon = percentage < 50 ? '🚨' : (percentage < 75 ? '⚠️' : '✅');
+                        ghostStr += `${icon} *${m.name}*: ${attended}/${totalSessions} (${percentage}%)\n`;
+                    });
+
+                    await message.reply(ghostStr + `\n(Type *0* to go back)`);
                 }
                 break;
             }
@@ -1025,6 +1055,96 @@ async function handleInput(client, message, userId, text, userName) {
             await message.reply(`✅ *${targetStudent.name}* has been demoted back to a regular student.\n\n0. 🔙 Back`);
             break;
         }
+
+        // ==========================================
+            // PHASE 8: THE WHISPER PROTOCOL (REP SIDE)
+            // ==========================================
+            case 'REP_WHISPER_MENU': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                    await sendRepDashboard(message, session.data.loggedInClass);
+                    return;
+                }
+                
+                let whispers = db.classes[session.data.loggedInClass].whispers || [];
+
+                if (input === '1') {
+                    const unread = whispers.filter(w => !w.replied);
+                    if (unread.length === 0) {
+                        await message.reply(`📭 Inbox empty. No unread whispers.\n\n(Type *0* to go back)`);
+                        return;
+                    }
+                    
+                    let wStr = `📥 *UNREAD WHISPERS*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    unread.forEach((w, i) => {
+                        const dObj = new Date(w.timestamp);
+                        const tStr = dObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' });
+                        wStr += `*ID: [${w.hash}]* (${tStr})\n"${w.text}"\n\n`;
+                    });
+                    await message.reply(wStr + `To reply, go back and select option 2.\n\n(Type *0* to go back)`);
+                
+                } else if (input === '2') {
+                    updateSessionState(userId, 'REP_WHISPER_SELECT', session.data);
+                    await message.reply(`✍️ *REPLY TO A WHISPER*\n\nEnter the exact Hash ID of the whisper you want to reply to (e.g., Ghost-8F2A):\n\n(Type *0* to cancel)`);
+                
+                } else if (input === '3') {
+                    db.classes[session.data.loggedInClass].whispers = [];
+                    writeClassDB(db);
+                    await message.reply(`🗑️ Inbox wiped clean.\n\n(Type *0* to go back)`);
+                }
+                break;
+            }
+
+            case 'REP_WHISPER_SELECT': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_WHISPER_MENU', session.data);
+                    await message.reply(`Returning to Inbox...`);
+                    return;
+                }
+                
+                const whispers = db.classes[session.data.loggedInClass].whispers || [];
+                const targetIdx = whispers.findIndex(w => w.hash.toLowerCase() === input.trim().toLowerCase());
+                
+                if (targetIdx === -1) {
+                    await message.reply(`❌ Hash ID not found. Make sure you typed it correctly.\n\nTry again or type *0* to cancel:`);
+                    return;
+                }
+
+                updateSessionState(userId, 'REP_WHISPER_REPLY', { ...session.data, whisperIdx: targetIdx });
+                await message.reply(`✅ *Whisper Found!*\n\n"${whispers[targetIdx].text}"\n\nType your reply below. It will be sent as an anonymous DM to the student.\n\n(Type *0* to cancel)`);
+                break;
+            }
+
+            case 'REP_WHISPER_REPLY': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_WHISPER_MENU', session.data);
+                    await message.reply(`Reply cancelled.`);
+                    return;
+                }
+
+                const sClass = session.data.loggedInClass;
+                const wIdx = session.data.whisperIdx;
+                const whisper = db.classes[sClass].whispers[wIdx];
+                const studentId = whisper.studentId;
+                const studentPhoneId = db.classes[sClass].members[studentId]?.phoneId;
+
+                if (studentPhoneId) {
+                    try {
+                        const replyMsg = `🤫 *WHISPER RESPONSE*\n━━━━━━━━━━━━━━━━━━\n*Your Feedback:* "${whisper.text}"\n\n*Rep's Reply:* "${input}"`;
+                        await client.sendMessage(studentPhoneId, replyMsg);
+                    } catch (e) {
+                        console.warn(`Failed to send whisper reply to ${studentPhoneId}`);
+                    }
+                }
+
+                // Mark as replied
+                db.classes[sClass].whispers[wIdx].replied = true;
+                writeClassDB(db);
+
+                updateSessionState(userId, 'REP_WHISPER_MENU', session.data);
+                await message.reply(`✅ *REPLY SENT*\n\nThe student has received your message anonymously.\n\n(Type *0* to go back)`);
+                break;
+            }
 
           case 'REP_ISSUES_MENU': {
               if (input === '0') {
@@ -1780,7 +1900,6 @@ async function handleInput(client, message, userId, text, userName) {
                 if (input === '1') {
                     // View Today's Timetable
                     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-                    // Get current day based on East Africa Time
                     const todayIdx = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Nairobi"})).getDay();
                     const todayStr = days[todayIdx];
                     const todayClasses = sDb.timetable[todayStr];
@@ -1811,8 +1930,6 @@ async function handleInput(client, message, userId, text, userName) {
                     // View Upcoming Deadlines
                     let assessments = sDb.assessments || [];
                     const now = Date.now();
-                    
-                    // Filter out past deadlines
                     assessments = assessments.filter(a => a.timestamp > now);
                     
                     if (assessments.length === 0) {
@@ -1820,9 +1937,7 @@ async function handleInput(client, message, userId, text, userName) {
                         return;
                     }
                     
-                    // Sort so the most urgent is at the top
                     assessments.sort((a, b) => a.timestamp - b.timestamp);
-                    
                     let viewStr = `⏳ *YOUR UPCOMING DEADLINES*\n━━━━━━━━━━━━━━━━━━\n\n`;
                     assessments.forEach(a => {
                         const timeDiffMs = a.timestamp - now;
@@ -1845,19 +1960,14 @@ async function handleInput(client, message, userId, text, userName) {
                             countdown = parts.join(' ');
                         }
                         
-                        viewStr += `${a.icon} *[${a.type}] ${a.unit}*\n`;
-                        viewStr += `📝 Details: ${a.details}\n`;
-                        viewStr += `⏰ Due In: *${countdown}*\n\n`;
+                        viewStr += `${a.icon} *[${a.type}] ${a.unit}*\n📝 Details: ${a.details}\n⏰ Due In: *${countdown}*\n\n`;
                     });
-                    
                     await message.reply(viewStr + `(Type *0* to go back)`);
 
                 } else if (input === '4') {
                     // View Updates
                     const ONE_DAY = 24 * 60 * 60 * 1000;
                     const now = Date.now();
-                    
-                    // Filter out updates older than 24 hours and save DB
                     sDb.updates = sDb.updates.filter(u => now - u.timestamp < ONE_DAY);
                     writeClassDB(db);
 
@@ -1886,9 +1996,111 @@ async function handleInput(client, message, userId, text, userName) {
                     classMates.forEach(mId => cmStr += `▪️ ${sDb.members[mId].name}\n`);
                     await message.reply(cmStr + `\n(Type *0* to go back)`);
 
+                } else if (input === '6') {
+                    // ⏱️ THE CHRONOS ENGINE
+                    const currentEAT = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Nairobi"}));
+                    const daysList = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+                    const todayStr = daysList[currentEAT.getDay()];
+                    const todayClasses = sDb.timetable[todayStr] || [];
+
+                    if (todayClasses.length === 0) {
+                        await message.reply(`🏖️ No classes scheduled for today! Relax.\n\n(Type *0* to go back)`);
+                        return;
+                    }
+
+                    const currentMins = (currentEAT.getHours() * 60) + currentEAT.getMinutes();
+                    let nextClass = null;
+                    let minDiff = Infinity;
+
+                    todayClasses.forEach(c => {
+                        const match = c.time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+                        if (match) {
+                            let h = parseInt(match[1]);
+                            let m = parseInt(match[2]);
+                            if (match[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+                            if (match[3].toUpperCase() === 'AM' && h === 12) h = 0;
+                            
+                            const classMins = (h * 60) + m;
+                            const diff = classMins - currentMins;
+                            
+                            if (diff > 0 && diff < minDiff) {
+                                minDiff = diff;
+                                nextClass = c;
+                            }
+                        }
+                    });
+
+                    if (nextClass) {
+                        const hrs = Math.floor(minDiff / 60);
+                        const mins = minDiff % 60;
+                        const timeString = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+                        await message.reply(`⏱️ *CHRONOS ENGINE*\n━━━━━━━━━━━━━━━━━━\n**Next Class:** ${nextClass.unit}\n**Starts In:** ${timeString} (at ${nextClass.time})\n\n(Type *0* to go back)`);
+                    } else {
+                        await message.reply(`✅ All of today's scheduled classes have already passed.\n\n(Type *0* to go back)`);
+                    }
+
+                } else if (input === '7') {
+                    // 🤫 INITIATE WHISPER PROTOCOL
+                    updateSessionState(userId, 'STUDENT_WHISPER_COMPOSE', session.data);
+                    await message.reply(`🤫 *THE WHISPER PROTOCOL*\n\nYour message will be sent anonymously to the Class Rep. Your name and phone number will be hidden.\n\nType your feedback/complaint below:\n(Type *0* to cancel)`);
+                
+                } else if (input === '8') {
+                    // 👻 GHOST TRACKER: SIGN ROLL CALL
+                    if (!sDb.activeRollCall) {
+                        await message.reply(`❌ No active roll call right now. Wait for your Class Rep to open the register.\n\n(Type *0* to go back)`);
+                        return;
+                    }
+
+                    const mId = session.data.currentStudentId;
+                    const studentData = sDb.members[mId];
+                    const todayDate = new Date().toLocaleDateString("en-US", {timeZone: "Africa/Nairobi"});
+
+                    if (studentData.lastSigned === todayDate) {
+                        await message.reply(`✅ You have already signed the register for today!\n\n(Type *0* to go back)`);
+                        return;
+                    }
+
+                    studentData.attendedClasses = (studentData.attendedClasses || 0) + 1;
+                    studentData.lastSigned = todayDate;
+                    // Push students to the Rep's active register
+                    sDb.activeRollCall.attendees[mId] = {
+                        name: studentData.name,
+                        regNo: studentData.admission,
+                        timestamp: new Date().toLocaleTimeString("en-US", {timeZone: "Africa/Nairobi"})
+                    };
+                    writeClassDB(db);
+
+                    await message.reply(`✅ *ATTENDANCE LOGGED*\nYour presence has been recorded in the Ghost Tracker.\n\n(Type *0* to go back)`);
                 } else {
-                    await message.reply(`❌ Invalid choice. Type 1-5, 0 to go back, or 99 to exit.`);
+                    await message.reply(`❌ Invalid choice. Type 1-8, 0 to go back, or 99 to exit.`);
                 }
+                break;
+            }
+
+            case 'STUDENT_WHISPER_COMPOSE': {
+                if (input === '0') {
+                    updateSessionState(userId, 'STUDENT_DASHBOARD', session.data);
+                    await sendStudentDashboard(message, session.data.loggedInClass, session.data.studentName);
+                    return;
+                }
+                
+                const sClass = session.data.loggedInClass;
+                if (!db.classes[sClass].whispers) db.classes[sClass].whispers = [];
+
+                // Generate a random anonymous hash (e.g., Ghost-8F2A)
+                const anonHash = 'Ghost-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+                
+                db.classes[sClass].whispers.push({
+                    hash: anonHash,
+                    studentId: session.data.currentStudentId,
+                    text: input,
+                    timestamp: Date.now(),
+                    replied: false
+                });
+                writeClassDB(db);
+
+                updateSessionState(userId, 'STUDENT_DASHBOARD', session.data);
+                await message.reply(`✅ *WHISPER DELIVERED*\n\nYour anonymous feedback has been safely routed to the Rep's inbox.\n\n(Type *0* to go back)`);
                 break;
             }
         }
@@ -1901,44 +2113,33 @@ async function handleInput(client, message, userId, text, userName) {
 // UI Helpers for Dashboards
 async function sendRepDashboard(message, className) {
     const menu = `╭──────────────────────────────╮
-│        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
-│                               
-│         \`REP COMMAND\`         
-│           \`[ ${className} ]\`         
-│                               
-│   👑 LEVEL ☞『_*AUTHORIZED*_』    
-╰──────────────────────────────╯
-
-┌─── ░◈ _*CONTROL BOARD*_ ◈░ ───────┐
-│
-│📅 \`1\` ☞『_*Manage Timetable*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│📢 \`2\` ☞『_*Manage Updates*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│👥 \`3\` ☞『_*Class Members*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🚨 \`4\` ☞『_*Resolve Issues*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│📜 \`5\` ☞『_*View Audit Logs*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│✅ \`6\` ☞『_*Start Roll Call*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🛑 \`7\` ☞『_*Close Roll Call*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│📚 \`8\` ☞『_*Manage Deadlines*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🎲 \`9\` ☞『_*Syndicate Maker*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🔙 \`0\` ☞『_*Main Menu*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🚪 \`99\` ☞『_*Logout*_』
-│
-└──────────────────────────────┘
-        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
-        「 CONTROL THE CHAOS 」`;
-
+  │        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
+  │                               
+  │         \`REP COMMAND\`         
+  │           \`[ ${className} ]\`         
+  │                               
+  │   👑 LEVEL ☞『_*AUTHORIZED*_』    
+  ╰──────────────────────────────╯
+  
+  ┌─── ░◈ _*CONTROL BOARD*_ ◈░ ───────┐
+  │
+  │📅 \`1\` ☞『_*Manage Timetable*_』
+  │📢 \`2\` ☞『_*Manage Updates*_』
+  │👥 \`3\` ☞『_*Class Members & Attendance*_』
+  │🚨 \`4\` ☞『_*Resolve Issues*_』
+  │📜 \`5\` ☞『_*View Audit Logs*_』
+  │✅ \`6\` ☞『_*Start Roll Call*_』
+  │🛑 \`7\` ☞『_*Close Roll Call*_』
+  │📚 \`8\` ☞『_*Manage Deadlines*_』
+  │🎲 \`9\` ☞『_*Syndicate Maker*_』
+  │🤫 \`10\` ☞『_*Whisper Inbox (Feedback)*_』
+  │🔙 \`0\` ☞『_*Main Menu*_』
+  │🚪 \`99\` ☞『_*Logout*_』
+  │
+  └──────────────────────────────┘
+          ⚡ _*TUM*_ × _*CHAOS*_ ⚡`;
     await message.reply(menu);
-}
+  }
 
 async function sendStudentGateway(message, className) {
   const menu = `╭──────────────────────────────╮
@@ -1971,43 +2172,32 @@ async function sendStudentGateway(message, className) {
 }
 
 async function sendStudentDashboard(message, className, studentName) {
-  const menu = `╭──────────────────────────────╮
-│        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
-│                               
-│           \`STUDENT HUB\`          
-│           \`[ ${className} ]\`         
-│                               
-│   👤 USER ☞『_*${studentName}*_』 
-╰──────────────────────────────╯
-
-┌─── ░◈ _*PORTAL FEED*_ ◈░ ──────────┐
-│
-│📅 \`1\`
-│    ☞『_*View Today's Classes*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🗓️ \`2\`
-│    ☞『_*View Full Timetable*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│📢 \`3\`
-│    ☞『_*View CAT/ASSIGN Deadlines*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│👥 \`4\`
-│    ☞『_*View Updates*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│👥 \`5\`
-│    ☞『_*View Classmates*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🔙 \`0\`
-│    ☞『_*Back to Main Menu*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🚪 \`99\`
-│    ☞『_*Logout*_』
-│
-└──────────────────────────────┘
-      ⚡ _*TUM*_ × _*CHAOS*_ ⚡`;
-
-  await message.reply(menu);
-}
+    const menu = `╔═══ 🎨 *C H A O S* 🎨 ═══╗
+  ║     ⚡ *STUDENT ACCESS* ⚡     ║
+  ╚════════════════════════╝
+  ┌─[ 👤 *IDENTITY* ]─────────┐
+  │ Student :: ${studentName}
+  │ Class   :: ${className}
+  └─────────────────────────┘
+  
+  ━━━━━━━ 💥 ━━━━━━━
+  📅  *1*  Today's Classes
+  🗓️  *2*  Full Timetable
+  ⏳  *3*  Upcoming Deadlines
+  📢  *4*  Updates
+  👥  *5*  Classmates
+  ⏱️  *6*  What's Next? (Chronos)
+  🤫  *7*  Send Anonymous Whisper
+  ✅  *8*  Sign Attendance (Roll Call)
+  ─────── ⚡ ───────
+  🔙  *0*   Back to Main Menu
+  🚪  *99*  Logout
+  
+  ╭──────────────────────╮
+  │ </> *CONNECTION_SECURED* │
+  ╰──────────────────────╯`;
+    await message.reply(menu);
+  }
 
 /**
  * Intercepts 'PRESENT' messages in DMs and logs attendance
@@ -2058,6 +2248,11 @@ async function handleAttendance(message, userId, client) {
         regNo: studentData.admission,
         timestamp: new Date().toLocaleTimeString("en-US", {timeZone: "Africa/Nairobi"})
     };
+
+    // Update their Ghost Tracker tally
+    studentData.attendedClasses = (studentData.attendedClasses || 0) + 1;
+    const todayDate = new Date().toLocaleDateString("en-US", {timeZone: "Africa/Nairobi"});
+    studentData.lastSigned = todayDate;
 
     writeClassDB(db);
 
