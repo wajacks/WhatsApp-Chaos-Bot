@@ -69,7 +69,7 @@ const { sendHymnPianoAudio } = require('./src/tools/hymnalAudio');
 const { logMessage, getChatHistory } = require('./src/database/chatlog');
 
 // CLASS PORTAL:
-const { resetClassDB } = require('./src/database/classdb');
+const { resetClassDB, readClassDB } = require('./src/database/classdb');
 const { isUserInClassSession, endSession } = require('./src/tools/classSession');
 const classHandler = require('./src/commands/classHandler');
 const { handleAttendance } = require('./src/commands/classHandler');
@@ -1596,15 +1596,26 @@ client.on('message', async message => {
             }
 
             // --------------------------------------------
-            // !owner classreset [classname]
+            // !owner classreset [classname] [reset|delete]
             // --------------------------------------------
 
             if (ownerCommand === 'classreset') {
                 try {
                     const db = readClassDB();
-                    const targetClassArg = ownerArgs.slice(2).join(' ').trim();
+                    const fullArgs = ownerArgs.slice(2);
+                    
+                    // Parse the action (reset or delete) if it's the last word typed
+                    let action = fullArgs[fullArgs.length - 1]?.toLowerCase();
+                    let targetClassArg = '';
 
-                    // 1. If no argument is given, list the available classes
+                    if (action === 'reset' || action === 'delete') {
+                        targetClassArg = fullArgs.slice(0, -1).join(' ').trim();
+                    } else {
+                        targetClassArg = fullArgs.join(' ').trim();
+                        action = null;
+                    }
+
+                    // 1. If no argument is given, list the available classes with instructions
                     if (!targetClassArg) {
                         const classes = Object.keys(db.classes || {});
                         if (classes.length === 0) {
@@ -1612,11 +1623,12 @@ client.on('message', async message => {
                             return;
                         }
 
-                        let listMsg = '🏫 *CLASS RESET MANAGER*\n━━━━━━━━━━━━━━━━━━\nTo reset a specific class, type:\n`!owner classreset <ClassName>`\n\n*Available Classes:*\n';
+                        let listMsg = '🏫 *CLASS RESET MANAGER*\n━━━━━━━━━━━━━━━━━━\nTo manage a specific class, add `reset` or `delete` after the name.\n\n*Available Classes:*\n';
                         classes.forEach((cls, idx) => {
                             listMsg += `${idx + 1}. \`${cls}\`\n`;
                         });
-                        listMsg += `\n*(To wipe the entire database, type \`!owner classreset all\`)*`;
+                        listMsg += `\n*Examples:*\n👉 \`!owner classreset BSIT/2024 reset\`\n(Wipes data, keeps Rep & Password)\n\n👉 \`!owner classreset BSIT/2024 delete\`\n(Removes portal completely)\n\n*(To wipe the entire database, type \`!owner classreset all\`)*`;
+                        
                         await message.reply(listMsg);
                         return;
                     }
@@ -1632,7 +1644,7 @@ client.on('message', async message => {
                         return;
                     }
 
-                    // 3. Specific class reset (case-insensitive search)
+                    // 3. Specific class target (case-insensitive search)
                     const matchedClassKey = Object.keys(db.classes || {}).find(
                         c => c.toLowerCase() === targetClassArg.toLowerCase()
                     );
@@ -1642,21 +1654,88 @@ client.on('message', async message => {
                         return;
                     }
 
-                    // Delete only the matched class from the database object and save
-                    delete db.classes[matchedClassKey];
-                    writeClassDB(db);
+                    const classData = db.classes[matchedClassKey];
 
-                    await message.reply(
-                        `💥 *CLASS RESET SUCCESSFUL*\n\n` +
-                        `Class *${matchedClassKey}* and all its associated student records, logs, and timetables have been wiped.\n\n` +
-                        `👑 *Executed by: Master Owner*`
-                    );
+                    // 4. Prompt if action is missing (They just typed the class name)
+                    if (!action) {
+                        await message.reply(
+                            `⚠️ *ACTION REQUIRED FOR: ${matchedClassKey}*\n\n` +
+                            `Please specify whether you want to reset or delete this class:\n\n` +
+                            `1️⃣ *Reset:* Wipes all students, timetables, and logs, but keeps the Rep and Class Password intact.\n` +
+                            `👉 \`!owner classreset ${matchedClassKey} reset\`\n\n` +
+                            `2️⃣ *Delete:* Completely destroys the portal and removes Rep access.\n` +
+                            `👉 \`!owner classreset ${matchedClassKey} delete\``
+                        );
+                        return;
+                    }
+
+                    // 5. Execute Action: DELETE
+                    if (action === 'delete') {
+                        // Notify the Rep via DM
+                        if (classData.repId) {
+                            try {
+                                await client.sendMessage(
+                                    classData.repId,
+                                    `🚨 *CRITICAL SYSTEM ALERT* 🚨\n━━━━━━━━━━━━━━━━━━\n\nYour Class Portal for *${matchedClassKey}* has been permanently *DELETED* by the Master Owner.\n\nYour Class Rep privileges for this portal have been revoked.`
+                                );
+                            } catch (e) {
+                                console.warn(`Could not notify rep ${classData.repId} about deletion.`);
+                            }
+                        }
+
+                        // Delete from DB and save
+                        delete db.classes[matchedClassKey];
+                        writeClassDB(db);
+
+                        await message.reply(
+                            `💥 *CLASS DELETED*\n\n` +
+                            `Portal *${matchedClassKey}* has been completely destroyed.\nThe Class Rep has been notified via DM.\n\n` +
+                            `👑 *Executed by: Master Owner*`
+                        );
+
+                    // 6. Execute Action: RESET
+                    } else if (action === 'reset') {
+                        // Notify the Rep via DM
+                        if (classData.repId) {
+                            try {
+                                await client.sendMessage(
+                                    classData.repId,
+                                    `🚨 *SYSTEM RESET ALERT* 🚨\n━━━━━━━━━━━━━━━━━━\n\nYour Class Portal for *${matchedClassKey}* has been *RESET* by the Master Owner.\n\nAll student records, timetables, deadlines, and logs have been wiped. However, your Class Rep privileges and the Class Password remain active. You will need to set up the portal again.`
+                                );
+                            } catch (e) {
+                                console.warn(`Could not notify rep ${classData.repId} about reset.`);
+                            }
+                        }
+
+                        // Reset properties but strictly preserve Rep identity and Class Password
+                        db.classes[matchedClassKey] = {
+                            repName: classData.repName, 
+                            repId: classData.repId,
+                            assistantReps: [],     
+                            classPassword: classData.classPassword,
+                            timetable: { sunday: [], monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [] },
+                            updates: [],
+                            members: {}, 
+                            issues: [],
+                            logs: [{ text: `Portal reset by Master Owner`, timestamp: Date.now() }],
+                            assessments: [],
+                            syndicates: [],
+                            whispers: []
+                        };
+                        writeClassDB(db);
+
+                        await message.reply(
+                            `🔄 *CLASS RESET SUCCESSFUL*\n\n` +
+                            `Portal *${matchedClassKey}* has been wiped clean (students, timetables cleared), but the Rep (*${classData.repName}*) and class password were preserved.\nThe Class Rep has been notified via DM.\n\n` +
+                            `👑 *Executed by: Master Owner*`
+                        );
+                    }
 
                 } catch (err) {
                     console.error('Owner class reset error:', err);
                     await message.reply(
-                        '❌ *CLASS RESET FAILED*\n\n' +
-                        'An error occurred while resetting the class.'
+                        '❌ *CLASS ACTION FAILED*\n\n' +
+                        'An error occurred while modifying the class.'
                     );
                 }
 
