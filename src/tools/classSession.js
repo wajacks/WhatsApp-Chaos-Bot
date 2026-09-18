@@ -269,6 +269,21 @@ async function broadcastToClass(client, classData, messageText) {
     }
 }
 
+function getPortalMetrics(className, repId) {
+    let activeCount = 0;
+    let repOnline = false;
+
+    for (const [userId, session] of activeClassSessions.entries()) {
+        if (session.data && session.data.loggedInClass === className) {
+            activeCount++;
+            if (userId === repId) {
+                repOnline = true;
+            }
+        }
+    }
+    return { activeCount, repOnline };
+}
+
 module.exports = {
     createSession,
     updateSessionState,
@@ -276,5 +291,6 @@ module.exports = {
     endSession,
     isUserInClassSession,
     startDeadlineMonitor,
-    startTimetableMonitor
+    startTimetableMonitor,
+    getPortalMetrics
 };

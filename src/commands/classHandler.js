@@ -1,5 +1,5 @@
 const { readClassDB, writeClassDB, classExists, isUserAlreadyRep } = require('../database/classdb');
-const { createSession, updateSessionState, getSession, endSession } = require('../tools/classSession');
+const { createSession, updateSessionState, getSession, endSession , getPortalMetricS} = require('../tools/classSession');
 const { timeToMinutes, minutesToTime, checkCollision } = require('../tools/timeHelper');
 
 let lastApplicantUserId = null;
@@ -2350,14 +2350,21 @@ async function handleInput(client, message, userId, text, userName) {
 
 // UI Helpers for Dashboards
 async function sendRepDashboard(message, className) {
+    const db = readClassDB();
+    const classData = db.classes[className] || {};
+    const metrics = getPortalMetrics(className, classData.repId);
+    
+    const repStatus = metrics.repOnline ? '🟢 ONLINE' : '🔴 OFFLINE';
+
     const menu = `╭──────────────────────────────╮
-  │        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
-  │                               
-  │         \`REP COMMAND\`         
-  │           \`[ ${className} ]\`         
-  │                               
-  │   👑 LEVEL ☞『_*AUTHORIZED*_』    
-  ╰──────────────────────────────╯
+│        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
+│                               
+│         \`REP COMMAND\`         
+│           \`[ ${className} ]\`         
+│                               
+│   👑 REP: ${repStatus}          
+│   👥 ACTIVE IN PORTAL: ${metrics.activeCount}           
+╰──────────────────────────────╯
   
   ┌─── ░◈ _*CONTROL BOARD*_ ◈░ ───────┐
   │
@@ -2376,8 +2383,9 @@ async function sendRepDashboard(message, className) {
   │
   └──────────────────────────────┘
           ⚡ _*TUM*_ × _*CHAOS*_ ⚡`;
+  
     await message.reply(menu);
-  }
+}
 
 async function sendStudentGateway(message, className) {
   const menu = `╭──────────────────────────────╮
@@ -2409,33 +2417,43 @@ async function sendStudentGateway(message, className) {
   await message.reply(menu);
 }
 
-async function sendStudentDashboard(message, className, studentName) {
-    const menu = `╔═══ 🎨 *C H A O S* 🎨 ═══╗
-  ║     ⚡ *STUDENT ACCESS* ⚡     ║
-  ╚════════════════════════╝
-  ┌─[ 👤 *IDENTITY* ]─────────┐
-  │ Student :: ${studentName}
-  │ Class   :: ${className}
-  └─────────────────────────┘
+async function sendRepDashboard(message, className) {
+    const db = readClassDB();
+    const classData = db.classes[className] || {};
+    const metrics = getPortalMetrics(className, classData.repId);
+    
+    const repStatus = metrics.repOnline ? '🟢 ONLINE' : '🔴 OFFLINE';
+
+    const menu = `╭──────────────────────────────╮
+│        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
+│                               
+│         \`REP COMMAND\`         
+│           \`[ ${className} ]\`         
+│                               
+│   👑 REP: ${repStatus}          
+│   👥 ACTIVE IN PORTAL: ${metrics.activeCount}           
+╰──────────────────────────────╯
   
-  ━━━━━━━ 💥 ━━━━━━━
-  📅  *1*  Today's Classes
-  🗓️  *2*  Full Timetable
-  ⏳  *3*  Upcoming Deadlines
-  📢  *4*  Updates
-  👥  *5*  Classmates
-  ⏱️  *6*  What's Next? (Chronos)
-  🤫  *7*  Send Anonymous Whisper
-  ✅  *8*  Sign Attendance (Roll Call)
-  ─────── ⚡ ───────
-  🔙  *0*   Back to Main Menu
-  🚪  *99*  Logout
+  ┌─── ░◈ _*CONTROL BOARD*_ ◈░ ───────┐
+  │
+  │📅 \`1\` ☞『_*Manage Timetable*_』
+  │📢 \`2\` ☞『_*Manage Updates*_』
+  │👥 \`3\` ☞『_*Class Members & Attendance*_』
+  │🚨 \`4\` ☞『_*Resolve Issues*_』
+  │📜 \`5\` ☞『_*View Audit Logs*_』
+  │✅ \`6\` ☞『_*Start Roll Call*_』
+  │🛑 \`7\` ☞『_*Close Roll Call*_』
+  │📚 \`8\` ☞『_*Manage Deadlines*_』
+  │🎲 \`9\` ☞『_*Syndicate Maker*_』
+  │🤫 \`10\` ☞『_*Whisper Inbox (Feedback)*_』
+  │🔙 \`0\` ☞『_*Main Menu*_』
+  │🚪 \`99\` ☞『_*Logout*_』
+  │
+  └──────────────────────────────┘
+          ⚡ _*TUM*_ × _*CHAOS*_ ⚡`;
   
-  ╭──────────────────────╮
-  │ </> *CONNECTION_SECURED* │
-  ╰──────────────────────╯`;
     await message.reply(menu);
-  }
+}
 
 /**
  * Intercepts 'PRESENT' messages in DMs and logs attendance
