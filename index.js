@@ -349,20 +349,23 @@ function initializeChaosBot(options) {
         console.log('Waiting for group and private messages...\n');
         startDeadlineMonitor(client);
 
-        try {
-            const chats = await client.getChats();
-            for (const chat of chats) {
-                const chatId = chat.id._serialized;
-                if (chat.isGroup) {
-                    knownGroupChats.add(chatId);
-                } else if (chatId.isUser || chatId.endsWith('@c.us')) {
-                    knownPrivateChats.add(chatId);
+        // Delay chat preloading slightly so the store is fully initialized
+        setTimeout(async () => {
+            try {
+                const chats = await client.getChats();
+                for (const chat of chats) {
+                    const chatId = chat.id._serialized;
+                    if (chat.isGroup) {
+                        knownGroupChats.add(chatId);
+                    } else if (chat.isUser || chatId.endsWith('@c.us')) {
+                        knownPrivateChats.add(chatId);
+                    }
                 }
+                console.log(`[STATS] Synchronized ${knownGroupChats.size} groups and ${knownPrivateChats.size} private chats.`);
+            } catch (err) {
+                console.warn('[STATS] Could not preload chats on startup (will build dynamically):', err.message || err);
             }
-            console.log(`[STATS] Synchronized ${knownGroupChats.size} groups and ${knownPrivateChats.size} private chats.`);
-        } catch (err) {
-            console.warn('[STATS] Could not preload chats on startup:', err.message);
-        }
+        }, 10000);
     });
 
     client.on('authenticated', () => {
