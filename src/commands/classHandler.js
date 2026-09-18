@@ -310,7 +310,7 @@ async function handleInput(client, message, userId, text, userName) {
                 }
                 if (input === '1') {
                     updateSessionState(userId, 'REP_TIMETABLE_MENU', session.data);
-                    await message.reply(`📅 *TIMETABLE MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Current Timetable\n2. 🛠️ Run Timetable Wizard (Rebuild)\n\n0. 🔙 Back to Dashboard`);
+                    await message.reply(`📅 *TIMETABLE MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Current Timetable\n2. 🛠️ Run Timetable Wizard (Create new Timetable)\n3. Modify/Cancel Classes\n\n0. 🔙 Back to Dashboard`);
                 } else if (input === '2') {
                     updateSessionState(userId, 'REP_UPDATES_MENU', session.data);
                     await message.reply(`📢 *UPDATES MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n4. 🔔 Remind Update\n\n0. 🔙 Back to Dashboard`);
