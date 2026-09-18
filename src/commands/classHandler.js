@@ -2362,8 +2362,8 @@ async function sendRepDashboard(message, className) {
 │         \`REP COMMAND\`         
 │           \`[ ${className} ]\`         
 │                               
-│   👑 REP: ${repStatus}          
-│   👥 ACTIVE IN PORTAL: ${metrics.activeCount}           
+│   👑 CLASS REP STATUS: ${repStatus}          
+│   👥 STUDENTS 🟢 ONLINE: ${metrics.activeCount}           
 ╰──────────────────────────────╯
   
   ┌─── ░◈ _*CONTROL BOARD*_ ◈░ ───────┐
@@ -2417,35 +2417,33 @@ async function sendStudentGateway(message, className) {
   await message.reply(menu);
 }
 
-async function sendRepDashboard(message, className) {
+async function sendStudentDashboard(message, className, studentName) {
     const db = readClassDB();
     const classData = db.classes[className] || {};
     const metrics = getPortalMetrics(className, classData.repId);
-    
     const repStatus = metrics.repOnline ? '🟢 ONLINE' : '🔴 OFFLINE';
 
     const menu = `╭──────────────────────────────╮
 │        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
 │                               
-│         \`REP COMMAND\`         
+│           \`STUDENT HUB\`          
 │           \`[ ${className} ]\`         
 │                               
-│   👑 REP: ${repStatus}          
-│   👥 ACTIVE IN PORTAL: ${metrics.activeCount}           
+│   👤 USER: ${studentName}       
+│   👑 CLASS REP STATUS: ${repStatus}          
+│   👥 CLASSMATES 🟢 ONLINE: ${metrics.activeCount}       
 ╰──────────────────────────────╯
   
-  ┌─── ░◈ _*CONTROL BOARD*_ ◈░ ───────┐
+  ┌─── ░◈ _*PORTAL FEED*_ ◈░ ───────┐
   │
-  │📅 \`1\` ☞『_*Manage Timetable*_』
-  │📢 \`2\` ☞『_*Manage Updates*_』
-  │👥 \`3\` ☞『_*Class Members & Attendance*_』
-  │🚨 \`4\` ☞『_*Resolve Issues*_』
-  │📜 \`5\` ☞『_*View Audit Logs*_』
-  │✅ \`6\` ☞『_*Start Roll Call*_』
-  │🛑 \`7\` ☞『_*Close Roll Call*_』
-  │📚 \`8\` ☞『_*Manage Deadlines*_』
-  │🎲 \`9\` ☞『_*Syndicate Maker*_』
-  │🤫 \`10\` ☞『_*Whisper Inbox (Feedback)*_』
+  │📅 \`1\` ☞『_*View Today's Classes*_』
+  │🗓️ \`2\` ☞『_*View Full Timetable*_』
+  │⏳ \`3\` ☞『_*Upcoming Deadlines*_』
+  │📢 \`4\` ☞『_*View Updates*_』
+  │👥 \`5\` ☞『_*View Classmates*_』
+  │⏱️ \`6\` ☞『_*What's Next? (Chronos)*_』
+  │🤫 \`7\` ☞『_*Send Anonymous Whisper*_』
+  │✅ \`8\` ☞『_*Sign Attendance (Roll Call)*_』
   │🔙 \`0\` ☞『_*Main Menu*_』
   │🚪 \`99\` ☞『_*Logout*_』
   │
