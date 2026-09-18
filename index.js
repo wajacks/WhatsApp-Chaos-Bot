@@ -69,7 +69,7 @@ const { sendHymnPianoAudio } = require('./src/tools/hymnalAudio');
 const { logMessage, getChatHistory } = require('./src/database/chatlog');
 
 // CLASS PORTAL:
-const { resetClassDB, readClassDB } = require('./src/database/classdb');
+const { resetClassDB, readClassDB, writeClassDB } = require('./src/database/classdb');
 const { isUserInClassSession, endSession } = require('./src/tools/classSession');
 const classHandler = require('./src/commands/classHandler');
 const { handleAttendance } = require('./src/commands/classHandler');
