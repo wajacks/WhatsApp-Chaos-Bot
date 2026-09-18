@@ -1,5 +1,6 @@
 const { readClassDB, writeClassDB, classExists, isUserAlreadyRep } = require('../database/classdb');
 const { createSession, updateSessionState, getSession, endSession } = require('../tools/classSession');
+const { timeToMinutes, minutesToTime, checkCollision } = require('../tools/timeHelper');
 
 let lastApplicantUserId = null;
 
@@ -643,6 +644,15 @@ async function handleInput(client, message, userId, text, userName) {
                         `Type *NEXT* when you are done adding classes for the current day.\n` +
                         `Type *0* to abort wizard.`
                     );
+                } else if (input === '3') {
+                    //The Edit / Modify Timetable option
+                    updateSessionState(userId, 'REP_EDIT_SELECT_DAY', session.data);
+                    await message.reply(
+                        `✏️ *MODIFY TIMETABLE*\n━━━━━━━━━━━━━━━━━━\n` +
+                        `Which day do you want to edit?\n\n` +
+                        `1. Monday\n2. Tuesday\n3. Wednesday\n4. Thursday\n5. Friday\n6. Saturday\n7. Sunday\n\n` +
+                        `*Reply with a number (1-7):*\n(Type *0* to go back)`
+                    );
                 }
                 break;
             }
@@ -683,6 +693,234 @@ async function handleInput(client, message, userId, text, userName) {
                 writeClassDB(db);
 
                 await message.reply(`✅ Added *${unit}* at *${time}* on *${currentDayStr.toUpperCase()}*.\n\nEnter another class for ${currentDayStr.toUpperCase()}, or type *NEXT* to move to the next day.`);
+                break;
+            }
+
+            case 'REP_EDIT_SELECT_DAY': {
+                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                const dayIdx = parseInt(input) - 1;
+                
+                if (isNaN(dayIdx) || dayIdx < 0 || dayIdx > 6) {
+                    await message.reply(`❌ Invalid choice. Reply 1-7 for the day of the week, or 0 to go back.`);
+                    return;
+                }
+                
+                const selectedDay = days[dayIdx];
+                const db = readClassDB();
+                const daySchedule = db.classes[session.data.loggedInClass].timetable?.[selectedDay] || [];
+
+                if (daySchedule.length === 0) {
+                    await message.reply(`📭 No classes scheduled for ${selectedDay}. Reply 0 to go back.`);
+                    return;
+                }
+
+                let msg = `📅 *${selectedDay.toUpperCase()} CLASSES*\n\nWhich class do you want to modify?\n`;
+                daySchedule.forEach((cls, i) => {
+                    msg += `${i + 1}. *${cls.unit}* (${cls.startTime} - ${cls.endTime})\n`;
+                });
+                msg += `\n0. 🔙 Back`;
+
+                updateSessionState(userId, 'REP_EDIT_SELECT_CLASS', { ...session.data, editDay: selectedDay, daySchedule });
+                await message.reply(msg);
+                break;
+            }
+
+            // 2. SELECT CLASS & ACTION
+            case 'REP_EDIT_SELECT_CLASS': {
+                if (input === '0') { /* Route back to Dashboard */ return; }
+                
+                const classIdx = parseInt(input) - 1;
+                const targetClass = session.data.daySchedule[classIdx];
+
+                if (!targetClass) {
+                    await message.reply(`❌ Invalid selection.`);
+                    return;
+                }
+
+                updateSessionState(userId, 'REP_EDIT_ACTION', { ...session.data, targetClass, classIdx });
+                await message.reply(`🛠️ *MODIFYING: ${targetClass.unit}*\n\nWhat is happening to this class?\n1. 🛑 Cancelled / Bounced\n2. ⏳ Postponed / Moved to new time\n\n0. 🔙 Cancel`);
+                break;
+            }
+
+            // 3. HANDLE CANCEL OR POSTPONE ROUTING
+            case 'REP_EDIT_ACTION': {
+                if (input === '1') {
+                    // It's a cancellation
+                    updateSessionState(userId, 'REP_EDIT_SCOPE', { ...session.data, editType: 'CANCEL' });
+                    await message.reply(`🛑 *CANCELLING CLASS*\nIs this permanent, or just for this week?\n1. 🗓️ Temporary (Just this week)\n2. ⚠️ Permanent (Remove from timetable forever)`);
+                } else if (input === '2') {
+                    // It's a move - Ask for target day first (Cross-day support)
+                    updateSessionState(userId, 'REP_EDIT_NEW_DAY', { ...session.data, editType: 'MOVE' });
+                    await message.reply(`⏳ *MOVING CLASS*\nWhich day is it moving to?\n1. Mon  2. Tue  3. Wed  4. Thu  5. Fri  6. Sat  7. Sun`);
+                }
+                break;
+            }
+
+            // (Skipping intermediate MOVE input states for brevity: REP_EDIT_NEW_DAY -> REP_EDIT_NEW_TIME -> REP_EDIT_NEW_DURATION)
+
+            // 4. THE EXECUTION ENGINE (Applying the Math & DB Save)
+            case 'REP_EDIT_SCOPE': {
+                const isTemp = input === '1';
+                const db = readClassDB();
+                const classData = db.classes[session.data.loggedInClass];
+                const target = session.data.targetClass;
+                
+                if (!classData.exceptions) classData.exceptions = {};
+
+                // Get exactly today's date in EAT (Mombasa time) for Temporary tracking
+                const todayEAT = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Nairobi"}));
+                const dateKey = todayEAT.toISOString().split('T')[0]; 
+
+                if (session.data.editType === 'CANCEL') {
+                    if (isTemp) {
+                        if (!classData.exceptions[dateKey]) classData.exceptions[dateKey] = {};
+                        classData.exceptions[dateKey][target.unit] = { status: 'CANCELLED' };
+                        await message.reply(`✅ *TEMPORARY EXCEPTION ADDED*\n${target.unit} is cancelled for this week only. Alerts are disabled for today.`);
+                    } else {
+                        // Permanent: Delete from array
+                        classData.timetable[session.data.editDay].splice(session.data.classIdx, 1);
+                        await message.reply(`✅ *PERMANENT DELETION*\n${target.unit} has been permanently removed from ${session.data.editDay}.`);
+                    }
+                } 
+                // [Logic for MOVE goes here, utilizing the Phase 1 collision check before saving]
+
+                writeClassDB(db);
+                updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                break;
+            }
+
+            // --- THE POSTPONE / MOVE ENGINE ---
+
+            case 'REP_EDIT_NEW_DAY': {
+                const daysMap = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                const dayIdx = parseInt(input) - 1;
+                
+                if (isNaN(dayIdx) || dayIdx < 0 || dayIdx > 6) {
+                    await message.reply(`❌ Invalid choice. Reply 1-7 for the day of the week.`);
+                    return;
+                }
+                
+                updateSessionState(userId, 'REP_EDIT_NEW_TIME', { ...session.data, newDay: daysMap[dayIdx] });
+                await message.reply(`🕒 What is the *NEW Start Time* for this class?\n(e.g., 02:00 PM, 14:00)`);
+                break;
+            }
+
+            case 'REP_EDIT_NEW_TIME': {
+                const startMins = timeToMinutes(input);
+                if (startMins === null) {
+                    await message.reply(`❌ Invalid time format. Try again (e.g., 02:00 PM):`);
+                    return;
+                }
+                
+                updateSessionState(userId, 'REP_EDIT_NEW_DURATION', { ...session.data, newStartMins: startMins, newStartTimeStr: input });
+                await message.reply(`⏳ What is the *duration* in hours?\n(Reply with a number, e.g., 2 or 3)`);
+                break;
+            }
+
+            case 'REP_EDIT_NEW_DURATION': {
+                const duration = parseFloat(input);
+                if (isNaN(duration) || duration <= 0) {
+                    await message.reply(`❌ Invalid duration. Try again (e.g., 3):`);
+                    return;
+                }
+                
+                const newStartMins = session.data.newStartMins;
+                const newEndMins = newStartMins + (duration * 60);
+                const newDay = session.data.newDay;
+                const targetClass = session.data.targetClass;
+                
+                const db = readClassDB();
+                const daySchedule = db.classes[session.data.loggedInClass].timetable?.[newDay] || [];
+                
+                // 🛑 COLLISION CHECK 
+                // (If moving on the same day, ignore the original class to prevent it from colliding with itself)
+                const ignoreName = (newDay.toLowerCase() === session.data.editDay.toLowerCase()) ? targetClass.unit : null;
+                const collisionCheck = checkCollision(daySchedule, newStartMins, newEndMins, ignoreName);
+                
+                if (collisionCheck.collision) {
+                    const conflict = collisionCheck.conflict;
+                    await message.reply(`🚨 *SCHEDULE CONFLICT!*\n\nMoving to ${newDay.toUpperCase()} at ${minutesToTime(newStartMins)} overlaps with *${conflict.unit}* (${conflict.startTime} - ${conflict.endTime}).\n\nPlease enter a different start time:`);
+                    updateSessionState(userId, 'REP_EDIT_NEW_TIME', session.data); // Backtrack to time
+                    return;
+                }
+                
+                updateSessionState(userId, 'REP_EDIT_MOVE_SCOPE', { ...session.data, newEndMins, newDuration: duration });
+                await message.reply(`✅ *TIME AVAILABLE*\n\nIs this move permanent or just for this week?\n1. 🗓️ Temporary (Just this week)\n2. ⚠️ Permanent (Forever)`);
+                break;
+            }
+
+            case 'REP_EDIT_MOVE_SCOPE': {
+                const isTemp = input === '1';
+                const db = readClassDB();
+                const classData = db.classes[session.data.loggedInClass];
+                const target = session.data.targetClass;
+                const { editDay, classIdx, newDay, newStartMins, newEndMins, newDuration } = session.data;
+                
+                const newStartTimeStr = minutesToTime(newStartMins);
+                const newEndTimeStr = minutesToTime(newEndMins);
+
+                // Mombasa Base Date Math
+                const todayEAT = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Nairobi"}));
+                
+                if (isTemp) {
+                    if (!classData.exceptions) classData.exceptions = {};
+                    
+                    // 1. Cancel the original class for TODAY
+                    const dateKey = todayEAT.toISOString().split('T')[0]; 
+                    if (!classData.exceptions[dateKey]) classData.exceptions[dateKey] = {};
+                    classData.exceptions[dateKey][target.unit] = { status: 'CANCELLED' };
+
+                    // 2. Calculate the future date of the Make-up class
+                    const daysMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+                    const currentDayIdx = todayEAT.getDay(); 
+                    const targetDayIdx = daysMap.indexOf(newDay.toLowerCase());
+                    
+                    let daysAhead = targetDayIdx - currentDayIdx;
+                    if (daysAhead < 0) daysAhead += 7; // If target day passed, it means next week
+                    
+                    const targetDate = new Date(todayEAT);
+                    targetDate.setDate(todayEAT.getDate() + daysAhead); // JS handles month-wrapping automatically
+                    const targetDateKey = targetDate.toISOString().split('T')[0];
+
+                    // 3. Inject the "Ghost Class" into that future date
+                    if (!classData.exceptions[targetDateKey]) classData.exceptions[targetDateKey] = {};
+                    classData.exceptions[targetDateKey][target.unit + "_TEMP"] = {
+                        status: 'MOVED',
+                        unit: target.unit + ' (Makeup Class)',
+                        startTime: newStartTimeStr,
+                        endTime: newEndTimeStr,
+                        startMinutes: newStartMins,
+                        endMinutes: newEndMins
+                    };
+
+                    await message.reply(`✅ *TEMPORARY MOVE SAVED*\n\n${target.unit} is cancelled for today.\nA makeup class is scheduled for *${newDay.toUpperCase()}* (${targetDateKey}) at ${newStartTimeStr}.`);
+                } else {
+                    // PERMANENT MOVE
+                    const oldDayLower = editDay.toLowerCase();
+                    
+                    // 1. Delete from old day
+                    classData.timetable[oldDayLower].splice(classIdx, 1);
+                    
+                    // 2. Inject into new day
+                    if (!classData.timetable[newDay]) classData.timetable[newDay] = [];
+                    classData.timetable[newDay].push({
+                        unit: target.unit,
+                        startTime: newStartTimeStr,
+                        endTime: newEndTimeStr,
+                        startMinutes: newStartMins,
+                        endMinutes: newEndMins,
+                        duration: newDuration
+                    });
+                    
+                    // 3. Sort chronologically so morning classes are first
+                    classData.timetable[newDay].sort((a, b) => a.startMinutes - b.startMinutes);
+                    
+                    await message.reply(`✅ *PERMANENT MOVE SAVED*\n\n${target.unit} has been permanently moved to *${newDay.toUpperCase()}* at ${newStartTimeStr}.`);
+                }
+
+                writeClassDB(db);
+                updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                await sendRepDashboard(message, session.data.loggedInClass);
                 break;
             }
 

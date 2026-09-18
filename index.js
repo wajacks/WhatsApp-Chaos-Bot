@@ -193,10 +193,7 @@ function getOwnerMenu() {
         'Reset the entire economy.\n\n' +
 
         '🏫 *!owner classreset*\n' +
-        'Wipe and reset all class portals and student records.\n\n' +
-
-        '🎟️ *!owner genrep*\n' +
-        'Generate a one-time authorization code for a new Class Rep.\n\n' +
+        'Wipe and reset class portals and student records.\n\n' +
 
         '🔄 *!owner restart*\n' +
         'Restart Chaos Bot through PM2.\n\n' +
@@ -347,10 +344,25 @@ function initializeChaosBot(options) {
         qrcode.generate(qr, { small: true });
     });
 
-    client.on('ready', () => {
+    client.on('ready', async () => {
         console.log('\nCHAOS BOT by Chriss IS ONLINE!');
         console.log('Waiting for group and private messages...\n');
         startDeadlineMonitor(client);
+
+        try {
+            const chats = await client.getChats();
+            for (const chat of chats) {
+                const chatId = chat.id._serialized;
+                if (chat.isGroup) {
+                    knownGroupChats.add(chatId);
+                } else if (chatId.isUser || chatId.endsWith('@c.us')) {
+                    knownPrivateChats.add(chatId);
+                }
+            }
+            console.log(`[STATS] Synchronized ${knownGroupChats.size} groups and ${knownPrivateChats.size} private chats.`);
+        } catch (err) {
+            console.warn('[STATS] Could not preload chats on startup:', err.message);
+        }
     });
 
     client.on('authenticated', () => {
@@ -505,8 +517,17 @@ client.on('message', async message => {
         // ============================================================
         // 🎓 CLASS PORTAL INTERCEPT (SESSION LOCKOUT)
         // ============================================================
+        // ============================================================
+        // 🎓 CLASS PORTAL INTERCEPT (SESSION LOCKOUT)
+        // ============================================================
         if (isUserInClassSession(senderId)) {
             
+            // 🛡️ SECURITY: Prevent session bleed into public groups
+            if (isGroup) {
+                // If they are in a session but typing in a group, ignore or gently warn them
+                return; 
+            }
+
             // Universal Escape Hatch
             if (text === '99') {
                 endSession(senderId);
@@ -523,7 +544,7 @@ client.on('message', async message => {
                  return;
             }
 
-            // Route their input directly to the class state machine (Phase 2)
+            // Route their input directly to the class state machine
             await classHandler.handleInput(client, message, senderId, text, userName);
             
             return; // CRITICAL: Stop execution so they don't trigger regular commands
@@ -1580,63 +1601,73 @@ client.on('message', async message => {
             }
 
             // --------------------------------------------
-            // !owner classreset
+            // !owner classreset [classname]
             // --------------------------------------------
 
             if (ownerCommand === 'classreset') {
                 try {
-                    resetClassDB();
+                    const db = readClassDB();
+                    const targetClassArg = ownerArgs.slice(2).join(' ').trim();
+
+                    // 1. If no argument is given, list the available classes
+                    if (!targetClassArg) {
+                        const classes = Object.keys(db.classes || {});
+                        if (classes.length === 0) {
+                            await message.reply('⚠️ No classes currently exist in the database.');
+                            return;
+                        }
+
+                        let listMsg = '🏫 *CLASS RESET MANAGER*\n━━━━━━━━━━━━━━━━━━\nTo reset a specific class, type:\n`!owner classreset <ClassName>`\n\n*Available Classes:*\n';
+                        classes.forEach((cls, idx) => {
+                            listMsg += `${idx + 1}. \`${cls}\`\n`;
+                        });
+                        listMsg += `\n*(To wipe the entire database, type \`!owner classreset all\`)*`;
+                        await message.reply(listMsg);
+                        return;
+                    }
+
+                    // 2. Full database wipe option
+                    if (targetClassArg.toLowerCase() === 'all') {
+                        resetClassDB();
+                        await message.reply(
+                            '💥 *GLOBAL CLASS PORTAL RESET SUCCESSFUL!*\n\n' +
+                            'All classes, student profiles, and timetables have been completely wiped clean.\n\n' +
+                            '👑 *Executed by: Master Owner*'
+                        );
+                        return;
+                    }
+
+                    // 3. Specific class reset (case-insensitive search)
+                    const matchedClassKey = Object.keys(db.classes || {}).find(
+                        c => c.toLowerCase() === targetClassArg.toLowerCase()
+                    );
+
+                    if (!matchedClassKey) {
+                        await message.reply(`❌ Class *"${targetClassArg}"* not found.\n\nType \`!owner classreset\` to see the list of active classes.`);
+                        return;
+                    }
+
+                    // Delete only the matched class from the database object and save
+                    delete db.classes[matchedClassKey];
+                    writeClassDB(db);
 
                     await message.reply(
-                        '💥 *CLASS PORTAL RESET SUCCESSFUL!*\n\n' +
-                        'All classes, registered student profiles, timetables, and audit logs have been completely wiped clean.\n\n' +
-                        '👑 *Executed by: Master Owner*'
+                        `💥 *CLASS RESET SUCCESSFUL*\n\n` +
+                        `Class *${matchedClassKey}* and all its associated student records, logs, and timetables have been wiped.\n\n` +
+                        `👑 *Executed by: Master Owner*`
                     );
+
                 } catch (err) {
                     console.error('Owner class reset error:', err);
-
                     await message.reply(
                         '❌ *CLASS RESET FAILED*\n\n' +
-                        'An error occurred while wiping the class database.'
+                        'An error occurred while resetting the class.'
                     );
                 }
 
                 return;
             }
-
-            // --------------------------------------------
-            // !owner genrep (Generate Rep Auth Code)
-            // --------------------------------------------
-
-            if (ownerCommand === 'genrep') {
-                try {
-                    const { readClassDB, writeClassDB } = require('./src/database/classdb');
-                    const db = readClassDB();
-                    
-                    // Generate a 5-character alphanumeric code (excluding confusing characters like O, 0, I, 1)
-                    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; 
-                    let code = 'REP-';
-                    for (let i = 0; i < 5; i++) {
-                        code += chars.charAt(Math.floor(Math.random() * chars.length));
-                    }
-                    
-                    // Save to database
-                    if (!db.repCodes) db.repCodes = [];
-                    db.repCodes.push(code);
-                    writeClassDB(db);
-                    
-                    await message.reply(
-                        '✅ *REP AUTHORIZATION GENERATED*\n\n' +
-                        `🎟️ *Code:* \`${code}\`\n\n` +
-                        'Send this exact code to the approved Class Rep. They will be prompted for it when they select "Create a New Class" in the portal gateway.'
-                    );
-                } catch (err) {
-                    console.error('Owner genrep error:', err);
-                    await message.reply('❌ *GENERATION FAILED*\nCould not generate the rep code.');
-                }
-                return;
-            }
-
+            
             // --------------------------------------------
             // !owner stats
             // --------------------------------------------

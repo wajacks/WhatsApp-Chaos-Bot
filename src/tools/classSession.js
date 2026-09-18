@@ -171,11 +171,110 @@ function startDeadlineMonitor(client) {
     }, 300000); // 5 minutes
 }
 
+function startTimetableMonitor(client) {
+    console.log("[CLASS PORTAL] 🏫 Timetable & Auto-Roll Call Daemon Started...");
+    
+    // Runs every 60 seconds
+    setInterval(async () => {
+        const db = readClassDB();
+        
+        // Get precise Mombasa time
+        const nowEAT = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Nairobi"}));
+        const currentMinutes = (nowEAT.getHours() * 60) + nowEAT.getMinutes();
+        
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const todayStr = days[nowEAT.getDay()];
+        const todayDateKey = nowEAT.toISOString().split('T')[0];
+
+        for (const className in db.classes) {
+            const classData = db.classes[className];
+            const schedule = classData.timetable?.[todayStr] || [];
+            if (schedule.length === 0) continue;
+
+            for (let i = 0; i < schedule.length; i++) {
+                const cls = schedule[i];
+                
+                // Check if a temporary exception exists for this exact class today
+                const isCancelled = classData.exceptions?.[todayDateKey]?.[cls.unit]?.status === 'CANCELLED';
+                if (isCancelled) continue; // Skip all alerts
+
+                // 1. THE 2-HOUR WARNING (With Anti-Spam)
+                if (cls.startMinutes - currentMinutes === 120) {
+                    let shouldWarn = true;
+                    // Anti-Spam Check: Did a class just end?
+                    if (i > 0) {
+                        const prevClass = schedule[i - 1];
+                        const gap = cls.startMinutes - prevClass.endMinutes;
+                        if (gap < 120) shouldWarn = false; // Classes are back-to-back, skip spam
+                    }
+
+                    if (shouldWarn) {
+                        broadcastToClass(client, classData, `⏳ *UPCOMING CLASS*\n\n${cls.unit} begins in exactly 2 hours at ${cls.startTime}.`);
+                    }
+                }
+
+                // 2. THE START TRIGGER & AUTO-ROLL CALL
+                if (currentMinutes === cls.startMinutes) {
+                    const msg = `🟢 *CLASS IS STARTING*\n\n🏫 *Unit:* ${cls.unit}\n⏰ *Time:* ${cls.startTime} - ${cls.endTime}\n\n_The attendance register is now open. Type !class to sign in._`;
+                    broadcastToClass(client, classData, msg);
+                    
+                    // Auto-open the database roll call flag
+                    classData.activeRollCall = cls.unit;
+                    writeClassDB(db);
+                }
+
+                // 3. THE END TRIGGER & ROLL CALL CLOSURE
+                if (currentMinutes === cls.endMinutes) {
+                    broadcastToClass(client, classData, `🛑 *CLASS ENDED*\n\n${cls.unit} has officially concluded. The attendance register is now closed.`);
+                    
+                    // Auto-close roll call
+                    delete classData.activeRollCall;
+                    writeClassDB(db);
+                }
+            }
+        }
+
+        // Process any Temporary Makeup Classes scheduled for today
+        const todaysExceptions = classData.exceptions?.[todayDateKey] || {};
+        for (const key in todaysExceptions) {
+            const makeupClass = todaysExceptions[key];
+            if (makeupClass.status === 'MOVED') {
+                // Start Trigger
+                if (currentMinutes === makeupClass.startMinutes) {
+                    broadcastToClass(client, classData, `🟢 *MAKEUP CLASS STARTING*\n\n🏫 *Unit:* ${makeupClass.unit}\n⏰ *Time:* ${makeupClass.startTime} - ${makeupClass.endTime}\n\n_The attendance register is now open. Type !class to sign in._`);
+                    classData.activeRollCall = makeupClass.unit;
+                    writeClassDB(db);
+                }
+                // End Trigger
+                if (currentMinutes === makeupClass.endMinutes) {
+                    broadcastToClass(client, classData, `🛑 *MAKEUP CLASS ENDED*\n\n${makeupClass.unit} has officially concluded.`);
+                    delete classData.activeRollCall;
+                    writeClassDB(db);
+                }
+            }
+        }
+
+    }, 60000); 
+}
+
+// Helper to blast all students
+async function broadcastToClass(client, classData, messageText) {
+    const members = classData.members || {};
+    for (const mId in members) {
+        try {
+            await client.sendMessage(members[mId].phoneId, messageText);
+        } catch (e) {
+            console.warn(`Failed to broadcast to ${members[mId].name}`);
+        }
+    }
+}
+
 module.exports = {
     createSession,
     updateSessionState,
     getSession,
     endSession,
     isUserInClassSession,
-    startDeadlineMonitor
+    startDeadlineMonitor,
+    startTimetableMonitor
 };
