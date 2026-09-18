@@ -502,17 +502,9 @@ client.on('message', async message => {
         // ============================================================
         // 🎓 CLASS PORTAL INTERCEPT (SESSION LOCKOUT)
         // ============================================================
-        // ============================================================
-        // 🎓 CLASS PORTAL INTERCEPT (SESSION LOCKOUT)
-        // ============================================================
-        if (isUserInClassSession(senderId)) {
+        // Sessions are strictly confined to DMs. Group chats remain 100% independent!
+        if (!isGroup && isUserInClassSession(senderId)) {
             
-            // 🛡️ SECURITY: Prevent session bleed into public groups
-            if (isGroup) {
-                // If they are in a session but typing in a group, ignore or gently warn them
-                return; 
-            }
-
             // Universal Escape Hatch
             if (text === '99') {
                 endSession(senderId);
@@ -520,19 +512,16 @@ client.on('message', async message => {
                 return;
             }
 
-            // Block global bot commands while logged in
+            // AUTO-EXIT ON GLOBAL COMMANDS IN DM: If you type a command starting with '!' 
+            // while in your portal session, automatically exit the session and run the command.
             if (text.startsWith('!')) {
-                 await message.reply(
-                     '⚠️ You are currently in the Class Portal.\n\n' +
-                     'Type *99* to logout before using normal bot commands.'
-                 );
-                 return;
+                endSession(senderId);
+                // Falls through smoothly to execute your command
+            } else {
+                // Route your standard portal menu input directly to the class state machine
+                await classHandler.handleInput(client, message, senderId, text, userName);
+                return; // CRITICAL: Stop execution for regular portal inputs
             }
-
-            // Route their input directly to the class state machine
-            await classHandler.handleInput(client, message, senderId, text, userName);
-            
-            return; // CRITICAL: Stop execution so they don't trigger regular commands
         }
 
         // ====================================================
@@ -1393,8 +1382,29 @@ client.on('message', async message => {
         // ====================================================
         // CLASS PORTAL
         // ====================================================
+        // ====================================================
+        // CLASS PORTAL (DM REDIRECTION FOR SECURITY)
+        // ====================================================
         if (lowerText === '!class' || lowerText === '!classes') {
-            await classHandler.handleClassCommand(client, message, senderId, userName);
+            if (isGroup) {
+                // 1. Gently notify the group without cluttering it
+                await message.reply('🏫 *Class Portal*\n\nFor privacy, security, and password protection, the Class Portal runs exclusively in **Private DMs**. \n\n📩 *I have sent the gateway to your inbox!*');
+                
+                try {
+                    // 2. Automatically open the session and send the menu directly to their DM inbox
+                    createSession(senderId, 'MAIN_MENU');
+                    // We simulate a message object so sendMainMenu works in their DM
+                    const dmMockMessage = {
+                        reply: async (text) => await client.sendMessage(senderId, text)
+                    };
+                    await sendMainMenu(dmMockMessage); // Or call handleClassCommand equivalent for DM
+                } catch (e) {
+                    await message.reply('❌ Please open a direct chat with me privately to use the Class Portal.');
+                }
+            } else {
+                // If already in DM, run normally
+                await classHandler.handleClassCommand(client, message, senderId, userName);
+            }
             return;
         }
         
@@ -2558,7 +2568,7 @@ client.on('message', async message => {
                         // Send the random animated video with gifPlayback enabled
                         await client.sendMessage(chatId, media, { 
                             caption: getBotMenu(),
-                            gifPlayback: true 
+                            gifPlayback: false 
                         });
                         sentMedia = true;
                     }
