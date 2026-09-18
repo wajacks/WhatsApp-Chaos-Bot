@@ -1,5 +1,5 @@
 const { readClassDB, writeClassDB, classExists, isUserAlreadyRep } = require('../database/classdb');
-const { createSession, updateSessionState, getSession, endSession , getPortalMetricS} = require('../tools/classSession');
+const { createSession, updateSessionState, getSession, endSession , getPortalMetrics} = require('../tools/classSession');
 const { timeToMinutes, minutesToTime, checkCollision } = require('../tools/timeHelper');
 
 let lastApplicantUserId = null;
