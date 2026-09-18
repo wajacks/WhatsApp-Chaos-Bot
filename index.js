@@ -348,24 +348,6 @@ function initializeChaosBot(options) {
         console.log('\nCHAOS BOT by Chriss IS ONLINE!');
         console.log('Waiting for group and private messages...\n');
         startDeadlineMonitor(client);
-
-        // Delay chat preloading slightly so the store is fully initialized
-        setTimeout(async () => {
-            try {
-                const chats = await client.getChats();
-                for (const chat of chats) {
-                    const chatId = chat.id._serialized;
-                    if (chat.isGroup) {
-                        knownGroupChats.add(chatId);
-                    } else if (chat.isUser || chatId.endsWith('@c.us')) {
-                        knownPrivateChats.add(chatId);
-                    }
-                }
-                console.log(`[STATS] Synchronized ${knownGroupChats.size} groups and ${knownPrivateChats.size} private chats.`);
-            } catch (err) {
-                console.warn('[STATS] Could not preload chats on startup (will build dynamically):', err.message || err);
-            }
-        }, 10000);
     });
 
     client.on('authenticated', () => {
@@ -2557,22 +2539,48 @@ client.on('message', async message => {
             lowerText === 'menu'
         ) {
             try {
-                const media = MessageMedia.fromFilePath(path.join(__dirname, 'src/assets/menu.gif'));
+                // 🎛️ TEMPORARY TOGGLE: Flip to true once whatsapp-web.js fixes voice notes
+                const ENABLE_MENU_AUDIO = false;
+                
+                const assetsDir = path.join(__dirname, 'src/assets/gifs');
+                let sentMedia = false;
 
-                // Single call with gifPlayback enabled
-                await client.sendMessage(chatId, media, { 
-                    caption: getBotMenu(),
-                    gifPlayback: true 
-                });
+                if (fs.existsSync(assetsDir)) {
+                    const files = fs.readdirSync(assetsDir);
+                    // Filter for all MP4 menu videos in the assets folder
+                    const menuVideos = files.filter(file => file.toLowerCase().endsWith('.mp4'));
 
-                const assetsDir = path.join(__dirname, 'src/assets');
-                const files = fs.readdirSync(assetsDir);
-                const songs = files.filter(file => file.toLowerCase().endsWith('.ogg'));
+                    if (menuVideos.length > 0) {
+                        // Pick a random MP4 from the pool
+                        const randomVideo = menuVideos[Math.floor(Math.random() * menuVideos.length)];
+                        const media = MessageMedia.fromFilePath(path.join(assetsDir, randomVideo));
 
-                if (songs.length > 0) {
-                    const randomSong = songs[Math.floor(Math.random() * songs.length)];
-                    const audioMedia = MessageMedia.fromFilePath(path.join(assetsDir, randomSong));
-                    await client.sendMessage(chatId, audioMedia, { sendAudioAsVoice: true });
+                        // Send the random animated video with gifPlayback enabled
+                        await client.sendMessage(chatId, media, { 
+                            caption: getBotMenu(),
+                            gifPlayback: true 
+                        });
+                        sentMedia = true;
+                    }
+                }
+
+                // Fallback to text if no MP4 videos exist in assets
+                if (!sentMedia) {
+                    await message.reply(getBotMenu());
+                }
+
+                // Audio block is safely bypassed while toggle is false
+                if (ENABLE_MENU_AUDIO) {
+                    if (fs.existsSync(assetsDir)) {
+                        const files = fs.readdirSync(assetsDir);
+                        const songs = files.filter(file => file.toLowerCase().endsWith('.ogg'));
+
+                        if (songs.length > 0) {
+                            const randomSong = songs[Math.floor(Math.random() * songs.length)];
+                            const audioMedia = MessageMedia.fromFilePath(path.join(assetsDir, randomSong));
+                            await client.sendMessage(chatId, audioMedia, { sendAudioAsVoice: true });
+                        }
+                    }
                 }
             } catch (err) {
                 console.warn('Could not load menu assets:', err);
