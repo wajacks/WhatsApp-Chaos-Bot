@@ -2,6 +2,27 @@ const { readClassDB, writeClassDB, classExists, isUserAlreadyRep } = require('..
 const { createSession, updateSessionState, getSession, endSession , getPortalMetrics} = require('../tools/classSession');
 const { timeToMinutes, minutesToTime, checkCollision } = require('../tools/timeHelper');
 
+// --- NEW: MARKETPLACE LIVE CHAT REGISTRY ---
+const activeMarketChats = new Map();
+
+// Helper to count unread market notifications
+function getMarketNotifs(className, userId) {
+    const db = readClassDB();
+    const market = db.classes[className]?.marketplace || [];
+    let count = 0;
+    market.forEach(item => {
+        // Count pending bids for sellers
+        if (item.sellerId === userId && item.status === 'ACTIVE') {
+            item.bids.forEach(b => { if (b.status === 'PENDING') count++; });
+        }
+        // Count unread rejections/acceptances for buyers
+        item.bids.forEach(b => {
+            if (b.buyerId === userId && !b.readByBuyer && (b.status === 'REJECTED' || b.status === 'ACCEPTED')) count++;
+        });
+    });
+    return count;
+}
+
 let lastApplicantUserId = null;
 
 // Entry point triggered by !class
@@ -54,6 +75,37 @@ async function handleInput(client, message, userId, text, userName) {
     if (!session) return;
 
     const input = text.trim();
+
+    // ========================================================
+    // 🛒 MARKETPLACE LIVE NEGOTIATION INTERCEPTOR
+    // ========================================================
+    if (activeMarketChats.has(userId)) {
+        const chatData = activeMarketChats.get(userId);
+        
+        // Check for exit commands
+        if (input === '0' || input.toLowerCase() === 'done' || input.toLowerCase() === 'done negotiating?') {
+            activeMarketChats.delete(userId);
+            activeMarketChats.delete(chatData.targetId);
+            
+            await client.sendMessage(userId, `🛑 *Negotiation Ended.*\nYou have left the live chat. Sending you back to the Market...`);
+            await client.sendMessage(chatData.targetId, `🛑 *The other party ended the negotiation.*`);
+            
+            // Route them both back to the Market Home safely
+            updateSessionState(userId, 'MARKET_HOME', session.data);
+            const targetSession = getSession(chatData.targetId);
+            if (targetSession) updateSessionState(chatData.targetId, 'MARKET_HOME', targetSession.data);
+            return;
+        }
+
+        // Route the message anonymously to the partner
+        try {
+            await client.sendMessage(chatData.targetId, `💬 *${chatData.alias}:* ${input}\n\n_(Type *0* to stop negotiating)_`);
+        } catch (e) {
+            console.warn("[MARKET] Failed to route live message.");
+        }
+        return; // STOP EXECUTION! Do not process portal menus.
+    }
+    // ========================================================
 
     try {
         const db = readClassDB();
@@ -410,7 +462,13 @@ async function handleInput(client, message, userId, text, userName) {
                 } else if (input === '10') {
                     updateSessionState(userId, 'REP_WHISPER_MENU', session.data);
                     await message.reply(`🤫 *WHISPER INBOX*\n━━━━━━━━━━━━━━━━━━\n1. 📥 View Unread Whispers\n2. ✍️ Reply to a Whisper\n3. 🗑️ Clear Inbox\n\n0. 🔙 Back to Dashboard`);
-                } else {
+                } else if (input === '11') {
+                    // Enter Hustle Board
+                    if (!sDb.marketplace) { sDb.marketplace = []; writeClassDB(db); }
+                    updateSessionState(userId, 'MARKET_HOME', session.data);
+                    const notifs = getMarketNotifs(sClass, userId);
+                    await message.reply(`🛒 *THE HUSTLE BOARD*\n━━━━━━━━━━━━━━━━━━\n1. 🛍️ Buy (Browse Items)\n2. 🏷️ Sell / Barter an Item\n3. 🔔 Notifications (${notifs})\n4. 📦 My Listings\n\n0. 🔙 Back to Dashboard`);
+                 } else {
                     await message.reply(`❌ Invalid choice. Type 1-9, 0 to go back, or 99 to exit.`);
                 }
                 break;
@@ -1460,7 +1518,273 @@ async function handleInput(client, message, userId, text, userName) {
             updateSessionState(userId, 'REP_ISSUES_MENU', session.data);
             await message.reply(`✅ *${targetIssue.name}* has been unlocked.\n\n🔒 *CRITICAL:* Please give them this One-Time Reset Code: *${otpCode}*\n\nThey must enter this code to regain access to their account.\n\n0. 🔙 Back`);
             break;
-        }
+            }
+
+            // ==========================================
+            // PHASE 9: THE HUSTLE BOARD (MARKETPLACE)
+            // ==========================================
+            case 'MARKET_HOME': {
+                if (input === '0') {
+                    // Send back to respective dashboard
+                    const isRep = session.data.isMainRep !== undefined;
+                    updateSessionState(userId, isRep ? 'REP_DASHBOARD' : 'STUDENT_DASHBOARD', session.data);
+                    if (isRep) await sendRepDashboard(message, session.data.loggedInClass);
+                    else await sendStudentDashboard(message, session.data.loggedInClass, session.data.studentName || db.classes[session.data.loggedInClass].repName);
+                    return;
+                }
+                const mDb = db.classes[session.data.loggedInClass];
+                
+                if (input === '1') { // BROWSE
+                    if (mDb.marketplace.length === 0) {
+                        await message.reply(`📭 The market is currently empty.\n\n(Type *0* to go back)`);
+                        return;
+                    }
+                    let mStr = `🛍️ *ACTIVE LISTINGS*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    mDb.marketplace.forEach((item, i) => {
+                        const statusTag = item.status === 'SOLD' ? '🔴 [SOLD]' : '🟢 [ACTIVE]';
+                        mStr += `${i + 1}. ${statusTag} *${item.itemName}*\n   ${item.type === 'CASH' ? '💰 Price:' : '🔄 Wants:'} ${item.price}\n\n`;
+                    });
+                    mStr += `*Reply with the number to view or make an offer:*\n(Type *0* to go back)`;
+                    updateSessionState(userId, 'MARKET_BROWSE', session.data);
+                    await message.reply(mStr);
+                
+                } else if (input === '2') { // SELL
+                    updateSessionState(userId, 'MARKET_SELL_TYPE', session.data);
+                    await message.reply(`🏷️ *CREATE LISTING*\n\nHow do you want to trade this item?\n1. 💰 Sell for Cash\n2. 🔄 Barter (Trade for something else)\n\n(Type *0* to cancel)`);
+                
+                } else if (input === '3') { // NOTIFICATIONS
+                    let notifStr = `🔔 *YOUR NOTIFICATIONS*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    let hasNotifs = false;
+                    const pendingBids = [];
+
+                    mDb.marketplace.forEach((item, itemIdx) => {
+                        // 1. Check for bids on MY items
+                        if (item.sellerId === userId && item.status === 'ACTIVE') {
+                            item.bids.forEach((bid, bidIdx) => {
+                                if (bid.status === 'PENDING') {
+                                    pendingBids.push({ itemIdx, bidIdx, item, bid });
+                                    hasNotifs = true;
+                                    notifStr += `[NEW OFFER] On your *${item.itemName}*\nAnonymous Buyer offers: ${bid.offer}\n\n`;
+                                }
+                            });
+                        }
+                        // 2. Check for replies to MY bids
+                        item.bids.forEach((bid, bidIdx) => {
+                            if (bid.buyerId === userId && !bid.readByBuyer) {
+                                if (bid.status === 'REJECTED') {
+                                    notifStr += `[REJECTED] Your offer of ${bid.offer} on *${item.itemName}* was rejected.\nReason: "${bid.rejectReason}"\n\n`;
+                                    hasNotifs = true;
+                                    mDb.marketplace[itemIdx].bids[bidIdx].readByBuyer = true; // Mark as read
+                                } else if (bid.status === 'ACCEPTED') {
+                                    notifStr += `[ACCEPTED!] Your offer on *${item.itemName}* won!\nThe Seller will DM you shortly.\n\n`;
+                                    hasNotifs = true;
+                                    mDb.marketplace[itemIdx].bids[bidIdx].readByBuyer = true; // Mark as read
+                                }
+                            }
+                        });
+                    });
+
+                    writeClassDB(db); // Save the read statuses
+
+                    if (!hasNotifs) {
+                        await message.reply(`📭 You have no new notifications.\n\n(Type *0* to go back)`);
+                        return;
+                    }
+
+                    if (pendingBids.length > 0) {
+                        notifStr += `━━━━━━━━━━━━━━━━━━\n*You have pending offers to review.*\nReply with *1* to start reviewing them, or *0* to go back.`;
+                        updateSessionState(userId, 'MARKET_REVIEW_START', { ...session.data, pendingBids });
+                    } else {
+                        notifStr += `(Type *0* to go back)`;
+                    }
+                    await message.reply(notifStr);
+                
+                } else if (input === '4') { // MY LISTINGS
+                    let myItems = mDb.marketplace.filter(i => i.sellerId === userId);
+                    if (myItems.length === 0) {
+                        await message.reply(`📦 You haven't listed anything yet.\n\n(Type *0* to go back)`);
+                        return;
+                    }
+                    let mStr = `📦 *MY LISTINGS*\n━━━━━━━━━━━━━━━━━━\n`;
+                    myItems.forEach((item, i) => {
+                        mStr += `${i + 1}. [${item.status}] ${item.itemName}\n`;
+                    });
+                    await message.reply(mStr + `\n(Type *0* to go back)`);
+                }
+                break;
+            }
+
+            // --- BUY FLOW ---
+            case 'MARKET_BROWSE': {
+                if (input === '0') { updateSessionState(userId, 'MARKET_HOME', session.data); await message.reply("Returning to Hustle Board..."); return; }
+                const mDb = db.classes[session.data.loggedInClass].marketplace;
+                const idx = parseInt(input) - 1;
+                if (isNaN(idx) || idx < 0 || idx >= mDb.length) { await message.reply("❌ Invalid choice."); return; }
+                
+                const item = mDb[idx];
+                if (item.sellerId === userId) {
+                    await message.reply(`⚠️ This is your own listing.\n\n(Type *0* to go back)`); return;
+                }
+
+                updateSessionState(userId, 'MARKET_MAKE_OFFER', { ...session.data, itemIdx: idx });
+                
+                let viewStr = `📦 *ITEM DETAILS*\n━━━━━━━━━━━━━━━━━━\n🏷️ Item: ${item.itemName}\n🔖 Type: ${item.type}\n${item.type === 'CASH' ? '💰 Price' : '🔄 Wants'}: ${item.price}\n🛑 Status: ${item.status}\n\n`;
+                
+                if (item.status === 'SOLD') {
+                    await message.reply(viewStr + `⚠️ This item is already sold.\n\n(Type *0* to go back)`);
+                } else {
+                    viewStr += `1. 💸 Make an Anonymous Offer\n0. 🔙 Cancel`;
+                    await message.reply(viewStr);
+                }
+                break;
+            }
+
+            case 'MARKET_MAKE_OFFER': {
+                if (input === '0') { updateSessionState(userId, 'MARKET_HOME', session.data); await message.reply("Cancelled."); return; }
+                if (input === '1') {
+                    updateSessionState(userId, 'MARKET_SUBMIT_OFFER', session.data);
+                    await message.reply(`🤫 *ANONYMOUS OFFER*\n\nType your offer below (either a Cash Amount or an Item to Trade).\nYour identity will remain completely hidden from the seller.\n\n(Type *0* to cancel)`);
+                }
+                break;
+            }
+
+            case 'MARKET_SUBMIT_OFFER': {
+                if (input === '0') { updateSessionState(userId, 'MARKET_HOME', session.data); await message.reply("Cancelled."); return; }
+                
+                const mDb = db.classes[session.data.loggedInClass].marketplace;
+                const item = mDb[session.data.itemIdx];
+                const alias = 'Buyer-' + Math.random().toString(36).substring(2, 5).toUpperCase();
+                
+                item.bids.push({
+                    buyerId: userId,
+                    alias: alias,
+                    offer: input,
+                    status: 'PENDING',
+                    readByBuyer: false
+                });
+                writeClassDB(db);
+
+                // Alert the Seller
+                try {
+                    await client.sendMessage(item.sellerId, `🔔 *MARKET ALERT*\nYou have a new anonymous offer on your *${item.itemName}*!\n\nHead to the Class Portal -> Hustle Board -> Notifications to view it.`);
+                } catch (e) {}
+
+                updateSessionState(userId, 'MARKET_HOME', session.data);
+                await message.reply(`✅ *OFFER SENT ANONYMOUSLY*\n\nThe seller has been notified. You will receive an alert when they respond.\n\nReturning to Hustle Board...`);
+                break;
+            }
+
+            // --- SELL FLOW ---
+            case 'MARKET_SELL_TYPE': {
+                if (input === '0') { updateSessionState(userId, 'MARKET_HOME', session.data); await message.reply("Cancelled."); return; }
+                const type = input === '1' ? 'CASH' : 'BARTER';
+                updateSessionState(userId, 'MARKET_SELL_NAME', { ...session.data, sellType: type });
+                await message.reply(`🏷️ What is the Name of the item?\n(e.g., Used HP Laptop, Networking Notes)`);
+                break;
+            }
+
+            case 'MARKET_SELL_NAME': {
+                updateSessionState(userId, 'MARKET_SELL_PRICE', { ...session.data, sellName: input });
+                const prompt = session.data.sellType === 'CASH' ? '💰 What is your asking price? (e.g., 15000 Ksh)' : '🔄 What are you looking to get in exchange? (e.g., Help with a Java Project)';
+                await message.reply(prompt);
+                break;
+            }
+
+            case 'MARKET_SELL_PRICE': {
+                const mDb = db.classes[session.data.loggedInClass];
+                mDb.marketplace.push({
+                    id: 'mkt_' + Date.now(),
+                    sellerId: userId,
+                    type: session.data.sellType,
+                    itemName: session.data.sellName,
+                    price: input,
+                    status: 'ACTIVE',
+                    bids: []
+                });
+                writeClassDB(db);
+                
+                updateSessionState(userId, 'MARKET_HOME', session.data);
+                await message.reply(`🎉 *LISTING CREATED*\n\nYour item is now live on the Hustle Board! You will receive DMs when anonymous offers arrive.`);
+                break;
+            }
+
+            // --- REVIEW BIDS & LIVE CHAT FLOW ---
+            case 'MARKET_REVIEW_START': {
+                if (input === '0') { updateSessionState(userId, 'MARKET_HOME', session.data); await message.reply("Returning to Market..."); return; }
+                if (input === '1') {
+                    // Pull the first pending bid
+                    const target = session.data.pendingBids[0];
+                    updateSessionState(userId, 'MARKET_PROCESS_BID', { ...session.data, target });
+                    
+                    await message.reply(`📝 *REVIEWING OFFER*\n━━━━━━━━━━━━━━━━━━\n📦 Item: ${target.item.itemName}\n👤 From: ${target.bid.alias}\n💵 Offer: ${target.bid.offer}\n\n1. ✅ Accept Offer\n2. ❌ Reject Offer\n3. 💬 Open Live Negotiation\n\n0. 🔙 Decide Later`);
+                }
+                break;
+            }
+
+            case 'MARKET_PROCESS_BID': {
+                if (input === '0') { updateSessionState(userId, 'MARKET_HOME', session.data); await message.reply("Saved for later."); return; }
+                const { itemIdx, bidIdx } = session.data.target;
+                const mDb = db.classes[session.data.loggedInClass].marketplace;
+                const theBid = mDb[itemIdx].bids[bidIdx];
+
+                if (input === '1') { // ACCEPT
+                    theBid.status = 'ACCEPTED';
+                    mDb[itemIdx].status = 'SOLD';
+                    
+                    // Reject all other pending bids
+                    mDb[itemIdx].bids.forEach(b => {
+                        if (b.status === 'PENDING') {
+                            b.status = 'REJECTED';
+                            b.rejectReason = 'Item sold to another buyer.';
+                        }
+                    });
+                    writeClassDB(db);
+
+                    // Reveal to both parties
+                    const sellerWa = `wa.me/${userId.split('@')[0]}`;
+                    const buyerWa = `wa.me/${theBid.buyerId.split('@')[0]}`;
+                    
+                    try { await client.sendMessage(theBid.buyerId, `🎉 *OFFER ACCEPTED!* 🎉\nThe seller accepted your offer on *${mDb[itemIdx].itemName}*!\n\nMessage them here to finalize: ${sellerWa}`); } catch(e){}
+                    
+                    updateSessionState(userId, 'MARKET_HOME', session.data);
+                    await message.reply(`✅ *DEAL CLOSED*\n\nYou accepted the offer! The item is marked SOLD.\nHere is the buyer's contact info to organize exchange: ${buyerWa}`);
+
+                } else if (input === '2') { // REJECT
+                    updateSessionState(userId, 'MARKET_REJECT_REASON', session.data);
+                    await message.reply(`❌ *REJECTING OFFER*\n\nPlease type a brief reason for the rejection (e.g., "Too low, looking for at least 10k"):\n(Type *0* to cancel)`);
+                
+                } else if (input === '3') { // NEGOTIATE (THE LIVE CHAT INITIATOR)
+                    // Lock both users into the active chat registry
+                    activeMarketChats.set(userId, { targetId: theBid.buyerId, alias: 'Seller' });
+                    activeMarketChats.set(theBid.buyerId, { targetId: userId, alias: theBid.alias });
+                    
+                    try {
+                        await client.sendMessage(theBid.buyerId, `💬 *MARKET INTERCOM*\nThe Seller of *${mDb[itemIdx].itemName}* wants to negotiate your offer of ${theBid.offer}.\n\n*You are now in a LIVE, ANONYMOUS CHAT with them.*\nEverything you type will be sent to the seller.\n\n_(Type *0* at any time to end the chat)_`);
+                    } catch(e) {}
+                    
+                    // We don't change session state because the interceptor blocks the menu anyway
+                    await message.reply(`🟢 *LIVE CHAT SECURED*\n\nYou are now anonymously connected to ${theBid.alias}. Everything you type will be sent directly to them.\n\n_(Type *0* at any time to close the connection)_`);
+                }
+                break;
+            }
+
+            case 'MARKET_REJECT_REASON': {
+                if (input === '0') { updateSessionState(userId, 'MARKET_HOME', session.data); await message.reply("Cancelled."); return; }
+                const { itemIdx, bidIdx } = session.data.target;
+                const mDb = db.classes[session.data.loggedInClass].marketplace;
+                
+                mDb[itemIdx].bids[bidIdx].status = 'REJECTED';
+                mDb[itemIdx].bids[bidIdx].rejectReason = input;
+                writeClassDB(db);
+
+                try {
+                    await client.sendMessage(mDb[itemIdx].bids[bidIdx].buyerId, `🔔 *MARKET UPDATE*\nYour offer on *${mDb[itemIdx].itemName}* was updated. Check your portal notifications.`);
+                } catch(e) {}
+
+                updateSessionState(userId, 'MARKET_HOME', session.data);
+                await message.reply(`✅ Rejection sent to the buyer.\n\nReturning to Market...`);
+                break;
+            }
             
             // ==========================================
             // PHASE 6: CAT & ASSIGNMENT TRACKER
@@ -2309,8 +2633,14 @@ async function handleInput(client, message, userId, text, userName) {
                     writeClassDB(db);
 
                     await message.reply(`✅ *ATTENDANCE LOGGED*\nYour presence has been recorded in the Ghost Tracker.\n\n(Type *0* to go back)`);
-                } else {
-                    await message.reply(`❌ Invalid choice. Type 1-8, 0 to go back, or 99 to exit.`);
+                } else if (input === '9') {
+                    // Enter Hustle Board
+                    if (!sDb.marketplace) { sDb.marketplace = []; writeClassDB(db); }
+                    updateSessionState(userId, 'MARKET_HOME', session.data);
+                    const notifs = getMarketNotifs(sClass, userId);
+                    await message.reply(`🛒 *THE HUSTLE BOARD*\n━━━━━━━━━━━━━━━━━━\n1. 🛍️ Buy (Browse Items)\n2. 🏷️ Sell / Barter an Item\n3. 🔔 Notifications (${notifs})\n4. 📦 My Listings\n\n0. 🔙 Back to Dashboard`);
+                 } else {
+                    await message.reply(`❌ Invalid choice. Type 1-9, 0 to go back, or 99 to exit.`);
                 }
                 break;
             }
@@ -2378,6 +2708,7 @@ async function sendRepDashboard(message, className) {
   │📚 \`8\` ☞『_*Manage Deadlines*_』
   │🎲 \`9\` ☞『_*Syndicate Maker*_』
   │🤫 \`10\` ☞『_*Whisper Inbox (Feedback)*_』
+  │🛒 \`11\` ☞『_*Hustle Board (Market)*_』
   │🔙 \`0\` ☞『_*Main Menu*_』
   │🚪 \`99\` ☞『_*Logout*_』
   │
@@ -2444,6 +2775,7 @@ async function sendStudentDashboard(message, className, studentName) {
   │⏱️ \`6\` ☞『_*What's Next? (Chronos)*_』
   │🤫 \`7\` ☞『_*Send Anonymous Whisper*_』
   │✅ \`8\` ☞『_*Sign Attendance (Roll Call)*_』
+  │🛒 \`9\` ☞『_*Hustle Board (Market)*_』
   │🔙 \`0\` ☞『_*Main Menu*_』
   │🚪 \`99\` ☞『_*Logout*_』
   │
