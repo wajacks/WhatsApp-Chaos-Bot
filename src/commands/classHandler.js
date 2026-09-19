@@ -468,6 +468,13 @@ async function handleInput(client, message, userId, text, userName) {
                     updateSessionState(userId, 'MARKET_HOME', session.data);
                     const notifs = getMarketNotifs(sClass, userId);
                     await message.reply(`🛒 *THE HUSTLE BOARD*\n━━━━━━━━━━━━━━━━━━\n1. 🛍️ Buy (Browse Items)\n2. 🏷️ Sell / Barter an Item\n3. 🔔 Notifications (${notifs})\n4. 📦 My Listings\n\n0. 🔙 Back to Dashboard`);
+                } else if (input === '12') {
+                    if (!db.classes[session.data.loggedInClass].polls) {
+                        db.classes[session.data.loggedInClass].polls = [];
+                        writeClassDB(db);
+                    }
+                    updateSessionState(userId, 'REP_POLL_MENU', session.data);
+                    await message.reply(`📊 *CLASS POLLS*\n━━━━━━━━━━━━━━━━━━\n1. ➕ Create New Poll\n2. 👁️ View Past Results\n3. 🗑️ Clear Poll History\n\n0. 🔙 Back to Dashboard`);
                  } else {
                     await message.reply(`❌ Invalid choice. Type 1-9, 0 to go back, or 99 to exit.`);
                 }
@@ -1785,6 +1792,122 @@ async function handleInput(client, message, userId, text, userName) {
                 await message.reply(`✅ Rejection sent to the buyer.\n\nReturning to Market...`);
                 break;
             }
+
+            // ==========================================
+            // PHASE 10: POLLS & GOVERNANCE
+            // ==========================================
+            case 'REP_POLL_MENU': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                    await sendRepDashboard(message, session.data.loggedInClass);
+                    return;
+                }
+                const polls = db.classes[session.data.loggedInClass].polls || [];
+
+                if (input === '1') {
+                    const activePoll = polls.find(p => p.status === 'ACTIVE');
+                    if (activePoll) {
+                        await message.reply(`⚠️ There is already an active poll running. Please wait for it to close before starting a new one.\n\n(Type *0* to go back)`);
+                        return;
+                    }
+                    updateSessionState(userId, 'REP_POLL_QUESTION', session.data);
+                    await message.reply(`📊 *CREATE NEW POLL*\n\nWhat is the question for the class?\n(e.g., When should we schedule the makeup class?)\n\n(Type *0* to cancel)`);
+                } else if (input === '2') {
+                    const closedPolls = polls.filter(p => p.status === 'CLOSED');
+                    if (closedPolls.length === 0) {
+                        await message.reply(`📭 No completed polls to display.\n(Type *0* to go back)`);
+                        return;
+                    }
+                    let resStr = `📊 *PAST POLL RESULTS*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    closedPolls.forEach((p, i) => {
+                        resStr += `*Poll ${i+1}:* ${p.question}\n`;
+                        resStr += p.finalResultStr ? p.finalResultStr.replace('🛑 *POLL CLOSED* 🛑\n━━━━━━━━━━━━━━━━━━\n', '').replace(`❓ *${p.question}*\n\n`, '') : 'No data';
+                        resStr += `\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    });
+                    await message.reply(resStr + `(Type *0* to go back)`);
+                } else if (input === '3') {
+                    db.classes[session.data.loggedInClass].polls = db.classes[session.data.loggedInClass].polls.filter(p => p.status === 'ACTIVE');
+                    writeClassDB(db);
+                    await message.reply(`🗑️ Past poll history cleared. (Active polls are kept).\n(Type *0* to go back)`);
+                }
+                break;
+            }
+
+            case 'REP_POLL_QUESTION': {
+                if (input === '0') { updateSessionState(userId, 'REP_POLL_MENU', session.data); await message.reply("Cancelled."); return; }
+                updateSessionState(userId, 'REP_POLL_OPTIONS', { ...session.data, pollQuestion: input });
+                await message.reply(`✅ Question saved: *${input}*\n\nNow, enter the options separated by commas.\n(e.g., Monday 8AM, Tuesday 2PM, Cancel it)\n\n*Note: I will automatically add an "Abstain / Don't Vote" option for you.*`);
+                break;
+            }
+
+            case 'REP_POLL_OPTIONS': {
+                if (input === '0') { updateSessionState(userId, 'REP_POLL_MENU', session.data); await message.reply("Cancelled."); return; }
+                const options = input.split(',').map(o => o.trim()).filter(o => o.length > 0);
+                if (options.length < 2) {
+                    await message.reply(`❌ You must provide at least two options separated by a comma. Try again:`);
+                    return;
+                }
+                options.push("Abstain / I don't want to vote");
+                
+                updateSessionState(userId, 'REP_POLL_DURATION', { ...session.data, pollOptions: options });
+                await message.reply(`✅ Options saved (${options.length} total).\n\nHow many *hours* should this poll run for before closing automatically?\n(Reply with a number, e.g., 2, 12, 24)`);
+                break;
+            }
+
+            case 'REP_POLL_DURATION': {
+                const hours = parseFloat(input);
+                if (isNaN(hours) || hours <= 0) {
+                    await message.reply(`❌ Invalid duration. Please enter a valid number of hours (e.g., 2):`);
+                    return;
+                }
+
+                const sClass = session.data.loggedInClass;
+                const members = db.classes[sClass].members || {};
+                const memberIds = Object.keys(members);
+                
+                if (memberIds.length === 0) {
+                    await message.reply(`⚠️ You have no registered students to send this poll to!`);
+                    updateSessionState(userId, 'REP_POLL_MENU', session.data);
+                    return;
+                }
+
+                const newPoll = {
+                    id: 'poll_' + Date.now(),
+                    question: session.data.pollQuestion,
+                    options: session.data.pollOptions,
+                    votes: {},
+                    expiresAt: Date.now() + (hours * 60 * 60 * 1000),
+                    status: 'ACTIVE'
+                };
+
+                if (!db.classes[sClass].polls) db.classes[sClass].polls = [];
+                db.classes[sClass].polls.push(newPoll);
+                writeClassDB(db);
+
+                // Build Blast Message
+                let blastMsg = `📊 *CLASS POLL: ${sClass}* 📊\n\n*${newPoll.question}*\n\n`;
+                newPoll.options.forEach((opt, idx) => {
+                    blastMsg += `${idx + 1}️⃣ ${opt}\n`;
+                });
+                blastMsg += `\n👉 *Reply directly to this message with a single number (e.g., 1 or 2) to cast your anonymous vote.*`;
+
+                await message.reply(`🚀 *LAUNCHING POLL*\n\nBroadcasting to ${memberIds.length} students...`);
+
+                let sentCount = 0;
+                for (const mId of memberIds) {
+                    try {
+                        await client.sendMessage(members[mId].phoneId, blastMsg);
+                        sentCount++;
+                    } catch (e) {
+                        console.warn(`[POLL] Failed to send to ${members[mId].name}`);
+                    }
+                }
+
+                updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                await message.reply(`✅ *POLL LIVE!*\n\nSent to ${sentCount} students. The results will be automatically DMed to you in ${hours} hours.\n\nReturning to Dashboard...`);
+                await sendRepDashboard(message, sClass);
+                break;
+            }
             
             // ==========================================
             // PHASE 6: CAT & ASSIGNMENT TRACKER
@@ -2639,6 +2762,21 @@ async function handleInput(client, message, userId, text, userName) {
                     updateSessionState(userId, 'MARKET_HOME', session.data);
                     const notifs = getMarketNotifs(sClass, userId);
                     await message.reply(`🛒 *THE HUSTLE BOARD*\n━━━━━━━━━━━━━━━━━━\n1. 🛍️ Buy (Browse Items)\n2. 🏷️ Sell / Barter an Item\n3. 🔔 Notifications (${notifs})\n4. 📦 My Listings\n\n0. 🔙 Back to Dashboard`);
+                } else if (input === '10') {
+                    // View Poll Results
+                    if (!sDb.polls) { sDb.polls = []; writeClassDB(db); }
+                    const closedPolls = sDb.polls.filter(p => p.status === 'CLOSED');
+                    if (closedPolls.length === 0) {
+                        await message.reply(`📭 No completed polls to display.\n(Type *0* to go back)`);
+                        return;
+                    }
+                    let resStr = `📊 *PAST POLL RESULTS*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    closedPolls.forEach((p, i) => {
+                        resStr += `*Poll ${i+1}:* ${p.question}\n`;
+                        resStr += p.finalResultStr ? p.finalResultStr.replace('🛑 *POLL CLOSED* 🛑\n━━━━━━━━━━━━━━━━━━\n', '').replace(`❓ *${p.question}*\n\n`, '') : 'No data';
+                        resStr += `\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    });
+                    await message.reply(resStr + `(Type *0* to go back)`);
                  } else {
                     await message.reply(`❌ Invalid choice. Type 1-9, 0 to go back, or 99 to exit.`);
                 }
@@ -2692,8 +2830,8 @@ async function sendRepDashboard(message, className) {
 │         \`REP COMMAND\`         
 │           \`[ ${className} ]\`         
 │                               
-│   👑 CLASS REP STATUS: ${repStatus}          
-│   👥 STUDENTS 🟢 ONLINE: ${metrics.activeCount}           
+│   👑 CLASSREP STATUS: ${repStatus}          
+│   👥 STUDENTS : ${metrics.activeCount}🟢 ONLINE           
 ╰──────────────────────────────╯
   
   ┌─── ░◈ _*CONTROL BOARD*_ ◈░ ───────┐
@@ -2709,6 +2847,7 @@ async function sendRepDashboard(message, className) {
   │🎲 \`9\` ☞『_*Syndicate Maker*_』
   │🤫 \`10\` ☞『_*Whisper Inbox (Feedback)*_』
   │🛒 \`11\` ☞『_*Hustle Board (Market)*_』
+  │📊 \`12\` ☞『Manage Polls』
   │🔙 \`0\` ☞『_*Main Menu*_』
   │🚪 \`99\` ☞『_*Logout*_』
   │
@@ -2760,9 +2899,9 @@ async function sendStudentDashboard(message, className, studentName) {
 │           \`STUDENT HUB\`          
 │           \`[ ${className} ]\`         
 │                               
-│   👤 USER: ${studentName}       
-│   👑 CLASS REP STATUS: ${repStatus}          
-│   👥 CLASSMATES 🟢 ONLINE: ${metrics.activeCount}       
+│   👤 STUDENT: ${studentName}       
+│   👑 CLASSREP STATUS: ${repStatus}          
+│   👥 CLASSMATES: ${metrics.activeCount}🟢 ONLINE       
 ╰──────────────────────────────╯
   
   ┌─── ░◈ _*PORTAL FEED*_ ◈░ ───────┐
@@ -2776,6 +2915,7 @@ async function sendStudentDashboard(message, className, studentName) {
   │🤫 \`7\` ☞『_*Send Anonymous Whisper*_』
   │✅ \`8\` ☞『_*Sign Attendance (Roll Call)*_』
   │🛒 \`9\` ☞『_*Hustle Board (Market)*_』
+  │📊 \`10\` ☞『View Poll Results』
   │🔙 \`0\` ☞『_*Main Menu*_』
   │🚪 \`99\` ☞『_*Logout*_』
   │

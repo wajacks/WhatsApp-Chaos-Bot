@@ -171,6 +171,63 @@ function startDeadlineMonitor(client) {
     }, 300000); // 5 minutes
 }
 
+function startPollMonitor(client) {
+    console.log("[CLASS PORTAL] 📊 Poll Monitor Started...");
+    setInterval(async () => {
+        const db = readClassDB();
+        const now = Date.now();
+        let dbChanged = false;
+
+        for (const className in db.classes) {
+            const classData = db.classes[className];
+            if (!classData.polls) continue;
+
+            for (let i = 0; i < classData.polls.length; i++) {
+                const poll = classData.polls[i];
+                if (poll.status === 'ACTIVE' && now > poll.expiresAt) {
+                    poll.status = 'CLOSED';
+                    dbChanged = true;
+
+                    // Tally results
+                    const results = Array(poll.options.length).fill(0);
+                    let totalVotes = 0;
+                    for (const studentId in poll.votes) {
+                        const voteIdx = poll.votes[studentId];
+                        if (voteIdx >= 0 && voteIdx < results.length) {
+                            results[voteIdx]++;
+                            totalVotes++;
+                        }
+                    }
+
+                    // Format result message
+                    let resultMsg = `🛑 *POLL CLOSED* 🛑\n━━━━━━━━━━━━━━━━━━\n`;
+                    resultMsg += `❓ *${poll.question}*\n\n`;
+                    poll.options.forEach((opt, idx) => {
+                        const count = results[idx];
+                        const percentage = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+                        resultMsg += `${idx + 1}. ${opt} - *${count} votes* (${percentage}%)\n`;
+                    });
+                    resultMsg += `\nTotal Votes: ${totalVotes}`;
+
+                    // Save the result string in the poll object so dashboards can view it
+                    poll.finalResultStr = resultMsg;
+
+                    // DM the Rep automatically
+                    if (classData.repId) {
+                        try {
+                            await client.sendMessage(classData.repId, `📊 *POLL RESULTS ARE IN!*\n\n${resultMsg}\n\nStudents can now view these results in their Student Hub.`);
+                        } catch (e) {
+                            console.warn(`[CLASS PORTAL] Failed to send poll results to rep for ${className}`);
+                        }
+                    }
+                    console.log(`[CLASS PORTAL] 📊 Poll Closed for ${className}`);
+                }
+            }
+        }
+        if (dbChanged) writeClassDB(db);
+    }, 60000); // Check every minute
+}
+
 function startTimetableMonitor(client) {
     console.log("[CLASS PORTAL] 🏫 Timetable & Auto-Roll Call Daemon Started...");
     
@@ -292,5 +349,6 @@ module.exports = {
     isUserInClassSession,
     startDeadlineMonitor,
     startTimetableMonitor,
-    getPortalMetrics
+    getPortalMetrics,
+    startPollMonitor
 };

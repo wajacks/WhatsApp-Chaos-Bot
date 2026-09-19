@@ -73,7 +73,7 @@ const { resetClassDB, readClassDB, writeClassDB } = require('./src/database/clas
 const { isUserInClassSession, endSession } = require('./src/tools/classSession');
 const classHandler = require('./src/commands/classHandler');
 const { handleAttendance } = require('./src/commands/classHandler');
-const { startDeadlineMonitor } = require('./src/tools/classSession');
+const { startDeadlineMonitor, startPollMonitor } = require('./src/tools/classSession');
 
 // ============================================================
 // WEATHER RESPONSE BUILDER
@@ -348,6 +348,7 @@ function initializeChaosBot(options) {
         console.log('\nCHAOS BOT by Chriss IS ONLINE!');
         console.log('Waiting for group and private messages...\n');
         startDeadlineMonitor(client);
+        startPollMonitor(client);
     });
 
     client.on('authenticated', () => {
@@ -640,6 +641,55 @@ client.on('message', async message => {
         if (!isGroup && lowerText === 'present') {
             const wasHandledAsAttendance = await handleAttendance(message, senderId, client);
             if (wasHandledAsAttendance) return;
+        }
+
+        // ====================================================
+        // 📊 CLASS POLL DIRECT MESSAGE INTERCEPTOR
+        // ====================================================
+        if (!isGroup && /^\d+$/.test(lowerText) && !isUserInClassSession(senderId)) {
+            const db = readClassDB();
+            let studentClass = null;
+            let studentId = null;
+
+            // Find if sender is a registered student
+            for (const className in db.classes) {
+                if (db.classes[className].members) {
+                    const memberId = Object.keys(db.classes[className].members).find(
+                        key => db.classes[className].members[key].phoneId === senderId
+                    );
+                    if (memberId) {
+                        studentClass = className;
+                        studentId = memberId;
+                        break;
+                    }
+                }
+            }
+
+            if (studentClass && db.classes[studentClass].polls) {
+                const activePoll = db.classes[studentClass].polls.find(p => p.status === 'ACTIVE');
+                if (activePoll) {
+                    const voteIdx = parseInt(lowerText) - 1;
+                    
+                    if (activePoll.votes[studentId] !== undefined) {
+                        await message.reply("❌ You have already voted on this poll.");
+                        return; // Stop execution
+                    }
+
+                    if (voteIdx >= 0 && voteIdx < activePoll.options.length) {
+                        activePoll.votes[studentId] = voteIdx;
+                        writeClassDB(db);
+                        
+                        const dateObj = new Date(activePoll.expiresAt);
+                        const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' });
+                        
+                        await message.reply(`✅ *Vote locked in anonymously.*\n\nThe final results will be available in your Student Hub today at *${timeStr}*.`);
+                        return; // Stop execution
+                    } else {
+                        await message.reply(`❌ Invalid option. Please reply with a number between 1 and ${activePoll.options.length}.`);
+                        return; // Stop execution
+                    }
+                }
+            }
         }
 
         // ====================================================
