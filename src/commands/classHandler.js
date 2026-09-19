@@ -464,6 +464,9 @@ async function handleInput(client, message, userId, text, userName) {
                     await message.reply(`🤫 *WHISPER INBOX*\n━━━━━━━━━━━━━━━━━━\n1. 📥 View Unread Whispers\n2. ✍️ Reply to a Whisper\n3. 🗑️ Clear Inbox\n\n0. 🔙 Back to Dashboard`);
                 } else if (input === '11') {
                     // Enter Hustle Board
+                    const sClass = session.data.loggedInClass;
+                    const sDb = db.classes[sClass];
+                    
                     if (!sDb.marketplace) { sDb.marketplace = []; writeClassDB(db); }
                     updateSessionState(userId, 'MARKET_HOME', session.data);
                     const notifs = getMarketNotifs(sClass, userId);
