@@ -173,12 +173,14 @@ const knownPrivateChats = new Set();
 // 👑 OWNER SYSTEM
 // ====================================================
 
-const OWNER_NUMBER = '254111659469';
+const OWNER_NUMBER = process.env.OWNER_NUMBER;
 
 function isOwner(senderId) {
     if (!senderId) return false;
 
-    return senderId === `${OWNER_NUMBER}@c.us`;
+    // Clean and match the incoming sender ID against the environment variable
+    const cleanOwnerNumber = OWNER_NUMBER.replace(/[^\d]/g, '');
+    return senderId === `${cleanOwnerNumber}@c.us`;
 }
 
 function getOwnerMenu() {
