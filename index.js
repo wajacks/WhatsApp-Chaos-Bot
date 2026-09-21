@@ -73,7 +73,7 @@ const { resetClassDB, readClassDB, writeClassDB } = require('./src/database/clas
 const { isUserInClassSession, endSession } = require('./src/tools/classSession');
 const classHandler = require('./src/commands/classHandler');
 const { handleAttendance } = require('./src/commands/classHandler');
-const { startDeadlineMonitor, startPollMonitor } = require('./src/tools/classSession');
+const { startDeadlineMonitor, startPollMonitor, startDailyReminders } = require('./src/tools/classSession');
 
 // ============================================================
 // WEATHER RESPONSE BUILDER
@@ -351,6 +351,7 @@ function initializeChaosBot(options) {
         console.log('Waiting for group and private messages...\n');
         startDeadlineMonitor(client);
         startPollMonitor(client);
+        startDailyReminders(client);
     });
 
     client.on('authenticated', () => {

@@ -1,6 +1,8 @@
 const activeClassSessions = new Map();
 const SESSION_TIMEOUT_MS = 600 * 1000; // 10 minutes
+const cron = require('node-cron');
 const { readClassDB, writeClassDB } = require('../database/classdb');
+
 
 function createSession(userId, state = 'MAIN_MENU', data = {}) {
     if (activeClassSessions.has(userId)) {
@@ -319,6 +321,7 @@ async function broadcastToClass(client, classData, messageText) {
     const members = classData.members || {};
     for (const mId in members) {
         try {
+            await new Promise(resolve => setTimeout(resolve, 5000));
             await client.sendMessage(members[mId].phoneId, messageText);
         } catch (e) {
             console.warn(`Failed to broadcast to ${members[mId].name}`);
@@ -341,6 +344,58 @@ function getPortalMetrics(className, repId) {
     return { activeCount, repOnline };
 }
 
+function startDailyReminders(client) {
+    // Schedule for 6:00 AM and 9:00 PM
+    const scheduleTimes = ['0 6 * * *', '0 21 * * *'];
+
+    scheduleTimes.forEach(time => {
+        cron.schedule(time, async () => {
+            console.log(`[CRON] Executing 6AM/9PM Class Portal reminders...`);
+            const db = readClassDB();
+            const classes = db.classes || {};
+
+            for (const className in classes) {
+                const classData = classes[className];
+
+                // 1. Remind the Rep & Assistant Reps
+                const repMessage = `🔔 *CLASS REP REMINDER*\n━━━━━━━━━━━━━━━━━━\n\nHello! Don't forget to update the Class Portal for *${className}* if there are any new announcements, assignments, or timetable changes today.\n\nType \`!class\` to manage the portal.`;
+                
+                const repIds = new Set();
+                if (classData.repId) repIds.add(classData.repId);
+                if (classData.assistantReps) {
+                    classData.assistantReps.forEach(id => repIds.add(id));
+                }
+
+                for (const repId of repIds) {
+                    try {
+                        await client.sendMessage(repId, repMessage);
+                    } catch (e) {
+                        console.warn(`[CRON] Failed to send reminder to rep: ${repId}`);
+                    }
+                }
+
+                // 2. Remind the Students
+                const studentMessage = `🔔 *STUDENT PORTAL REMINDER*\n━━━━━━━━━━━━━━━━━━\n\nHello! Remember to check your Class Portal for *${className}* to stay updated on today's classes, deadlines, and recent announcements.\n\nType \`!class\` to view your Student Hub.`;
+                
+                const members = classData.members || {};
+                for (const memberKey in members) {
+                    const studentId = members[memberKey].phoneId;
+                    try {
+                        // Small delay to prevent WhatsApp from flagging the bot for spamming messages too fast
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                        await client.sendMessage(studentId, studentMessage);
+                    } catch (e) {
+                        console.warn(`[CRON] Failed to send reminder to student: ${studentId}`);
+                    }
+                }
+            }
+        }, {
+            scheduled: true,
+            timezone: "Africa/Nairobi" // Locks exactly to Kenya time!
+        });
+    });
+}
+
 module.exports = {
     createSession,
     updateSessionState,
@@ -350,5 +405,6 @@ module.exports = {
     startDeadlineMonitor,
     startTimetableMonitor,
     getPortalMetrics,
-    startPollMonitor
+    startPollMonitor,
+    startDailyReminders
 };
