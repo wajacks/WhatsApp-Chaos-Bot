@@ -1574,6 +1574,16 @@ async function handleInput(client, message, userId, text, userName) {
                     await message.reply(mStr);
                 
                 } else if (input === '2') { // SELL
+                    const mDb = db.classes[session.data.loggedInClass];
+                    
+                    // ANTI-SPAM GUARDRAIL: Limit to 5 active listings per user
+                    const myActiveItems = (mDb.marketplace || []).filter(i => i.sellerId === userId && i.status === 'ACTIVE');
+                    
+                    if (myActiveItems.length >= 5) {
+                        await message.reply(`⚠️ *LIMIT REACHED*\n\nYou already have 5 active listings on the global board. To prevent spam, please delete or close an old listing before adding a new one.\n\n(Type *0* to go back)`);
+                        return;
+                    }
+
                     updateSessionState(userId, 'MARKET_SELL_TYPE', session.data);
                     await message.reply(`🏷️ *CREATE LISTING*\n\nHow do you want to trade this item?\n1. 💰 Sell for Cash\n2. 🔄 Barter (Trade for something else)\n\n(Type *0* to cancel)`);
                 
@@ -1634,7 +1644,11 @@ async function handleInput(client, message, userId, text, userName) {
                     myItems.forEach((item, i) => {
                         mStr += `${i + 1}. [${item.status}] ${item.itemName}\n`;
                     });
-                    await message.reply(mStr + `\n(Type *0* to go back)`);
+                    mStr += `\n*Reply with the number to DELETE a listing:*\n(Type *0* to go back)`;
+                    
+                    // Pass the filtered items into the session so we know exactly which one they select
+                    updateSessionState(userId, 'MARKET_MY_LISTINGS', { ...session.data, myItems });
+                    await message.reply(mStr);
                 }
                 break;
             }
@@ -1808,6 +1822,39 @@ async function handleInput(client, message, userId, text, userName) {
 
                 updateSessionState(userId, 'MARKET_HOME', session.data);
                 await message.reply(`✅ Rejection sent to the buyer.\n\nReturning to Market...`);
+                break;
+            }
+
+            case 'MARKET_MY_LISTINGS': {
+                if (input === '0') { 
+                    updateSessionState(userId, 'MARKET_HOME', session.data); 
+                    await message.reply("Returning to Market..."); 
+                    return; 
+                }
+                
+                const myItems = session.data.myItems;
+                const selectedIdx = parseInt(input) - 1;
+                
+                if (isNaN(selectedIdx) || selectedIdx < 0 || selectedIdx >= myItems.length) {
+                    await message.reply(`❌ Invalid selection. Reply with a valid number from the list, or type *0* to go back.`);
+                    return;
+                }
+                
+                const targetItem = myItems[selectedIdx];
+                const mDb = db.classes[session.data.loggedInClass];
+                
+                // Locate the exact item in the main marketplace array using its unique ID
+                const realIdx = mDb.marketplace.findIndex(i => i.id === targetItem.id);
+                
+                if (realIdx !== -1) {
+                    mDb.marketplace.splice(realIdx, 1);
+                    writeClassDB(db);
+                    
+                    updateSessionState(userId, 'MARKET_HOME', session.data);
+                    await message.reply(`✅ *LISTING DELETED*\n\n"${targetItem.itemName}" has been permanently removed from the Hustle Board.\n\nReturning to Market...`);
+                } else {
+                    await message.reply(`❌ Could not locate the item. It may have already been deleted.`);
+                }
                 break;
             }
 
