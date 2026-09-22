@@ -480,19 +480,16 @@ async function handleInput(client, message, userId, text, userName) {
                     await message.reply(`📊 *CLASS POLLS*\n━━━━━━━━━━━━━━━━━━\n1. ➕ Create New Poll\n2. 👁️ View Past Results\n3. 🗑️ Clear Poll History\n\n0. 🔙 Back to Dashboard`);
                 } else if (input === '13') {
                     const isHoliday = db.classes[session.data.loggedInClass].holidayMode || false;
-                    db.classes[session.data.loggedInClass].holidayMode = !isHoliday;
-                    writeClassDB(db);
+                    updateSessionState(userId, 'REP_HOLIDAY_MENU', session.data);
                     
-                    const newStatus = !isHoliday ? '🟢 ON' : '🔴 OFF';
-                    let replyMsg = `🌴 *HOLIDAY MODE: ${newStatus}*\n━━━━━━━━━━━━━━━━━━\n\n`;
-                    if (!isHoliday) {
-                        replyMsg += `All automated timetable warnings, deadline alerts, and daily morning/night reminders for *${session.data.loggedInClass}* are now **MUTED**.\nEnjoy your break!`;
-                    } else {
-                        replyMsg += `Automated alerts and reminders for *${session.data.loggedInClass}* have been **RESTORED**.\nWelcome back to the semester!`;
-                    }
-                    await message.reply(replyMsg + `\n\n(Type *0* to go back)`);
-                 // 👆 END BLOCK 👆
-                 
+                    await message.reply(
+                        `🌴 *HOLIDAY MODE SETTINGS*\n━━━━━━━━━━━━━━━━━━\n` +
+                        `Current Status: *${isHoliday ? '🟢 ON (Alerts Muted)' : '🔴 OFF (Alerts Active)'}*\n\n` +
+                        `Holiday Mode mutes all automated timetable warnings, deadline alerts, and daily morning/night reminders for your class.\n\n` +
+                        `1. 🟢 Turn Holiday Mode ON\n` +
+                        `2. 🔴 Turn Holiday Mode OFF\n\n` +
+                        `0. 🔙 Back to Dashboard`
+                    );
                  } else {
                     await message.reply(`❌ Invalid choice. Type 1-13, 0 to go back, or 99 to exit.`);
                 } 
@@ -1971,6 +1968,38 @@ async function handleInput(client, message, userId, text, userName) {
                 updateSessionState(userId, 'REP_DASHBOARD', session.data);
                 await message.reply(`✅ *POLL LIVE!*\n\nSent to ${sentCount} students. The results will be automatically DMed to you in ${hours} hours.\n\nReturning to Dashboard...`);
                 await sendRepDashboard(message, sClass);
+                break;
+            }
+
+            // ==========================================
+            // PHASE 11: HOLIDAY MODE CONFIGURATION
+            // ==========================================
+            case 'REP_HOLIDAY_MENU': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                    await sendRepDashboard(message, session.data.loggedInClass);
+                    return;
+                }
+                
+                if (input === '1') {
+                    db.classes[session.data.loggedInClass].holidayMode = true;
+                    writeClassDB(db);
+                    
+                    updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                    await message.reply(`🌴 *HOLIDAY MODE ACTIVATED*\n\nAll automated alerts for *${session.data.loggedInClass}* are now MUTED. Enjoy your break!\n\nReturning to Dashboard...`);
+                    await sendRepDashboard(message, session.data.loggedInClass);
+                    
+                } else if (input === '2') {
+                    db.classes[session.data.loggedInClass].holidayMode = false;
+                    writeClassDB(db);
+                    
+                    updateSessionState(userId, 'REP_DASHBOARD', session.data);
+                    await message.reply(`🔴 *HOLIDAY MODE DISABLED*\n\nAutomated alerts and reminders for *${session.data.loggedInClass}* have been RESTORED.\n\nReturning to Dashboard...`);
+                    await sendRepDashboard(message, session.data.loggedInClass);
+                    
+                } else {
+                    await message.reply(`❌ Invalid choice. Reply 1 to turn ON, 2 to turn OFF, or 0 to go back.`);
+                }
                 break;
             }
             
