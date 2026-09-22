@@ -64,6 +64,7 @@ function startDeadlineMonitor(client) {
 
         for (const className in db.classes) {
             const classData = db.classes[className];
+            if (classData.holidayMode) continue;
             if (!classData.assessments || classData.assessments.length === 0) continue;
 
             for (let i = 0; i < classData.assessments.length; i++) {
@@ -227,7 +228,7 @@ function startPollMonitor(client) {
             }
         }
         if (dbChanged) writeClassDB(db);
-    }, 60000); // Check every minute
+    }, 180000); // Check every minute
 }
 
 function startTimetableMonitor(client) {
@@ -247,6 +248,7 @@ function startTimetableMonitor(client) {
 
         for (const className in db.classes) {
             const classData = db.classes[className];
+            if (classData.holidayMode) continue; // Skip all alerts if holiday mode is active
             const schedule = classData.timetable?.[todayStr] || [];
             if (schedule.length === 0) continue;
 
@@ -257,8 +259,8 @@ function startTimetableMonitor(client) {
                 const isCancelled = classData.exceptions?.[todayDateKey]?.[cls.unit]?.status === 'CANCELLED';
                 if (isCancelled) continue; // Skip all alerts
 
-                // 1. THE 2-HOUR WARNING (With Anti-Spam)
-                if (cls.startMinutes - currentMinutes === 120) {
+                // 1. THE 3/4 -HOUR WARNING (With Anti-Spam)
+                if (cls.startMinutes - currentMinutes === 45) {
                     let shouldWarn = true;
                     // Anti-Spam Check: Did a class just end?
                     if (i > 0) {
@@ -345,55 +347,109 @@ function getPortalMetrics(className, repId) {
 }
 
 function startDailyReminders(client) {
-    // Schedule for 6:00 AM and 9:00 PM
-    const scheduleTimes = ['0 6 * * *', '0 21 * * *'];
+    // 6 AM Reminder (Morning)
+    cron.schedule('0 6 * * *', async () => {
+        await sendDynamicReminders(client, 'MORNING');
+    }, { scheduled: true, timezone: "Africa/Nairobi" });
 
-    scheduleTimes.forEach(time => {
-        cron.schedule(time, async () => {
-            console.log(`[CRON] Executing 6AM/9PM Class Portal reminders...`);
+    // 9 PM Reminder (Night)
+    cron.schedule('0 21 * * *', async () => {
+        await sendDynamicReminders(client, 'NIGHT');
+    }, { scheduled: true, timezone: "Africa/Nairobi" });
+}
+
+async function sendDynamicReminders(client, timeOfDay) {
+    console.log(`[CRON] Executing ${timeOfDay} Class Portal reminders...`);
+    const db = readClassDB();
+    const classes = db.classes || {};
+    const isMorning = timeOfDay === 'MORNING';
+    
+    const greeting = isMorning ? 'Good morning' : 'Good evening';
+    const actionText = isMorning 
+        ? "Here is your morning check-in. Don't forget to update the portal" 
+        : "Here is your evening wrap-up. Make sure the portal is ready for tomorrow";
+    const studentAction = isMorning
+        ? "Have a great day ahead! Remember to check your portal"
+        : "Rest well! Take a moment to review your portal";
+
+    for (const className in classes) {
+        const classData = classes[className];
+        
+        // 🌴 Skip reminders entirely if the class is on Holiday Mode
+        if (classData.holidayMode) continue;
+
+        // 1. Remind Reps
+        const repIds = new Set();
+        if (classData.repId) repIds.add(classData.repId);
+        if (classData.assistantReps) classData.assistantReps.forEach(id => repIds.add(id));
+
+        for (const repId of repIds) {
+            try {
+                const repPhone = repId.split('@')[0];
+                const msg = `🌅 *CLASS REP REMINDER*\n━━━━━━━━━━━━━━━━━━\n\n${greeting} @${repPhone}! 👑\n\n${actionText} for *${className}*.\n\nType \`!class\` to manage your dashboard.`;
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                await client.sendMessage(repId, msg, { mentions: [repId] });
+            } catch (e) {}
+        }
+
+        // 2. Remind Students
+        const members = classData.members || {};
+        for (const memberKey in members) {
+            const studentId = members[memberKey].phoneId;
+            try {
+                const stuPhone = studentId.split('@')[0];
+                const msg = `🔔 *STUDENT PORTAL REMINDER*\n━━━━━━━━━━━━━━━━━━\n\n${greeting} @${stuPhone}! 👋\n\n${studentAction} for *${className}* to stay updated on classes and deadlines.\n\nType \`!class\` to view your Student Hub.`;
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                await client.sendMessage(studentId, msg, { mentions: [studentId] });
+            } catch (e) {}
+        }
+    }
+}
+
+function startSystemMaintenance(client) {
+    // 1. MIDNIGHT SWEEP: Closes orphaned roll calls at 11:59 PM daily
+    cron.schedule('59 23 * * *', () => {
+        const db = readClassDB();
+        let changed = false;
+        for (const className in db.classes) {
+            if (db.classes[className].activeRollCall) {
+                delete db.classes[className].activeRollCall;
+                changed = true;
+            }
+        }
+        if (changed) writeClassDB(db);
+        console.log("[SYSTEM] Midnight Sweep complete. All active roll calls closed.");
+    }, { scheduled: true, timezone: "Africa/Nairobi" });
+
+    // 2. 3-DAY BACKUP: Overwrites the backup file at 3:00 AM and notifies Reps
+    cron.schedule('0 3 */3 * *', async () => {
+        const fs = require('fs');
+        const path = require('path');
+        const dbPath = path.join(__dirname, '..', 'database', 'classdb.json');
+        const backupPath = path.join(__dirname, '..', 'database', 'classdb_backup.json');
+
+        try {
+            // Overwrites the old backup with the new one
+            fs.copyFileSync(dbPath, backupPath);
+            console.log("[SYSTEM] 3-Day Database Backup Overwritten Successfully.");
+
             const db = readClassDB();
-            const classes = db.classes || {};
-
-            for (const className in classes) {
-                const classData = classes[className];
-
-                // 1. Remind the Rep & Assistant Reps
-                const repMessage = `🔔 *CLASS REP REMINDER*\n━━━━━━━━━━━━━━━━━━\n\nHello! Don't forget to update the Class Portal for *${className}* if there are any new announcements, assignments, or timetable changes today.\n\nType \`!class\` to manage the portal.`;
-                
-                const repIds = new Set();
-                if (classData.repId) repIds.add(classData.repId);
-                if (classData.assistantReps) {
-                    classData.assistantReps.forEach(id => repIds.add(id));
-                }
-
-                for (const repId of repIds) {
+            for (const className in db.classes) {
+                const classData = db.classes[className];
+                if (classData.repId && !classData.holidayMode) {
                     try {
-                        await client.sendMessage(repId, repMessage);
-                    } catch (e) {
-                        console.warn(`[CRON] Failed to send reminder to rep: ${repId}`);
-                    }
-                }
-
-                // 2. Remind the Students
-                const studentMessage = `🔔 *STUDENT PORTAL REMINDER*\n━━━━━━━━━━━━━━━━━━\n\nHello! Remember to check your Class Portal for *${className}* to stay updated on today's classes, deadlines, and recent announcements.\n\nType \`!class\` to view your Student Hub.`;
-                
-                const members = classData.members || {};
-                for (const memberKey in members) {
-                    const studentId = members[memberKey].phoneId;
-                    try {
-                        // Small delay to prevent WhatsApp from flagging the bot for spamming messages too fast
                         await new Promise(resolve => setTimeout(resolve, 5000));
-                        await client.sendMessage(studentId, studentMessage);
-                    } catch (e) {
-                        console.warn(`[CRON] Failed to send reminder to student: ${studentId}`);
-                    }
+                        await client.sendMessage(
+                            classData.repId, 
+                            `💾 *SYSTEM MAINTENANCE*\n\nThe scheduled 3-day database backup was completed successfully. All class data for *${className}* is secure.`
+                        );
+                    } catch (e) {}
                 }
             }
-        }, {
-            scheduled: true,
-            timezone: "Africa/Nairobi" // Locks exactly to Kenya time!
-        });
-    });
+        } catch (err) {
+            console.error("[SYSTEM] Backup failed:", err.message);
+        }
+    }, { scheduled: true, timezone: "Africa/Nairobi" });
 }
 
 module.exports = {

@@ -478,9 +478,24 @@ async function handleInput(client, message, userId, text, userName) {
                     }
                     updateSessionState(userId, 'REP_POLL_MENU', session.data);
                     await message.reply(`📊 *CLASS POLLS*\n━━━━━━━━━━━━━━━━━━\n1. ➕ Create New Poll\n2. 👁️ View Past Results\n3. 🗑️ Clear Poll History\n\n0. 🔙 Back to Dashboard`);
+                } else if (input === '13') {
+                    const isHoliday = db.classes[session.data.loggedInClass].holidayMode || false;
+                    db.classes[session.data.loggedInClass].holidayMode = !isHoliday;
+                    writeClassDB(db);
+                    
+                    const newStatus = !isHoliday ? '🟢 ON' : '🔴 OFF';
+                    let replyMsg = `🌴 *HOLIDAY MODE: ${newStatus}*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    if (!isHoliday) {
+                        replyMsg += `All automated timetable warnings, deadline alerts, and daily morning/night reminders for *${session.data.loggedInClass}* are now **MUTED**.\nEnjoy your break!`;
+                    } else {
+                        replyMsg += `Automated alerts and reminders for *${session.data.loggedInClass}* have been **RESTORED**.\nWelcome back to the semester!`;
+                    }
+                    await message.reply(replyMsg + `\n\n(Type *0* to go back)`);
+                 // 👆 END BLOCK 👆
+                 
                  } else {
-                    await message.reply(`❌ Invalid choice. Type 1-9, 0 to go back, or 99 to exit.`);
-                }
+                    await message.reply(`❌ Invalid choice. Type 1-13, 0 to go back, or 99 to exit.`);
+                } 
                 break;
             }
 
@@ -2890,35 +2905,40 @@ async function sendStudentGateway(message, className) {
   await message.reply(menu);
 }
 
-async function sendStudentDashboard(message, className, studentName) {
+async function sendRepDashboard(message, className) {
     const db = readClassDB();
     const classData = db.classes[className] || {};
     const metrics = getPortalMetrics(className, classData.repId);
+    
     const repStatus = metrics.repOnline ? '🟢 ONLINE' : '🔴 OFFLINE';
+    const holidayStatus = classData.holidayMode ? '🌴 ACTIVE' : '🔴 OFF';
 
     const menu = `╭──────────────────────────────╮
 │        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
 │                               
-│           \`STUDENT HUB\`          
+│         \`REP COMMAND\`         
 │           \`[ ${className} ]\`         
 │                               
-│   👤 STUDENT: ${studentName}       
 │   👑 CLASSREP STATUS: ${repStatus}          
-│   👥 CLASSMATES: ${metrics.activeCount}🟢 ONLINE       
+│   👥 STUDENTS : ${metrics.activeCount}🟢 ONLINE     
+│   🌴 HOLIDAY MODE : ${holidayStatus}      
 ╰──────────────────────────────╯
   
-  ┌─── ░◈ _*PORTAL FEED*_ ◈░ ───────┐
+  ┌─── ░◈ _*CONTROL BOARD*_ ◈░ ───────┐
   │
-  │📅 \`1\` ☞『_*View Today's Classes*_』
-  │🗓️ \`2\` ☞『_*View Full Timetable*_』
-  │⏳ \`3\` ☞『_*Upcoming Deadlines*_』
-  │📢 \`4\` ☞『_*View Updates*_』
-  │👥 \`5\` ☞『_*View Classmates*_』
-  │⏱️ \`6\` ☞『_*What's Next? (Chronos)*_』
-  │🤫 \`7\` ☞『_*Send Anonymous Whisper*_』
-  │✅ \`8\` ☞『_*Sign Attendance (Roll Call)*_』
-  │🛒 \`9\` ☞『_*Hustle Board (Market)*_』
-  │📊 \`10\` ☞『View Poll Results』
+  │📅 \`1\` ☞『_*Manage Timetable*_』
+  │📢 \`2\` ☞『_*Manage Updates*_』
+  │👥 \`3\` ☞『_*Class Members & Attendance*_』
+  │🚨 \`4\` ☞『_*Resolve Issues*_』
+  │📜 \`5\` ☞『_*View Audit Logs*_』
+  │✅ \`6\` ☞『_*Start Roll Call*_』
+  │🛑 \`7\` ☞『_*Close Roll Call*_』
+  │📚 \`8\` ☞『_*Manage Deadlines*_』
+  │🎲 \`9\` ☞『_*Syndicate Maker*_』
+  │🤫 \`10\` ☞『_*Whisper Inbox (Feedback)*_』
+  │🛒 \`11\` ☞『_*Hustle Board (Market)*_』
+  │📊 \`12\` ☞『_*Manage Polls*_』
+  │🌴 \`13\` ☞『_*Toggle Holiday Mode*_』
   │🔙 \`0\` ☞『_*Main Menu*_』
   │🚪 \`99\` ☞『_*Logout*_』
   │
