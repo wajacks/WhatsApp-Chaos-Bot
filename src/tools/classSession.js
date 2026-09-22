@@ -323,7 +323,7 @@ async function broadcastToClass(client, classData, messageText) {
     const members = classData.members || {};
     for (const mId in members) {
         try {
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            await new Promise(resolve => setTimeout(resolve, 2000));
             await client.sendMessage(members[mId].phoneId, messageText);
         } catch (e) {
             console.warn(`Failed to broadcast to ${members[mId].name}`);
