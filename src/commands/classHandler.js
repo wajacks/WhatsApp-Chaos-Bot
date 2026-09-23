@@ -777,25 +777,33 @@ async function handleInput(client, message, userId, text, userName) {
                 }
 
                 const [unit, time] = input.split(',').map(s => s.trim());
-                db.classes[session.data.loggedInClass].timetable[currentDayStr].push({ unit, time });
+                db.classes[session.data.loggedInClass].timetable[currentDayStr.toLowerCase()].push({ unit, time });
                 writeClassDB(db);
 
-                await message.reply(`✅ Added *${unit}* at *${time}* on *${currentDayStr.toUpperCase()}*.\n\nEnter another class for ${currentDayStr.toUpperCase()}, or type *NEXT* to move to the next day.`);
+                await message.reply(`✅ Added *${unit}* at *${time}* on *${currentDayStr.toUpperCase()}*.\n\nEnter another class for ${currentDayStr.toUpperCase()}, or type *NEXT* to move to the next day, or *0* to go back to the Timetable Menu.`);
                 break;
-            }
+                }
 
             case 'REP_EDIT_SELECT_DAY': {
+                if (input === '0') {
+                    // Back to the Timetable Menu
+                    updateSessionState(userId, 'REP_TIMETABLE_MENU', session.data);
+                    await message.reply(
+                        `📅 *TIMETABLE MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Current Timetable\n2. 🛠️ Run Timetable Wizard (Create new Timetable)\n3. Modify/Cancel Classes\n\n0. 🔙 Back to Dashboard`
+                    );
+                    return;
+                }
+
                 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
                 const dayIdx = parseInt(input) - 1;
-                
+
                 if (isNaN(dayIdx) || dayIdx < 0 || dayIdx > 6) {
                     await message.reply(`❌ Invalid choice. Reply 1-7 for the day of the week, or 0 to go back.`);
                     return;
                 }
-                
+
                 const selectedDay = days[dayIdx];
-                const db = readClassDB();
-                const daySchedule = db.classes[session.data.loggedInClass].timetable?.[selectedDay] || [];
+                const daySchedule = db.classes[session.data.loggedInClass].timetable?.[selectedDay.toLowerCase()] || [];
 
                 if (daySchedule.length === 0) {
                     await message.reply(`📭 No classes scheduled for ${selectedDay}. Reply 0 to go back.`);
@@ -804,7 +812,7 @@ async function handleInput(client, message, userId, text, userName) {
 
                 let msg = `📅 *${selectedDay.toUpperCase()} CLASSES*\n\nWhich class do you want to modify?\n`;
                 daySchedule.forEach((cls, i) => {
-                    msg += `${i + 1}. *${cls.unit}* (${cls.startTime} - ${cls.endTime})\n`;
+                    msg += `${i + 1}. *${cls.unit}* (${cls.time})\n`;
                 });
                 msg += `\n0. 🔙 Back`;
 
