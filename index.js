@@ -2464,37 +2464,21 @@ client.on('message', async message => {
                             ? 'pm2.cmd'
                             : 'pm2';
 
-                    try {
-
-                        const restartResult = await runCommand(
+                    // Delay the restart by 2 seconds so the "UPDATE COMPLETE" message fully sends.
+                    setTimeout(() => {
+                        runCommand(
                             pm2Command,
                             ['restart', 'chaos-bot'],
                             {
                                 cwd: projectDir,
                                 maxBuffer: 1024 * 1024
                             }
-                        );
+                        ).catch(err => {
+                            console.error('[OWNER UPDATE] PM2 restart failed:', err);
+                        });
+                    }, 2000);
 
-                        console.log(
-                            '[OWNER UPDATE] PM2 restart successful:',
-                            restartResult.stdout,
-                            restartResult.stderr
-                        );
-
-                    } catch (error) {
-
-                        console.error(
-                            '[OWNER UPDATE] PM2 restart failed:',
-                            error
-                        );
-
-                        console.error(
-                            '[OWNER UPDATE] PM2 stderr:',
-                            error.stderr
-                        );
-
-                        return;
-                    }
+                    return; // Exit the command successfully before PM2 kills the process!
 
                 } catch (error) {
 
