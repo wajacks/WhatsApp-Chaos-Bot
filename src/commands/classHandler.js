@@ -807,7 +807,11 @@ async function handleInput(client, message, userId, text, userName) {
 
             // 2. SELECT CLASS & ACTION
             case 'REP_EDIT_SELECT_CLASS': {
-                if (input === '0') { /* Route back to Dashboard */ return; }
+                if (input === '0') { 
+                    updateSessionState(userId, 'REP_EDIT_SELECT_DAY', session.data); 
+                    await message.reply(`✏️ *MODIFY TIMETABLE*\n━━━━━━━━━━━━━━━━━━\nWhich day do you want to edit?\n\n1. Monday\n2. Tuesday\n3. Wednesday\n4. Thursday\n5. Friday\n6. Saturday\n7. Sunday\n\n*Reply with a number (1-7):*\n0. 🔙 Back`);
+                    return; 
+                }
                 
                 const classIdx = parseInt(input) - 1;
                 const targetClass = session.data.daySchedule[classIdx];
@@ -824,6 +828,17 @@ async function handleInput(client, message, userId, text, userName) {
 
             // 3. HANDLE CANCEL OR POSTPONE ROUTING
             case 'REP_EDIT_ACTION': {
+                    if (input === '0') { 
+                        updateSessionState(userId, 'REP_EDIT_SELECT_CLASS', session.data); 
+                        let msg = `📅 *${session.data.editDay.toUpperCase()} CLASSES*\n\nWhich class do you want to modify?\n`;
+                        session.data.daySchedule.forEach((cls, i) => {
+                            msg += `${i + 1}. *${cls.unit}* (${cls.startTime} - ${cls.endTime})\n`;
+                        });
+                        msg += `\n0. 🔙 Back`;
+                        await message.reply(msg);
+                        return; 
+                    }
+
                 if (input === '1') {
                     // It's a cancellation
                     updateSessionState(userId, 'REP_EDIT_SCOPE', { ...session.data, editType: 'CANCEL' });
@@ -840,6 +855,12 @@ async function handleInput(client, message, userId, text, userName) {
 
             // 4. THE EXECUTION ENGINE (Applying the Math & DB Save)
             case 'REP_EDIT_SCOPE': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_EDIT_ACTION', session.data);
+                    await message.reply(`🛠️ *MODIFYING: ${session.data.targetClass.unit}*\n\nWhat is happening to this class?\n1. 🛑 Cancelled / Bounced\n2. ⏳ Postponed / Moved to new time\n\n0. 🔙 Back`);
+                    return;
+                }
+
                 const isTemp = input === '1';
                 const db = readClassDB();
                 const classData = db.classes[session.data.loggedInClass];
@@ -872,6 +893,12 @@ async function handleInput(client, message, userId, text, userName) {
             // --- THE POSTPONE / MOVE ENGINE ---
 
             case 'REP_EDIT_NEW_DAY': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_EDIT_ACTION', session.data);
+                    await message.reply(`🛠️ *MODIFYING: ${session.data.targetClass.unit}*\n\nWhat is happening to this class?\n1. 🛑 Cancelled / Bounced\n2. ⏳ Postponed / Moved to new time\n\n0. 🔙 Back`);
+                    return;
+                }
+
                 const daysMap = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
                 const dayIdx = parseInt(input) - 1;
                 
@@ -886,6 +913,12 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             case 'REP_EDIT_NEW_TIME': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_EDIT_NEW_DAY', session.data);
+                    await message.reply(`⏳ *MOVING CLASS*\nWhich day is it moving to?\n1. Mon  2. Tue  3. Wed  4. Thu  5. Fri  6. Sat  7. Sun\n\n0. 🔙 Back`);
+                    return;
+                }
+
                 const startMins = timeToMinutes(input);
                 if (startMins === null) {
                     await message.reply(`❌ Invalid time format. Try again (e.g., 02:00 PM):`);
@@ -898,6 +931,12 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             case 'REP_EDIT_NEW_DURATION': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_EDIT_NEW_TIME', session.data);
+                    await message.reply(`🕒 What is the *NEW Start Time* for this class?\n(e.g., 02:00 PM, 14:00)\n\n0. 🔙 Back`);
+                    return;
+                }
+
                 const duration = parseFloat(input);
                 if (isNaN(duration) || duration <= 0) {
                     await message.reply(`❌ Invalid duration. Try again (e.g., 3):`);
@@ -930,6 +969,12 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             case 'REP_EDIT_MOVE_SCOPE': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_EDIT_NEW_DURATION', session.data);
+                    await message.reply(`⏳ What is the *duration* in hours?\n(Reply with a number, e.g., 2 or 3)\n\n0. 🔙 Back`);
+                    return;
+                }
+
                 const isTemp = input === '1';
                 const db = readClassDB();
                 const classData = db.classes[session.data.loggedInClass];
@@ -1676,7 +1721,21 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             case 'MARKET_MAKE_OFFER': {
-                if (input === '0') { updateSessionState(userId, 'MARKET_HOME', session.data); await message.reply("Cancelled."); return; }
+                if (input === '0') { 
+                    updateSessionState(userId, 'MARKET_BROWSE', session.data); 
+                    
+                    // Rebuild the Browse Menu
+                    const mDb = db.classes[session.data.loggedInClass].marketplace;
+                    let mStr = `🛍️ *ACTIVE LISTINGS*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    mDb.forEach((item, i) => {
+                        const statusTag = item.status === 'SOLD' ? '🔴 [SOLD]' : '🟢 [ACTIVE]';
+                        mStr += `${i + 1}. ${statusTag} *${item.itemName}*\n   ${item.type === 'CASH' ? '💰 Price:' : '🔄 Wants:'} ${item.price}\n\n`;
+                    });
+                    mStr += `*Reply with the number to view or make an offer:*\n0. 🔙 Back`;
+                    await message.reply(mStr);
+                    return; 
+                }
+
                 if (input === '1') {
                     updateSessionState(userId, 'MARKET_SUBMIT_OFFER', session.data);
                     await message.reply(`🤫 *ANONYMOUS OFFER*\n\nType your offer below (either a Cash Amount or an Item to Trade).\nYour identity will remain completely hidden from the seller.\n\n(Type *0* to cancel)`);
@@ -1685,7 +1744,12 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             case 'MARKET_SUBMIT_OFFER': {
-                if (input === '0') { updateSessionState(userId, 'MARKET_HOME', session.data); await message.reply("Cancelled."); return; }
+                if (input === '0') { 
+                    updateSessionState(userId, 'MARKET_MAKE_OFFER', session.data); 
+                    const item = db.classes[session.data.loggedInClass].marketplace[session.data.itemIdx];
+                    await message.reply(`📦 *ITEM DETAILS*\n━━━━━━━━━━━━━━━━━━\n🏷️ Item: ${item.itemName}\n🔖 Type: ${item.type}\n${item.type === 'CASH' ? '💰 Price' : '🔄 Wants'}: ${item.price}\n🛑 Status: ${item.status}\n\n1. 💸 Make an Anonymous Offer\n0. 🔙 Back`);
+                    return; 
+                }
                 
                 const mDb = db.classes[session.data.loggedInClass].marketplace;
                 const item = mDb[session.data.itemIdx];
@@ -1720,6 +1784,12 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             case 'MARKET_SELL_NAME': {
+                if (input === '0') { 
+                    updateSessionState(userId, 'MARKET_SELL_TYPE', session.data); 
+                    await message.reply(`🏷️ *CREATE LISTING*\n\nHow do you want to trade this item?\n1. 💰 Sell for Cash\n2. 🔄 Barter (Trade for something else)\n\n0. 🔙 Cancel`); 
+                    return; 
+                }
+
                 updateSessionState(userId, 'MARKET_SELL_PRICE', { ...session.data, sellName: input });
                 const prompt = session.data.sellType === 'CASH' ? '💰 What is your asking price? (e.g., 15000 Ksh)' : '🔄 What are you looking to get in exchange? (e.g., Help with a Java Project)';
                 await message.reply(prompt);
@@ -1727,6 +1797,12 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             case 'MARKET_SELL_PRICE': {
+                if (input === '0') { 
+                    updateSessionState(userId, 'MARKET_SELL_NAME', session.data); 
+                    await message.reply(`🏷️ What is the Name of the item?\n(e.g., Used HP Laptop, Networking Notes)\n\n0. 🔙 Back`); 
+                    return; 
+                }
+
                 const mDb = db.classes[session.data.loggedInClass];
                 mDb.marketplace.push({
                     id: 'mkt_' + Date.now(),
@@ -1902,9 +1978,14 @@ async function handleInput(client, message, userId, text, userName) {
                 break;
             }
 
-            case 'REP_POLL_OPTIONS': {
-                if (input === '0') { updateSessionState(userId, 'REP_POLL_MENU', session.data); await message.reply("Cancelled."); return; }
-                const options = input.split(',').map(o => o.trim()).filter(o => o.length > 0);
+            case 'REP_POLL_DURATION': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_POLL_OPTIONS', session.data);
+                    await message.reply(`✅ Question saved: *${session.data.pollQuestion}*\n\nNow, enter the options separated by commas.\n(e.g., Monday 8AM, Tuesday 2PM, Cancel it)\n\n*Note: I will automatically add an "Abstain / Don't Vote" option for you.*\n\n0. 🔙 Back`);
+                    return;
+                }
+                
+                    const options = input.split(',').map(o => o.trim()).filter(o => o.length > 0);
                 if (options.length < 2) {
                     await message.reply(`❌ You must provide at least two options separated by a comma. Try again:`);
                     return;
@@ -2120,8 +2201,8 @@ async function handleInput(client, message, userId, text, userName) {
             // WIZARD STEP 2: UNIT
             case 'REP_DEADLINES_ADD_UNIT': {
                 if (input === '0') {
-                    updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
-                    await message.reply(`📚 Returning to Deadlines Menu... Type 6 to open again.`);
+                    updateSessionState(userId, 'REP_DEADLINES_ADD_TYPE', session.data);
+                    await message.reply(`➕ *ADD NEW DEADLINE (Step 1 of 4)*\n\nWhat type of assessment is this?\nReply with the number:\n\n1. 🔴 CAT / Exam\n2. 📘 Assignment\n3. 👥 Group Project\n\n0. 🔙 Cancel`);
                     return;
                 }
                 
@@ -2136,8 +2217,8 @@ async function handleInput(client, message, userId, text, userName) {
             // WIZARD STEP 3: DETAILS
             case 'REP_DEADLINES_ADD_DESC': {
                 if (input === '0') {
-                    updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
-                    await message.reply(`📚 Returning to Deadlines Menu....`);
+                    updateSessionState(userId, 'REP_DEADLINES_ADD_UNIT', session.data);
+                    await message.reply(`✅ Type Selected: *${session.data.newDeadline.type}*\n\n➕ *ADD NEW DEADLINE (Step 2 of 4)*\n\nWhat is the *Unit Name*?\n(e.g., Database Systems)\n\n0. 🔙 Back`);
                     return;
                 }
                 
@@ -2152,8 +2233,8 @@ async function handleInput(client, message, userId, text, userName) {
             // WIZARD STEP 4: PARSE DATE & SAVE
             case 'REP_DEADLINES_ADD_DATE': {
                 if (input === '0') {
-                    updateSessionState(userId, 'REP_DEADLINES_MENU', session.data);
-                    await message.reply(`📚 Returning to Deadlines Menu...`);
+                    updateSessionState(userId, 'REP_DEADLINES_ADD_DESC', session.data);
+                    await message.reply(`✅ Unit Saved: *${session.data.newDeadline.unit}*\n\n➕ *ADD NEW DEADLINE (Step 3 of 4)*\n\nEnter the task details or submission link.\n(e.g., Chapter 4 PDF due on portal)\n\n0. 🔙 Back`);
                     return;
                 }
                 
