@@ -2910,6 +2910,76 @@ async function handleInput(client, message, userId, text, userName) {
     }
 }
 
+// --- LIVE RADAR ENGINE ---
+function getCurrentClassStatus(classData) {
+    const currentEAT = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Nairobi"}));
+    const daysList = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const todayStr = daysList[currentEAT.getDay()];
+    const currentMins = (currentEAT.getHours() * 60) + currentEAT.getMinutes();
+    
+    // Get date key for temporary exceptions (e.g., 2026-09-23)
+    const y = currentEAT.getFullYear();
+    const m = String(currentEAT.getMonth() + 1).padStart(2, '0');
+    const d = String(currentEAT.getDate()).padStart(2, '0');
+    const dateKey = `${y}-${m}-${d}`;
+
+    const todayClasses = classData.timetable?.[todayStr] || [];
+    const todayExceptions = classData.exceptions?.[dateKey] || {};
+
+    let ongoingClass = null;
+    let nextClass = null;
+    let minDiff = Infinity;
+
+    const processSlot = (unitName, startMins, endMins, displayTime) => {
+        if (currentMins >= startMins && currentMins <= endMins) {
+            ongoingClass = unitName;
+        } else if (startMins > currentMins) {
+            const diff = startMins - currentMins;
+            if (diff < minDiff) {
+                minDiff = diff;
+                nextClass = { unit: unitName, diff };
+            }
+        }
+    };
+
+    // 1. Check Master Timetable
+    todayClasses.forEach(c => {
+        if (todayExceptions[c.unit] && todayExceptions[c.unit].status === 'CANCELLED') return;
+        
+        let sMins = c.startMinutes;
+        let eMins = c.endMinutes;
+
+        // Fallback for older classes created before the time upgrade
+        if (sMins === undefined && c.time) {
+            const match = c.time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+            if (match) {
+                let h = parseInt(match[1]); let min = parseInt(match[2]);
+                if (match[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+                if (match[3].toUpperCase() === 'AM' && h === 12) h = 0;
+                sMins = (h * 60) + min;
+                eMins = sMins + 180; // Estimate 3 hours
+            }
+        }
+        if (sMins !== undefined) processSlot(c.unit, sMins, eMins, c.startTime || c.time);
+    });
+
+    // 2. Check for classes temporarily moved TO today
+    for (const exKey in todayExceptions) {
+        const ex = todayExceptions[exKey];
+        if (ex.status === 'MOVED') processSlot(ex.unit, ex.startMinutes, ex.endMinutes, ex.startTime);
+    }
+
+    if (ongoingClass) return `🟢 ONGOING: ${ongoingClass}`;
+    if (nextClass) {
+        const hrs = Math.floor(nextClass.diff / 60);
+        const mins = nextClass.diff % 60;
+        const tStr = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+        return `⏳ NEXT: ${nextClass.unit} (in ${tStr})`;
+    }
+    
+    return todayClasses.length > 0 ? "✅ ALL FINISHED TODAY" : "🏖️ FREE DAY";
+}
+
 // UI Helpers for Dashboards
 async function sendRepDashboard(message, className) {
     const db = readClassDB();
@@ -2917,6 +2987,8 @@ async function sendRepDashboard(message, className) {
     const metrics = getPortalMetrics(className, classData.repId);
     
     const repStatus = metrics.repOnline ? '🟢 ONLINE' : '🔴 OFFLINE';
+    const holidayStatus = classData.holidayMode ? '🌴 ACTIVE' : '🔴 OFF';
+    const classRadar = getCurrentClassStatus(classData);
 
     const menu = `╭──────────────────────────────╮
 │        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
@@ -2925,7 +2997,9 @@ async function sendRepDashboard(message, className) {
 │           \`[ ${className} ]\`         
 │                               
 │   👑 CLASSREP STATUS: ${repStatus}          
-│   👥 STUDENTS : ${metrics.activeCount}🟢 ONLINE           
+│   👥 STUDENTS : ${metrics.activeCount}🟢 ONLINE     
+│   🌴 HOLIDAY MODE : ${holidayStatus}  
+│   📡 RADAR: ${classRadar}    
 ╰──────────────────────────────╯
   
   ┌─── ░◈ _*CONTROL BOARD*_ ◈░ ───────┐
@@ -2941,7 +3015,59 @@ async function sendRepDashboard(message, className) {
   │🎲 \`9\` ☞『_*Syndicate Maker*_』
   │🤫 \`10\` ☞『_*Whisper Inbox (Feedback)*_』
   │🛒 \`11\` ☞『_*Hustle Board (Market)*_』
-  │📊 \`12\` ☞『Manage Polls』
+  │📊 \`12\` ☞『_*Manage Polls*_』
+  │🌴 \`13\` ☞『_*Toggle Holiday Mode*_』
+  │🔙 \`0\` ☞『_*Main Menu*_』
+  │🚪 \`99\` ☞『_*Logout*_』
+  │
+  └──────────────────────────────┘
+          ⚡ _*TUM*_ × _*CHAOS*_ ⚡`;
+  
+    await message.reply(menu);
+}
+
+async function sendStudentDashboard(message, className, studentName) {
+    const db = readClassDB();
+    const classData = db.classes[className] || {};
+
+    const polls = classData.polls || [];
+    const marketplace = classData.marketplace || [];
+    const assessments = classData.assessments || [];
+    
+    const activePollsCount = polls.filter(p => p.status === 'ACTIVE').length;
+    const marketCount = marketplace.filter(i => i.status === 'ACTIVE').length;
+    const activeDeadlines = assessments.filter(a => a.timestamp > Date.now()).length;
+    const rcStatus = classData.activeRollCall ? '🟢 ACTIVE' : '🔴 CLOSED';
+
+    const metrics = getPortalMetrics(className, classData.repId);
+    const repStatus = metrics.repOnline ? '🟢 ONLINE' : '🔴 OFFLINE';
+    const classRadar = getCurrentClassStatus(classData);
+
+    const menu = `╭──────────────────────────────╮
+│        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
+│                               
+│        \`STUDENT PORTAL\`       
+│           \`[ ${className} ]\`         
+│                               
+│   👤 STUDENT: ${studentName}          
+│   📝 ROLL CALL: ${rcStatus}           
+│   👑 CLASSREP : ${repStatus}
+│   👥 CLASSMATES : ${metrics.activeCount}🟢 ONLINE
+│   📡 RADAR: ${classRadar}
+╰──────────────────────────────╯
+  
+  ┌─── ░◈ _*STUDENT HUB*_ ◈░ ────────┐
+  │
+  │📅 \`1\` ☞『_*Today's Classes*_』
+  │🗓️ \`2\` ☞『_*Full Timetable*_』
+  │⏳ \`3\` ☞『_*Upcoming Deadlines (${activeDeadlines})*_』
+  │📢 \`4\` ☞『_*View Class Updates*_』
+  │👥 \`5\` ☞『_*View Classmates*_』
+  │⏱️ \`6\` ☞『_*Chronos Engine (Next Class)*_』
+  │🤫 \`7\` ☞『_*Whisper Protocol (Feedback)*_』
+  │👻 \`8\` ☞『_*Sign Attendance (Ghost Tracker)*_』
+  │🛒 \`9\` ☞『_*Hustle Board (${marketCount} Active)*_』
+  │📊 \`10\` ☞『_*View Polls (${activePollsCount} Active)*_』
   │🔙 \`0\` ☞『_*Main Menu*_』
   │🚪 \`99\` ☞『_*Logout*_』
   │
@@ -2979,49 +3105,6 @@ async function sendStudentGateway(message, className) {
       ⚡ _*TUM*_ × _*CHAOS*_ ⚡`;
 
   await message.reply(menu);
-}
-
-async function sendRepDashboard(message, className) {
-    const db = readClassDB();
-    const classData = db.classes[className] || {};
-    const metrics = getPortalMetrics(className, classData.repId);
-    
-    const repStatus = metrics.repOnline ? '🟢 ONLINE' : '🔴 OFFLINE';
-    const holidayStatus = classData.holidayMode ? '🌴 ACTIVE' : '🔴 OFF';
-
-    const menu = `╭──────────────────────────────╮
-│        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
-│                               
-│         \`REP COMMAND\`         
-│           \`[ ${className} ]\`         
-│                               
-│   👑 CLASSREP STATUS: ${repStatus}          
-│   👥 STUDENTS : ${metrics.activeCount}🟢 ONLINE     
-│   🌴 HOLIDAY MODE : ${holidayStatus}      
-╰──────────────────────────────╯
-  
-  ┌─── ░◈ _*CONTROL BOARD*_ ◈░ ───────┐
-  │
-  │📅 \`1\` ☞『_*Manage Timetable*_』
-  │📢 \`2\` ☞『_*Manage Updates*_』
-  │👥 \`3\` ☞『_*Class Members & Attendance*_』
-  │🚨 \`4\` ☞『_*Resolve Issues*_』
-  │📜 \`5\` ☞『_*View Audit Logs*_』
-  │✅ \`6\` ☞『_*Start Roll Call*_』
-  │🛑 \`7\` ☞『_*Close Roll Call*_』
-  │📚 \`8\` ☞『_*Manage Deadlines*_』
-  │🎲 \`9\` ☞『_*Syndicate Maker*_』
-  │🤫 \`10\` ☞『_*Whisper Inbox (Feedback)*_』
-  │🛒 \`11\` ☞『_*Hustle Board (Market)*_』
-  │📊 \`12\` ☞『_*Manage Polls*_』
-  │🌴 \`13\` ☞『_*Toggle Holiday Mode*_』
-  │🔙 \`0\` ☞『_*Main Menu*_』
-  │🚪 \`99\` ☞『_*Logout*_』
-  │
-  └──────────────────────────────┘
-          ⚡ _*TUM*_ × _*CHAOS*_ ⚡`;
-  
-    await message.reply(menu);
 }
 
 /**
