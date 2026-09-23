@@ -319,8 +319,16 @@ async function handleInput(client, message, userId, text, userName) {
 
             case 'ENTER_CLASS_PASS': {
                 if (input === '0') {
-                    updateSessionState(userId, 'MAIN_MENU');
-                    await sendMainMenu(message);
+                    const db = readClassDB();
+                    const classes = Object.keys(db.classes);
+                    let classList = `🏫 *AVAILABLE CLASSES*\n━━━━━━━━━━━━━━━━━━\n`;
+                    classes.forEach((cls, idx) => {
+                        classList += `${idx + 1}. ${cls}\n`;
+                    });
+                    classList += `\n*Reply with the number of your class:*\n(Type *0* to go back)`;
+                    
+                    updateSessionState(userId, 'SELECT_CLASS', session.data);
+                    await message.reply(classList);
                     return;
                 }
 
@@ -1978,14 +1986,14 @@ async function handleInput(client, message, userId, text, userName) {
                 break;
             }
 
-            case 'REP_POLL_DURATION': {
+            case 'REP_POLL_OPTIONS': {
                 if (input === '0') {
-                    updateSessionState(userId, 'REP_POLL_OPTIONS', session.data);
-                    await message.reply(`✅ Question saved: *${session.data.pollQuestion}*\n\nNow, enter the options separated by commas.\n(e.g., Monday 8AM, Tuesday 2PM, Cancel it)\n\n*Note: I will automatically add an "Abstain / Don't Vote" option for you.*\n\n0. 🔙 Back`);
+                    updateSessionState(userId, 'REP_POLL_QUESTION', session.data);
+                    await message.reply(`📊 *CREATE NEW POLL*\n\nWhat is the question for the class?\n(e.g., When should we schedule the makeup class?)\n\n(Type *0* to cancel)`);
                     return;
                 }
                 
-                    const options = input.split(',').map(o => o.trim()).filter(o => o.length > 0);
+                const options = input.split(',').map(o => o.trim()).filter(o => o.length > 0);
                 if (options.length < 2) {
                     await message.reply(`❌ You must provide at least two options separated by a comma. Try again:`);
                     return;
@@ -2511,7 +2519,11 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             case 'STUDENT_REG_ADM': {
-              if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
+                if (input === '0') { 
+                    updateSessionState(userId, 'STUDENT_REG_NAME', session.data); 
+                    await message.reply(`📝 *STUDENT REGISTRATION*\n\nEnter your *Full Name*:\n(Type *0* to cancel)`); 
+                    return; 
+                }
               
               const cleanAdm = input.trim().toUpperCase();
               const members = db.classes[session.data.loggedInClass].members;
@@ -2531,22 +2543,36 @@ async function handleInput(client, message, userId, text, userName) {
               break;
           }
 
-            case 'STUDENT_REG_PASS': {
-              if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
+          case 'STUDENT_REG_PASS': {
+            if (input === '0') { 
+                updateSessionState(userId, 'STUDENT_REG_ADM', session.data); 
+                await message.reply(`✅ Name saved: *${session.data.regName}*\n\nEnter your *Admission Number* (e.g., BSIT/045J/2024):`); 
+                return; 
+            }
+
               updateSessionState(userId, 'STUDENT_REG_SEC_Q', { ...session.data, regPass: input });
               await message.reply(`✅ Password saved.\n\n🛡️ *SECURITY RECOVERY*\nPlease type a custom *Security Question* (e.g., What is my pet's name?, What is my favorite movie?).\n\nYou will be asked this if you forget your password:`);
               break;
           }
 
           case 'STUDENT_REG_SEC_Q': {
-              if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
+                if (input === '0') { 
+                    updateSessionState(userId, 'STUDENT_REG_PASS', session.data); 
+                    await message.reply(`✅ Admission No saved: *${session.data.regAdm}*\n\nCreate a *Personal Password* for your portal login:\n(Make it secure but easy to remember!)`); 
+                    return; 
+                }
+
               updateSessionState(userId, 'STUDENT_REG_SEC_A', { ...session.data, secQuestion: input });
               await message.reply(`✅ Question saved: *${input}*\n\nNow, type the *Answer* to your question:\n(Keep it simple and easy to remember!)`);
               break;
           }
 
           case 'STUDENT_REG_SEC_A': {
-              if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
+            if (input === '0') { 
+                updateSessionState(userId, 'STUDENT_REG_SEC_Q', session.data); 
+                await message.reply(`✅ Password saved.\n\n🛡️ *SECURITY RECOVERY*\nPlease type a custom *Security Question* (e.g., What is my pet's name?, What is my favorite movie?).\n\nYou will be asked this if you forget your password:`); 
+                return; 
+            }
               
               // Save to Database
               const newMemberId = `std_${Date.now()}`;
@@ -2607,8 +2633,20 @@ async function handleInput(client, message, userId, text, userName) {
               break;
           }
 
-            case 'STUDENT_LOGIN_PASS': {
-                if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
+          case 'STUDENT_LOGIN_PASS': {
+            if (input === '0') { 
+                const db = readClassDB();
+                const members = db.classes[session.data.loggedInClass].members;
+                let memberList = `👥 *SELECT YOUR NAME*\n━━━━━━━━━━━━━━━━━━\n`;
+                session.data.memberIds.forEach((mId, idx) => {
+                    memberList += `${idx + 1}. ${members[mId].name}\n`;
+                });
+                memberList += `\n*Reply with your number:*\n(Type *0* to go back)`;
+                
+                updateSessionState(userId, 'STUDENT_LOGIN_SELECT', session.data); 
+                await message.reply(memberList);
+                return; 
+            }
                 
                 const targetStudentId = session.data.loginTargetId;
                 const studentRecord = db.classes[session.data.loggedInClass].members[targetStudentId];
@@ -2678,7 +2716,19 @@ async function handleInput(client, message, userId, text, userName) {
 
             // --- REP UNLOCK / OTP FLOW ---
             case 'STUDENT_LOGIN_OTP': {
-              if (input === '0') { updateSessionState(userId, 'STUDENT_GATEWAY', session.data); await sendStudentGateway(message, session.data.loggedInClass); return; }
+                if (input === '0') { 
+                    const db = readClassDB();
+                    const members = db.classes[session.data.loggedInClass].members;
+                    let memberList = `👥 *SELECT YOUR NAME*\n━━━━━━━━━━━━━━━━━━\n`;
+                    session.data.memberIds.forEach((mId, idx) => {
+                        memberList += `${idx + 1}. ${members[mId].name}\n`;
+                    });
+                    memberList += `\n*Reply with your number:*\n(Type *0* to go back)`;
+                    
+                    updateSessionState(userId, 'STUDENT_LOGIN_SELECT', session.data); 
+                    await message.reply(memberList);
+                    return; 
+                }
               
               const otpTargetId = session.data.loginTargetId;
               const otpRecord = db.classes[session.data.loggedInClass].members[otpTargetId];

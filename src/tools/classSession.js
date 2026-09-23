@@ -215,10 +215,22 @@ function startPollMonitor(client) {
                     // Save the result string in the poll object so dashboards can view it
                     poll.finalResultStr = resultMsg;
 
-                    // DM the Rep automatically
+                    // 1. Blast the final tally to every registered student safely
+                    const members = classData.members || {};
+                    for (const mId in members) {
+                        try {
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            await client.sendMessage(members[mId].phoneId, resultMsg);
+                        } catch (e) {
+                            console.warn(`[POLL] Could not send result to ${members[mId].name}`);
+                        }
+                    }
+
+                    // 2. DM the Rep automatically
                     if (classData.repId) {
                         try {
-                            await client.sendMessage(classData.repId, `📊 *POLL RESULTS ARE IN!*\n\n${resultMsg}\n\nStudents can now view these results in their Student Hub.`);
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            await client.sendMessage(classData.repId, `📊 *POLL FINISHED*\nYour class poll has ended and the results have been broadcasted to all students.\n\n${resultMsg}`);
                         } catch (e) {
                             console.warn(`[CLASS PORTAL] Failed to send poll results to rep for ${className}`);
                         }
@@ -228,7 +240,7 @@ function startPollMonitor(client) {
             }
         }
         if (dbChanged) writeClassDB(db);
-    }, 180000); // Check every minute
+    }, 60000); // Check every minute
 }
 
 function startTimetableMonitor(client) {
