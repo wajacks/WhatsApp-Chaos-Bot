@@ -5,6 +5,57 @@ const { timeToMinutes, minutesToTime, checkCollision } = require('../tools/timeH
 // --- NEW: MARKETPLACE LIVE CHAT REGISTRY ---
 const activeMarketChats = new Map();
 
+// Helper to combine registered students and ensure the Main Class Rep is always included
+function getAllClassParticipants(classData) {
+    const members = { ...(classData.members || {}) };
+    
+    // Check if the Rep is already in the members list
+    let repExists = false;
+    for (const mId in members) {
+        if (members[mId].phoneId === classData.repId) {
+            repExists = true;
+            break;
+        }
+    }
+    
+    // If the Rep isn't in members, inject a temporary participant profile for them
+    if (!repExists && classData.repId) {
+        members['rep_main_profile'] = {
+            name: classData.repName || 'Class Rep',
+            admission: 'REP',
+            phoneId: classData.repId,
+            isRep: true
+        };
+    }
+    
+    return members;
+}
+
+// Helper to sort members: Main Rep first (👑), Assistant Reps second (⭐), then alphabetical students
+function getSortedMemberIds(classData) {
+    const members = getAllClassParticipants(classData);
+    const mIds = Object.keys(members);
+    
+    return mIds.sort((idA, idB) => {
+        const a = members[idA];
+        const b = members[idB];
+        
+        const aIsRep = a.phoneId === classData.repId || a.isRep;
+        const bIsRep = b.phoneId === classData.repId || b.isRep;
+        
+        const aIsAsst = classData.assistantReps?.includes(a.phoneId);
+        const bIsAsst = classData.assistantReps?.includes(b.phoneId);
+        
+        if (aIsRep && !bIsRep) return -1;
+        if (!aIsRep && bIsRep) return 1;
+        
+        if (aIsAsst && !bIsAsst) return -1;
+        if (!aIsAsst && bIsAsst) return 1;
+        
+        return (a.name || '').localeCompare(b.name || '');
+    });
+}
+
 // Helper to count unread market notifications
 function getMarketNotifs(className, userId) {
     const db = readClassDB();
@@ -600,8 +651,10 @@ async function handleInput(client, message, userId, text, userName) {
                 }
 
                 const groupSize = parseInt(input.trim(), 10);
-                const membersObj = db.classes[session.data.loggedInClass].members;
-                const memberIds = Object.keys(membersObj);
+                const classData = db.classes[session.data.loggedInClass];
+                
+                const membersObj = getAllClassParticipants(classData);
+                const memberIds = getSortedMemberIds(classData);
 
                 if (isNaN(groupSize) || groupSize < 2) {
                     await message.reply(`❌ Invalid size. A group must have at least 2 members. Try again:`);
@@ -609,7 +662,7 @@ async function handleInput(client, message, userId, text, userName) {
                 }
 
                 if (groupSize >= memberIds.length) {
-                    await message.reply(`❌ Group size cannot be larger than the total number of students (${memberIds.length}). Try again:`);
+                    await message.reply(`❌ Group size cannot be larger than the total number of participants (${memberIds.length}). Try again:`);
                     return;
                 }
 
@@ -625,12 +678,21 @@ async function handleInput(client, message, userId, text, userName) {
                 for (let i = 0; i < shuffledIds.length; i += groupSize) {
                     const groupIds = shuffledIds.slice(i, i + groupSize);
                     
-                    // Map IDs back to minimal student objects to save in the DB
-                    const mappedGroup = groupIds.map(id => ({
-                        id: id,
-                        name: membersObj[id].name,
-                        admission: membersObj[id].admission
-                    }));
+                    const mappedGroup = groupIds.map(id => {
+                        const m = membersObj[id];
+                        const isRep = m.phoneId === classData.repId || m.isRep;
+                        const isAsst = classData.assistantReps?.includes(m.phoneId);
+                        
+                        let badge = '';
+                        if (isRep) badge = ' 👑';
+                        else if (isAsst) badge = ' ⭐';
+
+                        return {
+                            id: id,
+                            name: m.name + badge,
+                            admission: m.admission
+                        };
+                    });
                     
                     newSyndicates.push(mappedGroup);
                 }
@@ -638,7 +700,6 @@ async function handleInput(client, message, userId, text, userName) {
                 // 3. Save to database
                 db.classes[session.data.loggedInClass].syndicates = newSyndicates;
                 
-                // Add to audit logs
                 db.classes[session.data.loggedInClass].logs.push({
                     text: `Generated ${newSyndicates.length} random groups (Size: ${groupSize})`,
                     timestamp: Date.now()
@@ -647,7 +708,7 @@ async function handleInput(client, message, userId, text, userName) {
                 writeClassDB(db);
 
                 updateSessionState(userId, 'REP_SYNDICATE_MENU', session.data);
-                await message.reply(`🎉 *GROUPS SUCCESSFULLY GENERATED!*\n\nCreated *${newSyndicates.length}* groups of approximately *${groupSize}* students each.\n\nReply with *2* to view them, or *3* to broadcast them immediately to the class.\n\n0. 🔙 Back`);
+                await message.reply(`🎉 *GROUPS SUCCESSFULLY GENERATED!*\n\nCreated *${newSyndicates.length}* groups of approximately *${groupSize}* participants each (including the Class Rep).\n\nReply with *2* to view them, or *3* to broadcast them immediately to the class.\n\n0. 🔙 Back`);
                 break;
             }
 
@@ -1279,19 +1340,26 @@ async function handleInput(client, message, userId, text, userName) {
                     await sendRepDashboard(message, session.data.loggedInClass);
                     return;
                 }
-                const members = db.classes[session.data.loggedInClass].members;
-                const mIds = Object.keys(members);
+                const classData = db.classes[session.data.loggedInClass];
+                const members = getAllClassParticipants(classData);
+                const mIds = getSortedMemberIds(classData);
 
                 if (input === '1') {
                     if (mIds.length === 0) {
-                        await message.reply(`📭 No students registered yet.\n(Type *0* to go back)`);
+                        await message.reply(`📭 No participants registered yet.\n(Type *0* to go back)`);
                         return;
                     }
-                    let mList = `👥 *REGISTERED STUDENTS (${mIds.length})*\n━━━━━━━━━━━━━━━━━━\n`;
+                    let mList = `👥 *REGISTERED PARTICIPANTS (${mIds.length})*\n━━━━━━━━━━━━━━━━━━\n`;
                     mIds.forEach((id, idx) => {
                         const m = members[id];
-                        const isAsst = db.classes[session.data.loggedInClass].assistantReps?.includes(m.phoneId);
-                        mList += `${idx + 1}. ${m.name.toUpperCase()} (${m.admission.toUpperCase()}) ${isAsst ? '⭐_*Asst*_' : ''}\n`;
+                        const isRep = m.phoneId === classData.repId || m.isRep;
+                        const isAsst = classData.assistantReps?.includes(m.phoneId);
+                        
+                        let badge = '';
+                        if (isRep) badge = ' 👑 *[Class Rep]*';
+                        else if (isAsst) badge = ' ⭐ *[Asst Rep]*';
+
+                        mList += `${idx + 1}. ${m.name.toUpperCase()} (${m.admission.toUpperCase()})${badge}\n`;
                     });
                     await message.reply(mList + `\n(Type *0* to go back)`);
                 } else if (input === '2') {
@@ -2968,16 +3036,27 @@ async function handleInput(client, message, userId, text, userName) {
                     await message.reply(upStr + `(Type *0* to go back)`);
 
                 } else if (input === '5') {
-                    // View Classmates
-                    const classMates = Object.keys(sDb.members);
-                    if (classMates.length === 0) {
-                        await message.reply(`No other students registered yet.\n(Type *0* to go back)`);
+                    // View Classmates (including Rep and Assistants)
+                    const membersObj = getAllClassParticipants(sDb);
+                    const mIds = getSortedMemberIds(sDb);
+
+                    if (mIds.length === 0) {
+                        await message.reply(`No participants registered yet.\n(Type *0* to go back)`);
                         return;
                     }
-                    let cmStr = `👥 *YOUR CLASSMATES*\n━━━━━━━━━━━━━━━━━━\n`;
-                    classMates.forEach(mId => cmStr += `▪️ ${sDb.members[mId].name.toUpperCase()}\n`);
-                    await message.reply(cmStr + `\n(Type *0* to go back)`);
+                    let cmStr = `👥 *CLASS PARTICIPANTS (${mIds.length})*\n━━━━━━━━━━━━━━━━━━\n`;
+                    mIds.forEach((id, idx) => {
+                        const m = membersObj[id];
+                        const isRep = m.phoneId === sDb.repId || m.isRep;
+                        const isAsst = sDb.assistantReps?.includes(m.phoneId);
+                        
+                        let badge = '';
+                        if (isRep) badge = ' 👑 *[Class Rep]*';
+                        else if (isAsst) badge = ' ⭐ *[Asst Rep]*';
 
+                        cmStr += `${idx + 1}. ${m.name.toUpperCase()} (${m.admission.toUpperCase()})${badge}\n`;
+                    });
+                    await message.reply(cmStr + `\n(Type *0* to go back)`);
                 } else if (input === '6') {
                     // ⏱️ THE CHRONOS ENGINE
                     const currentEAT = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Nairobi"}));
