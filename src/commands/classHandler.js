@@ -174,7 +174,11 @@ async function handleInput(client, message, userId, text, userName) {
 
             // WIZARD STEP 1: CLASS
             case 'APP_CLASS': {
-                if (input === '0') { updateSessionState(userId, 'MAIN_MENU'); await sendMainMenu(message); return; }
+                if (input === '0') { 
+                    updateSessionState(userId, 'CREATE_CLASS_GATEWAY'); 
+                    await message.reply(`🛠️ *CLASS REP ONBOARDING*\n━━━━━━━━━━━━━━━━━━\n\nTo create a class portal, you must be an authorized Class Representative.\n\n1. 🎟️ I have an Authorization Code\n2. 📝 Apply for a Code\n\n(Type *0* to go back)`); 
+                    return; 
+                }
                 updateSessionState(userId, 'APP_LINK', { ...session.data, appClass: input.toUpperCase() });
                 await message.reply(`✅ Class saved: *${input.toUpperCase()}*\n\n📝 *REP APPLICATION (Step 2 of 2)*\n\nPaste the *WhatsApp Group Invite Link* for your class.\n\n⚠️ *CRITICAL:* Please ensure you are ready to accept join requests so the admin can verify your group!`);
                 break;
@@ -182,7 +186,11 @@ async function handleInput(client, message, userId, text, userName) {
 
             // WIZARD STEP 2: LINK & SUBMIT
             case 'APP_LINK': {
-                if (input === '0') { updateSessionState(userId, 'MAIN_MENU'); await sendMainMenu(message); return; }
+                if (input === '0') { 
+                    updateSessionState(userId, 'APP_CLASS'); 
+                    await message.reply(`📝 *REP APPLICATION (Step 1 of 2)*\n━━━━━━━━━━━━━━━━━━\n\nEnter your *Target Class & Year* (e.g., BSIT/2024):\n\n(Type *0* to cancel)`);
+                    return; 
+                }
                 
                 // 1. Send Application to Owner
                 const ownerJid = '254111659469@c.us'; // Your Master Owner Number
@@ -214,8 +222,8 @@ async function handleInput(client, message, userId, text, userName) {
             // NEW STATE: VERIFY THE AUTH CODE
             case 'CREATE_CLASS_AUTH': {
                 if (input === '0') {
-                    updateSessionState(userId, 'MAIN_MENU');
-                    await sendMainMenu(message);
+                    updateSessionState(userId, 'CREATE_CLASS_GATEWAY'); 
+                    await message.reply(`🛠️ *CLASS REP ONBOARDING*\n━━━━━━━━━━━━━━━━━━\n\nTo create a class portal, you must be an authorized Class Representative.\n\n1. 🎟️ I have an Authorization Code\n2. 📝 Apply for a Code\n\n(Type *0* to go back)`); 
                     return;
                 }
                 
@@ -235,8 +243,8 @@ async function handleInput(client, message, userId, text, userName) {
 
             case 'CREATE_CLASS_NAME': {
                 if (input === '0') {
-                    updateSessionState(userId, 'MAIN_MENU');
-                    await sendMainMenu(message);
+                    updateSessionState(userId, 'CREATE_CLASS_AUTH');
+                    await message.reply(`🔐 *AUTHORIZATION REQUIRED*\n\nPlease enter the *One-Time Authorization Code* provided by the Master Owner:\n\n(Type *0* to go back)`);
                     return;
                 }
                 
@@ -716,6 +724,9 @@ async function handleInput(client, message, userId, text, userName) {
                         }
                         ttStr += `\n`;
                     });
+                    
+                    // 🛡️ NEW: Catch the view state
+                    updateSessionState(userId, 'REP_TIMETABLE_VIEW', session.data);
                     await message.reply(ttStr + `(Type *0* to go back)`);
                 } else if (input === '2') {
                     // Start Wizard - Clear existing timetable to rebuild fresh
@@ -745,10 +756,27 @@ async function handleInput(client, message, userId, text, userName) {
                 break;
             }
 
+            case 'REP_TIMETABLE_VIEW': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_TIMETABLE_MENU', session.data);
+                    await message.reply(`📅 *TIMETABLE MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Current Timetable\n2. 🛠️ Run Timetable Wizard (Create new Timetable)\n3. Modify/Cancel Classes\n\n0. 🔙 Back to Dashboard`);
+                }
+                break;
+            }
+
             case 'TIMETABLE_WIZARD': {
                 if (input === '0') {
-                    updateSessionState(userId, 'REP_DASHBOARD', session.data);
-                    await sendRepDashboard(message, session.data.loggedInClass);
+                    if (session.data.dayIndex > 0) {
+                        // Go back exactly one day in the wizard
+                        const prevDayIdx = session.data.dayIndex - 1;
+                        updateSessionState(userId, 'TIMETABLE_WIZARD', { ...session.data, dayIndex: prevDayIdx });
+                        const daysList = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+                        await message.reply(`🔙 *STEPPED BACK*\n\nNow editing 📅 *${daysList[prevDayIdx].toUpperCase()}*.\n\nEnter a class (*Unit, Time*) or type *NEXT* if there are no classes.\n\n(Type *0* to step back again)`);
+                    } else {
+                        // If it's Sunday, exit the wizard back to the Timetable Menu
+                        updateSessionState(userId, 'REP_TIMETABLE_MENU', session.data);
+                        await message.reply(`📅 *TIMETABLE MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Current Timetable\n2. 🛠️ Run Timetable Wizard (Create new Timetable)\n3. Modify/Cancel Classes\n\n0. 🔙 Back to Dashboard`);
+                    }
                     return;
                 }
 
@@ -1850,7 +1878,11 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             case 'MARKET_PROCESS_BID': {
-                if (input === '0') { updateSessionState(userId, 'MARKET_HOME', session.data); await message.reply("Saved for later."); return; }
+                if (input === '0') { 
+                    updateSessionState(userId, 'MARKET_REVIEW_START', session.data); 
+                    await message.reply(`🔔 *YOUR NOTIFICATIONS*\n━━━━━━━━━━━━━━━━━━\n*You have pending offers to review.*\nReply with *1* to start reviewing them, or *0* to go back.`); 
+                    return; 
+                }
                 const { itemIdx, bidIdx } = session.data.target;
                 const mDb = db.classes[session.data.loggedInClass].marketplace;
                 const theBid = mDb[itemIdx].bids[bidIdx];
@@ -1897,7 +1929,12 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             case 'MARKET_REJECT_REASON': {
-                if (input === '0') { updateSessionState(userId, 'MARKET_HOME', session.data); await message.reply("Cancelled."); return; }
+                if (input === '0') { 
+                    updateSessionState(userId, 'MARKET_PROCESS_BID', session.data); 
+                    const target = session.data.target;
+                    await message.reply(`📝 *REVIEWING OFFER*\n━━━━━━━━━━━━━━━━━━\n📦 Item: ${target.item.itemName}\n👤 From: ${target.bid.alias}\n💵 Offer: ${target.bid.offer}\n\n1. ✅ Accept Offer\n2. ❌ Reject Offer\n3. 💬 Open Live Negotiation\n\n0. 🔙 Decide Later`);
+                    return; 
+                }
                 const { itemIdx, bidIdx } = session.data.target;
                 const mDb = db.classes[session.data.loggedInClass].marketplace;
                 
@@ -2014,6 +2051,11 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             case 'REP_POLL_DURATION': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_POLL_OPTIONS', session.data);
+                    await message.reply(`✅ Question saved: *${session.data.pollQuestion}*\n\nNow, enter the options separated by commas.\n(e.g., Monday 8AM, Tuesday 2PM, Cancel it)\n\n*Note: I will automatically add an "Abstain / Don't Vote" option for you.*`);
+                    return;
+                }
                 const hours = parseFloat(input);
                 if (isNaN(hours) || hours <= 0) {
                     await message.reply(`❌ Invalid duration. Please enter a valid number of hours (e.g., 2):`);
@@ -2680,6 +2722,13 @@ async function handleInput(client, message, userId, text, userName) {
             }
 
             case 'STUDENT_LOGIN_SEC': {
+                if (input === '0') {
+                    const db = readClassDB();
+                    const chosenStudent = db.classes[session.data.loggedInClass].members[session.data.loginTargetId];
+                    updateSessionState(userId, 'STUDENT_LOGIN_PASS', session.data);
+                    await message.reply(`🔐 *LOGIN: ${chosenStudent.name}*\n\nEnter your Personal Password:\n(Type *0* to go back)`);
+                    return;
+                }
               const secStudentId = session.data.loginTargetId;
               const secRecord = db.classes[session.data.loggedInClass].members[secStudentId];
               let secAttempts = session.data.secAttempts || 0;
@@ -2712,6 +2761,14 @@ async function handleInput(client, message, userId, text, userName) {
           }
 
             case 'STUDENT_RESET_PASS': {
+                if (input === '0') {
+                    const db = readClassDB();
+                    const chosenStudent = db.classes[session.data.loggedInClass].members[session.data.loginTargetId];
+                    updateSessionState(userId, 'STUDENT_LOGIN_PASS', { ...session.data, attempts: 0 });
+                    await message.reply(`🔐 *LOGIN: ${chosenStudent.name}*\n\nEnter your Personal Password:\n(Type *0* to go back)`);
+                    return;
+                }
+
                 const resetStudentId = session.data.loginTargetId;
                 db.classes[session.data.loggedInClass].members[resetStudentId].password = input;
                 writeClassDB(db);
@@ -2828,6 +2885,9 @@ async function handleInput(client, message, userId, text, userName) {
                     } else {
                         todayClasses.forEach(c => todayRes += `▪️ *${c.unit}* @ ${c.time}\n`);
                     }
+                    
+                    // 🛡️ NEW: Locks them in a view state so 0 goes back to Dashboard
+                    updateSessionState(userId, 'STUDENT_VIEW_ONLY', session.data);
                     await message.reply(todayRes + `\n(Type *0* to go back)`);
 
                 } else if (input === '2') {
@@ -2842,6 +2902,9 @@ async function handleInput(client, message, userId, text, userName) {
                         }
                     });
                     if (ttFull === `🗓️ *FULL TIMETABLE*\n━━━━━━━━━━━━━━━━━━\n`) ttFull += `No classes scheduled yet.\n`;
+                    
+                    // 🛡️ NEW: Locks them in a view state so 0 goes back to Dashboard
+                    updateSessionState(userId, 'STUDENT_VIEW_ONLY', session.data);
                     await message.reply(ttFull + `(Type *0* to go back)`);
 
                 } else if (input === '3') {
@@ -3012,6 +3075,14 @@ async function handleInput(client, message, userId, text, userName) {
                     await message.reply(resStr + `(Type *0* to go back)`);
                  } else {
                     await message.reply(`❌ Invalid choice. Type 1-9, 0 to go back, or 99 to exit.`);
+                }
+                break;
+            }
+
+            case 'STUDENT_VIEW_ONLY': {
+                if (input === '0') {
+                    updateSessionState(userId, 'STUDENT_DASHBOARD', session.data);
+                    await sendStudentDashboard(message, session.data.loggedInClass, session.data.studentName);
                 }
                 break;
             }
