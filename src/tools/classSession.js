@@ -331,16 +331,24 @@ function startTimetableMonitor(client) {
 }
 
 // Helper to blast all students
-async function broadcastToClass(client, classData, messageText) {
+// Fire and forget: Do not use 'await' when calling this function
+function broadcastToClass(client, classData, messageText) {
     const members = classData.members || {};
-    for (const mId in members) {
-        try {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            await client.sendMessage(members[mId].phoneId, messageText);
-        } catch (e) {
-            console.warn(`Failed to broadcast to ${members[mId].name}`);
+    const memberIds = Object.keys(members);
+    
+    // Background execution wrapper
+    (async () => {
+        for (let i = 0; i < memberIds.length; i++) {
+            const mId = memberIds[i];
+            try {
+                // Keep the anti-spam delay, but now it doesn't block the rest of the bot
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                await client.sendMessage(members[mId].phoneId, messageText);
+            } catch (e) {
+                console.warn(`Failed to broadcast to ${members[mId].name}`);
+            }
         }
-    }
+    })(); // Execute immediately in background
 }
 
 function getPortalMetrics(className, repId) {

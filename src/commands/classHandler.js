@@ -1262,7 +1262,7 @@ async function handleInput(client, message, userId, text, userName) {
                     mIds.forEach((id, idx) => {
                         const m = members[id];
                         const isAsst = db.classes[session.data.loggedInClass].assistantReps?.includes(m.phoneId);
-                        mList += `${idx + 1}. ${m.name} (${m.admission}) ${isAsst ? '⭐ *[Asst]*' : ''}\n`;
+                        mList += `${idx + 1}. ${m.name.toUpperCase()} (${m.admission.toUpperCase()}) ${isAsst ? '⭐_*Asst*_' : ''}\n`;
                     });
                     await message.reply(mList + `\n(Type *0* to go back)`);
                 } else if (input === '2') {
@@ -1272,7 +1272,7 @@ async function handleInput(client, message, userId, text, userName) {
                     }
                     let mList = `🗑️ *REMOVE A STUDENT*\n━━━━━━━━━━━━━━━━━━\n`;
                     mIds.forEach((id, idx) => {
-                        mList += `${idx + 1}. ${members[id].name} (${members[id].admission})\n`;
+                        mList += `${idx + 1}. ${members[id].name.toUpperCase()} (${members[id].admission.toUpperCase()})\n`;
                     });
                     mList += `\n*Reply with the number to REMOVE them:*\n(Type *0* to cancel)`;
                     updateSessionState(userId, 'REP_MEMBERS_REMOVE', { ...session.data, memberIds: mIds });
@@ -1285,7 +1285,7 @@ async function handleInput(client, message, userId, text, userName) {
                     let mList = `🎖️ *PROMOTE TO ASSISTANT*\n━━━━━━━━━━━━━━━━━━\n`;
                     mIds.forEach((id, idx) => {
                         const isAsst = db.classes[session.data.loggedInClass].assistantReps?.includes(members[id].phoneId);
-                        mList += `${idx + 1}. ${members[id].name} (${members[id].admission}) ${isAsst ? '⭐ *(Already Asst)*' : ''}\n`;
+                        mList += `${idx + 1}. ${members[id].name.toUpperCase()} (${members[id].admission.toUpperCase()}) ${isAsst ? '⭐ *(Already Asst)*' : ''}\n`;
                     });
                     mList += `\n*Reply with the number to PROMOTE them:*\n(Type *0* to cancel)`;
                     updateSessionState(userId, 'REP_MEMBERS_PROMOTE', { ...session.data, memberIds: mIds });
@@ -1299,7 +1299,7 @@ async function handleInput(client, message, userId, text, userName) {
                     let mList = `🔻 *REVOKE ASSISTANT*\n━━━━━━━━━━━━━━━━━━\n`;
                     const asstIds = mIds.filter(id => assistants.includes(members[id].phoneId));
                     asstIds.forEach((id, idx) => {
-                        mList += `${idx + 1}. ${members[id].name} (${members[id].admission})\n`;
+                        mList += `${idx + 1}. ${members[id].name.toUpperCase()} (${members[id].admission.toUpperCase()})\n`;
                     });
                     mList += `\n*Reply with the number to REVOKE them:*\n(Type *0* to cancel)`;
                     updateSessionState(userId, 'REP_MEMBERS_REVOKE', { ...session.data, asstIds });
@@ -1327,7 +1327,7 @@ async function handleInput(client, message, userId, text, userName) {
                         const attended = m.attendedClasses || 0;
                         const percentage = Math.round((attended / totalSessions) * 100);
                         const icon = percentage < 50 ? '🚨' : (percentage < 75 ? '⚠️' : '✅');
-                        ghostStr += `${icon} *${m.name}*: ${attended}/${totalSessions} (${percentage}%)\n`;
+                        ghostStr += `${icon} *${m.name.toUpperCase()}*: ${attended}/${totalSessions} (${percentage}%)\n`;
                     });
 
                     await message.reply(ghostStr + `\n(Type *0* to go back)`);
@@ -2911,7 +2911,7 @@ async function handleInput(client, message, userId, text, userName) {
                         return;
                     }
                     let cmStr = `👥 *YOUR CLASSMATES*\n━━━━━━━━━━━━━━━━━━\n`;
-                    classMates.forEach(mId => cmStr += `▪️ ${sDb.members[mId].name}\n`);
+                    classMates.forEach(mId => cmStr += `▪️ ${sDb.members[mId].name.toUpperCase()}\n`);
                     await message.reply(cmStr + `\n(Type *0* to go back)`);
 
                 } else if (input === '6') {

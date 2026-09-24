@@ -308,7 +308,12 @@ const clientOptions = {
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--js-flags=--max-old-space-size=2048'
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--mute-audio'
         ]
     }
 };
@@ -2055,13 +2060,13 @@ client.on('message', async message => {
                             ? 'pm2.cmd'
                             : 'pm2';
 
-                    execFile(
-                        pm2Command,
-                        ['restart', 'chaos-bot'],
-                        {
-                            windowsHide: true
-                        },
-                        (error, stdout, stderr) => {
+                            execFile(
+                                pm2Command,
+                                ['restart', 'chaos-bot', '--node-args=--max-old-space-size=1024'],
+                                {
+                                    windowsHide: true
+                                },
+                                (error, stdout, stderr) => {
 
                             if (error) {
                                 console.error(
@@ -2468,7 +2473,8 @@ client.on('message', async message => {
                     setTimeout(() => {
                         runCommand(
                             pm2Command,
-                            ['restart', 'chaos-bot'],
+                            // ADDED: V8 Garbage Collection Memory Cap
+                            ['restart', 'chaos-bot', '--node-args=--max-old-space-size=1024'],
                             {
                                 cwd: projectDir,
                                 maxBuffer: 1024 * 1024
