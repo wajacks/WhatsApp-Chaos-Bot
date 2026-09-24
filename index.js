@@ -357,6 +357,7 @@ function initializeChaosBot(options) {
         startDeadlineMonitor(client);
         startPollMonitor(client);
         startDailyReminders(client);
+        startTimetableMonitor(client)
     });
 
     client.on('authenticated', () => {

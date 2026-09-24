@@ -244,19 +244,21 @@ function startPollMonitor(client) {
 }
 
 function startTimetableMonitor(client) {
-    console.log("[CLASS PORTAL] 🏫 Timetable & Auto-Roll Call Daemon Started...");
+    console.log("[CLASS PORTAL] 🏫 Timetable & Auto-Roll Call Daemon Started (Cron Engine)...");
     
-    // Runs every 60 seconds
-    setInterval(async () => {
+    // Runs every minute with explicit East Africa Time enforcement
+    cron.schedule('* * * * *', async () => {
         const db = readClassDB();
         
-        // Get precise Mombasa time
+        // Get precise Mombasa time via cron's native timezone handling
         const nowEAT = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Nairobi"}));
         const currentMinutes = (nowEAT.getHours() * 60) + nowEAT.getMinutes();
         
         const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         const todayStr = days[nowEAT.getDay()];
         const todayDateKey = nowEAT.toISOString().split('T')[0];
+
+        let dbChanged = false;
 
         for (const className in db.classes) {
             const classData = db.classes[className];
@@ -271,7 +273,7 @@ function startTimetableMonitor(client) {
                 const isCancelled = classData.exceptions?.[todayDateKey]?.[cls.unit]?.status === 'CANCELLED';
                 if (isCancelled) continue; // Skip all alerts
 
-                // 1. THE 3/4 -HOUR WARNING (With Anti-Spam)
+                // 1. THE 45-MINUTE WARNING (With Anti-Spam)
                 if (cls.startMinutes - currentMinutes === 45) {
                     let shouldWarn = true;
                     // Anti-Spam Check: Did a class just end?
@@ -282,7 +284,7 @@ function startTimetableMonitor(client) {
                     }
 
                     if (shouldWarn) {
-                        broadcastToClass(client, classData, `⏳ *UPCOMING CLASS*\n\n${cls.unit} begins in exactly 2 hours at ${cls.startTime}.`);
+                        broadcastToClass(client, classData, `⏳ *UPCOMING CLASS*\n\n${cls.unit} begins in exactly 45 minutes at ${cls.startTime}.`);
                     }
                 }
 
@@ -292,8 +294,12 @@ function startTimetableMonitor(client) {
                     broadcastToClass(client, classData, msg);
                     
                     // Auto-open the database roll call flag
-                    classData.activeRollCall = cls.unit;
-                    writeClassDB(db);
+                    classData.activeRollCall = {
+                        unit: cls.unit,
+                        date: todayDateKey,
+                        attendees: {}
+                    };
+                    dbChanged = true;
                 }
 
                 // 3. THE END TRIGGER & ROLL CALL CLOSURE
@@ -302,32 +308,37 @@ function startTimetableMonitor(client) {
                     
                     // Auto-close roll call
                     delete classData.activeRollCall;
-                    writeClassDB(db);
+                    dbChanged = true;
+                }
+            }
+
+            // Process any Temporary Makeup Classes scheduled for today
+            const todaysExceptions = classData.exceptions?.[todayDateKey] || {};
+            for (const key in todaysExceptions) {
+                const makeupClass = todaysExceptions[key];
+                if (makeupClass.status === 'MOVED') {
+                    // Start Trigger
+                    if (currentMinutes === makeupClass.startMinutes) {
+                        broadcastToClass(client, classData, `🟢 *MAKEUP CLASS STARTING*\n\n🏫 *Unit:* ${makeupClass.unit}\n⏰ *Time:* ${makeupClass.startTime} - ${makeupClass.endTime}\n\n_The attendance register is now open. Type !class to sign in._`);
+                        classData.activeRollCall = {
+                            unit: makeupClass.unit,
+                            date: todayDateKey,
+                            attendees: {}
+                        };
+                        dbChanged = true;
+                    }
+                    // End Trigger
+                    if (currentMinutes === makeupClass.endMinutes) {
+                        broadcastToClass(client, classData, `🛑 *MAKEUP CLASS ENDED*\n\n${makeupClass.unit} has officially concluded.`);
+                        delete classData.activeRollCall;
+                        dbChanged = true;
+                    }
                 }
             }
         }
 
-        // Process any Temporary Makeup Classes scheduled for today
-        const todaysExceptions = classData.exceptions?.[todayDateKey] || {};
-        for (const key in todaysExceptions) {
-            const makeupClass = todaysExceptions[key];
-            if (makeupClass.status === 'MOVED') {
-                // Start Trigger
-                if (currentMinutes === makeupClass.startMinutes) {
-                    broadcastToClass(client, classData, `🟢 *MAKEUP CLASS STARTING*\n\n🏫 *Unit:* ${makeupClass.unit}\n⏰ *Time:* ${makeupClass.startTime} - ${makeupClass.endTime}\n\n_The attendance register is now open. Type !class to sign in._`);
-                    classData.activeRollCall = makeupClass.unit;
-                    writeClassDB(db);
-                }
-                // End Trigger
-                if (currentMinutes === makeupClass.endMinutes) {
-                    broadcastToClass(client, classData, `🛑 *MAKEUP CLASS ENDED*\n\n${makeupClass.unit} has officially concluded.`);
-                    delete classData.activeRollCall;
-                    writeClassDB(db);
-                }
-            }
-        }
-
-    }, 60000); 
+        if (dbChanged) writeClassDB(db);
+    }, { scheduled: true, timezone: "Africa/Nairobi" });
 }
 
 // Helper to blast all students
