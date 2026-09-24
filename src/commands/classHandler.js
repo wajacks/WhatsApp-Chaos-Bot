@@ -729,12 +729,10 @@ async function handleInput(client, message, userId, text, userName) {
                     updateSessionState(userId, 'REP_TIMETABLE_VIEW', session.data);
                     await message.reply(ttStr + `(Type *0* to go back)`);
                 } else if (input === '2') {
-                    // Start Wizard - Clear existing timetable to rebuild fresh
-                    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-                    days.forEach(d => db.classes[session.data.loggedInClass].timetable[d] = []);
-                    writeClassDB(db);
+                    // Start Wizard - Build in temporary session memory first to prevent data loss on cancel
+                    const tempTimetable = { sunday: [], monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [] };
 
-                    updateSessionState(userId, 'TIMETABLE_WIZARD', { ...session.data, dayIndex: 0 });
+                    updateSessionState(userId, 'TIMETABLE_WIZARD', { ...session.data, dayIndex: 0, tempTimetable });
                     await message.reply(
                         `🛠️ *TIMETABLE WIZARD INITIATED*\n\n` +
                         `We will build this day by day, starting with *SUNDAY*.\n\n` +
@@ -766,34 +764,38 @@ async function handleInput(client, message, userId, text, userName) {
 
             case 'TIMETABLE_WIZARD': {
                 if (input === '0') {
-                    if (session.data.dayIndex > 0) {
-                        // Go back exactly one day in the wizard
-                        const prevDayIdx = session.data.dayIndex - 1;
-                        updateSessionState(userId, 'TIMETABLE_WIZARD', { ...session.data, dayIndex: prevDayIdx });
-                        const daysList = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-                        await message.reply(`🔙 *STEPPED BACK*\n\nNow editing 📅 *${daysList[prevDayIdx].toUpperCase()}*.\n\nEnter a class (*Unit, Time*) or type *NEXT* if there are no classes.\n\n(Type *0* to step back again)`);
-                    } else {
-                        // If it's Sunday, exit the wizard back to the Timetable Menu
-                        updateSessionState(userId, 'REP_TIMETABLE_MENU', session.data);
-                        await message.reply(`📅 *TIMETABLE MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Current Timetable\n2. 🛠️ Run Timetable Wizard (Create new Timetable)\n3. Modify/Cancel Classes\n\n0. 🔙 Back to Dashboard`);
-                    }
+                    // Send them back to the Timetable Sub-menu instead of the main dashboard
+                    updateSessionState(userId, 'REP_TIMETABLE_MENU', session.data);
+                    await message.reply(
+                        `🛠️ *Wizard Aborted.* Your previous timetable remains safe and unchanged.\n\n` +
+                        `📅 *TIMETABLE MANAGEMENT*\n` +
+                        `1. View Current Timetable\n` +
+                        `2. Re-run Timetable Wizard (Overwrite)\n` +
+                        `3. Modify/Cancel Classes\n\n` +
+                        `0. 🔙 Back to Dashboard`
+                    );
                     return;
                 }
 
                 const daysList = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
                 const currentDayStr = daysList[session.data.dayIndex];
+                const tempTimetable = session.data.tempTimetable;
 
                 if (input.toUpperCase() === 'NEXT' || input.toUpperCase() === 'DONE') {
                     if (session.data.dayIndex >= 6) {
-                        // Wizard finished Saturday
+                        // Wizard finished Saturday - NOW we safely save to the actual database!
+                        const db = readClassDB();
+                        db.classes[session.data.loggedInClass].timetable = tempTimetable;
+                        writeClassDB(db);
+
                         updateSessionState(userId, 'REP_DASHBOARD', session.data);
-                        await message.reply(`🎉 *TIMETABLE COMPLETED!*\n\nAll 7 days have been configured successfully.`);
+                        await message.reply(`🎉 *TIMETABLE COMPLETED & SAVED!*\n\nAll 7 days have been configured successfully.`);
                         await sendRepDashboard(message, session.data.loggedInClass);
                     } else {
                         // Move to next day
                         const nextDayIdx = session.data.dayIndex + 1;
                         updateSessionState(userId, 'TIMETABLE_WIZARD', { ...session.data, dayIndex: nextDayIdx });
-                        await message.reply(`✅ *${currentDayStr.toUpperCase()}* saved.\n\nMoving to 📅 *${daysList[nextDayIdx].toUpperCase()}*.\n\nEnter a class (*Unit, Time*) or type *NEXT* if there are no classes.`);
+                        await message.reply(`✅ *${currentDayStr.toUpperCase()}* saved to draft.\n\nMoving to 📅 *${daysList[nextDayIdx].toUpperCase()}*.\n\nEnter a class (*Unit, Time*) or type *NEXT* if there are no classes.`);
                     }
                     return;
                 }
@@ -805,12 +807,11 @@ async function handleInput(client, message, userId, text, userName) {
                 }
 
                 const [unit, time] = input.split(',').map(s => s.trim());
-                db.classes[session.data.loggedInClass].timetable[currentDayStr.toLowerCase()].push({ unit, time });
-                writeClassDB(db);
+                tempTimetable[currentDayStr].push({ unit, time });
 
-                await message.reply(`✅ Added *${unit}* at *${time}* on *${currentDayStr.toUpperCase()}*.\n\nEnter another class for ${currentDayStr.toUpperCase()}, or type *NEXT* to move to the next day, or *0* to go back to the Timetable Menu.`);
+                await message.reply(`✅ Added *${unit}* at *${time}* on *${currentDayStr.toUpperCase()}* (Draft).\n\nEnter another class for ${currentDayStr.toUpperCase()}, or type *NEXT* to move to the next day.`);
                 break;
-                }
+            }
 
             case 'REP_EDIT_SELECT_DAY': {
                 if (input === '0') {
