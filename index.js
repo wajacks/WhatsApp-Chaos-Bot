@@ -361,69 +361,6 @@ function initializeChaosBot(options) {
         startClassWeekendBroadcast(client);
     });
 
-    ///////////////////////////////////////////////////////
-    const commandReactions = {
-        // 🪙 Economy
-        profile: '👤',
-        bal: '💰',
-        balance: '💰',
-        daily: '🎁',
-        store: '🏪',
-        catalog: '🏪',
-        market: '🏪',
-        buy: '🛒',
-        beg: '🥷',
-        request: '🥷',
-        pay: '💸',
-    
-        // 🧠 AI & Media
-        ai: '🧠',
-        draw: '🎨',
-        image: '🎨',
-        catchup: '🛰️',
-        summary: '🛰️',
-        speak: '🎙️',
-        tts: '🎙️',
-        voice: '🗣️',
-        verse: '📖',
-        nyimbo: '🎵',
-        randomsong: '🎵',
-        song: '🎵',
-        track: '🎵',
-        video: '🎬',
-    
-        // 🎮 Game Center
-        wordle: '🟩',
-        join: '👥',
-        wjoin: '👥',
-        rjoin: '👥',
-        rebus: '🌍',
-        joinrebus: '👥',
-        rguess: '🎯',
-        hint: '💡',
-        mafia: '🕵️',
-        startmafia: '🕵️',
-        joinmafia: '👥',
-        endmafia: '🛑',
-        stopmafia: '🛑',
-    
-        // 🛠️ System
-        class: '📋',
-        classes: '📋',
-        games: '🎮',
-        gamelist: '🎮',
-        ping: '📡',
-        menu: '📋',
-        help: '📋',
-        commands: '📋',
-        weather: '🌤️',
-    
-        // 👑 Owner Access
-        contactowner: '📞',
-        ownercontact: '📞',
-        owner: '🔐'
-    };
-
     client.on('call', async (call) => {
         console.log(`[CALL DETECTED] Incoming call from ${call.from}`);
         
@@ -552,22 +489,6 @@ function initializeChaosBot(options) {
         }
     });
 
-    client.on('message', async (message) => {
-        if (!message.body || !message.body.startsWith('!')) return;
-    
-        try {
-            // Extract the command name (e.g., "!weather Nairobi" -> "weather")
-            const cleanCommand = message.body.slice(1).trim().split(/\s+/)[0].toLowerCase();
-    
-            // If the command exists in our dictionary, react with its matching emoji!
-            if (commandReactions[cleanCommand]) {
-                await message.react(commandReactions[cleanCommand]);
-            }
-        } catch (err) {
-            console.warn('[REACTION ERROR] Could not react to command:', err.message);
-        }
-    });
-
     client.on('authenticated', () => {
         console.log('WhatsApp authenticated!');
     });
@@ -685,6 +606,28 @@ function getContactJid(contact) {
 
 client.on('message', async message => {
     if (message.from === 'status@broadcast') return;
+    // ====================================================
+    // 🎨 MENU COMMAND TO EMOJI REACTION MAPPING
+    // ====================================================
+    const commandReactions = {
+        profile: '👤', bal: '💰', balance: '💰', daily: '🎁', store: '🏪', catalog: '🏪', market: '🏪', buy: '🛒', beg: '🥷', request: '🥷', pay: '💸',
+        ai: '🧠', draw: '🎨', image: '🎨', catchup: '🛰️', summary: '🛰️', speak: '🎙️', tts: '🎙️', voice: '🗣️', verse: '📖', nyimbo: '🎵', randomsong: '🎵', song: '🎵', track: '🎵', video: '🎬',
+        wordle: '🟩', join: '👥', wjoin: '👥', rjoin: '👥', rebus: '🌍', joinrebus: '👥', rguess: '🎯', hint: '💡', mafia: '🕵️', startmafia: '🕵️', joinmafia: '👥', endmafia: '🛑', stopmafia: '🛑',
+        class: '📋', classes: '📋', games: '🎮', gamelist: '🎮', ping: '📡', menu: '📋', help: '📋', commands: '📋', weather: '🌤️',
+        contactowner: '📞', ownercontact: '📞', owner: '🔐'
+    };
+
+     // 🎨 INSTANTLY REACT TO COMMANDS
+    if (message.body && message.body.startsWith('!')) {
+        try {
+            const cleanCommand = message.body.slice(1).trim().split(/\s+/)[0].toLowerCase();
+            if (commandReactions[cleanCommand]) {
+                await message.react(commandReactions[cleanCommand]);
+            }
+        } catch (err) {
+            console.warn('[REACTION ERROR]', err.message);
+        }
+    }
 
     try {
         const chatId = message.from;
