@@ -617,15 +617,18 @@ const commandReactions = {
     contactowner: '📞', ownercontact: '📞', owner: '🔐'
 };
 
-    // 🎨 AUTO-REACT REPLACED: Sends the emoji as a message reply instead
+    // 🎨 TYPING INDICATOR + EMOJI REPLY
     if (message.body && message.body.startsWith('!')) {
         try {
-            await message.chat.sendStateTyping();
+            // 1. Fetch the chat object asynchronously and trigger typing
+            const chat = await message.getChat();
+            await chat.sendStateTyping();
+
             const cleanCommand = message.body.slice(1).trim().split(/\s+/)[0].toLowerCase();
             const emoji = commandReactions[cleanCommand];
 
             if (emoji) {
-                // Sends the matching emoji as a quick message reply
+                // 2. Send the matching emoji as a quick message reply
                 await message.reply(emoji);
             }
         } catch (err) {
