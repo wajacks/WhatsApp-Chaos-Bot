@@ -361,107 +361,62 @@ function initializeChaosBot(options) {
         startClassWeekendBroadcast(client);
     });
 
-    client.on('call', async (call) => {
-        console.log(`[CALL DETECTED] Incoming call from ${call.from}`);
-        
-        try {
-            await call.reject();
+        // ====================================================
+    // 🔄 RECOVERY & SYSTEM FALLBACK MONITOR (PM2 / Ubuntu)
+    // ====================================================
+    client.on('message_create', async (msg) => {
+        // Only monitor group system announcements ('gp2' or template notifications)
+        if (!msg.isGroup || (msg.type !== 'gp2' && msg.type !== 'notification_template')) return;
 
-            await client.sendMessage(
-                call.from,
-                `📞 *Call Declined!*\n\n` +
-                `Hey there! I am **Chaos Bot**, an automated assistant. I cannot receive voice or video calls.\n\n` +
-                `Please drop a text command or type \`!menu\` / \`!class\` to interact with me!`
-            );
+        try {
+            const chat = await msg.getChat();
             
-            console.log(`[CALL HANDLED] Successfully rejected call and sent notice to ${call.from}`);
+            // 1. FALLBACK FOR AUTO-WELCOME
+            if (msg.body.includes('added') || msg.body.includes('joined')) {
+                const contactId = msg.mentionedIds?.[0] || msg.recipientIds?.[0];
+                const cleanUser = contactId ? `@${contactId.split('@')[0]}` : 'New Member';
+
+                await chat.sendMessage(
+                    `👋 Welcome to *${chat.name}*, ${cleanUser}!\n\n` +
+                    `I am **Chaos Bot** 🤖. Type \`!menu\` to see games, economy, and tools, or type \`!class\` to open your student portal.\n\n` +
+                    `📢 *Stay updated:* Join our official WhatsApp channel:\n` +
+                    `https://whatsapp.com`,
+                    { mentions: contactId ? [contactId] : [] }
+                );
+                console.log(`[FALLBACK JOIN] Welcome sent in: ${chat.name}`);
+            }
+
+            // 2. FALLBACK FOR LEAVE TRACKER
+            if (msg.body.includes('left') || msg.body.includes('removed')) {
+                const contactId = msg.mentionedIds?.[0] || msg.id.participant;
+                const cleanUser = contactId ? `@${contactId.split('@')[0]}` : 'A member';
+
+                await chat.sendMessage(
+                    `🚪 ${cleanUser} has left the group. Goodbye! 👋`,
+                    { mentions: contactId ? [contactId] : [] }
+                );
+                console.log(`[FALLBACK LEAVE] Departure notice sent in: ${chat.name}`);
+            }
+
+            // 3. FALLBACK FOR ADMIN UPDATES
+            if (msg.body.includes('admin')) {
+                const isPromoted = msg.body.includes('now an admin') || msg.body.includes('promoted');
+                const action = isPromoted ? 'promoted to *Admin* 👑' : 'demoted from *Admin* 🔻';
+                const contactId = msg.mentionedIds?.[0] || msg.id.participant;
+                const cleanUser = contactId ? `@${contactId.split('@')[0]}` : 'A user';
+
+                await chat.sendMessage(
+                    `📢 *Admin Update:* ${cleanUser} has been ${action} in *${chat.name}*.`,
+                    { mentions: contactId ? [contactId] : [] }
+                );
+                console.log(`[FALLBACK ADMIN] Status tracking posted in: ${chat.name}`);
+            }
+
         } catch (err) {
-            console.error(`[CALL ERROR] Failed to process incoming call from ${call.from}:`, err.message);
+            console.error('[FALLBACK MONITOR ERROR]:', err.message);
         }
     });
 
-    // ====================================================
-    // 👋 AUTO-WELCOME NEW GROUP MEMBERS
-    // ====================================================
-
-    client.on('group_join', async (notification) => {
-        try {
-            const chat = await notification.getChat();
-            const contact = await notification.getContact();
-
-            await chat.sendMessage(
-                `👋 Welcome to *${chat.name}*, @${contact.id.user}!\n\n` +
-                `I am **Chaos Bot** 🤖. Type \`!menu\` to see games, economy, and tools, or type \`!class\` to open your student portal.\n\n` +
-                `📢 *Stay updated:* Join our official WhatsApp channel:\n` +
-                `https://whatsapp.com/channel/0029VbDIVR4LCoX1TAJppJ3H`,
-                {
-                    mentions: [contact]
-                }
-            );
-        } catch (err) {
-            console.error('[GROUP JOIN ERROR]', err.message);
-        }
-    });
-
-    // ====================================================
-    // 🚪 GROUP LEAVE TRACKER
-    // ====================================================
-
-    client.on('group_leave', async (notification) => {
-        try {
-            const chat = await notification.getChat();
-            const contact = await notification.getContact();
-
-            await chat.sendMessage(
-                `🚪 @${contact.id.user} has left the group. Goodbye! 👋`,
-                {
-                    mentions: [contact]
-                }
-            );
-        } catch (err) {
-            console.error('[GROUP LEAVE ERROR]', err.message);
-        }
-    });
-
-    // ====================================================
-    // 👑 ADMIN STATUS CHANGE TRACKER
-    // ====================================================
-
-    client.on('group_admin_changed', async (notification) => {
-        try {
-            const chat = await notification.getChat();
-            const contact = await notification.getContact();
-            
-            // Determine whether they were promoted or demoted
-            const action = notification.type === 'promote' 
-                ? 'promoted to *Admin* 👑' 
-                : 'demoted from *Admin* 🔻';
-
-            await chat.sendMessage(
-                `📢 *Admin Update:* @${contact.id.user} has been ${action} in *${chat.name}*.`,
-                {
-                    mentions: [contact]
-                }
-            );
-        } catch (err) {
-            console.error('[ADMIN CHANGE ERROR]', err.message);
-        }
-    });
-
-    // ====================================================
-    // 🔒 GROUP MEMBERSHIP JOIN REQUESTS
-    // ====================================================
-
-    client.on('group_membership_request', async (notification) => {
-        try {
-            const chat = await notification.getChat();
-            const contact = await notification.getContact();
-
-            console.log(`[JOIN REQUEST] @${contact.id.user} (${contact.pushname || 'Unknown'}) requested to join locked group: ${chat.name}`);
-        } catch (err) {
-            console.error('[MEMBERSHIP REQUEST ERROR]', err.message);
-        }
-    });
 
     client.on('authenticated', () => {
         console.log('WhatsApp authenticated!');
@@ -604,19 +559,6 @@ const commandReactions = {
         } catch (err) {
             console.warn('[EMOJI REPLY ERROR]:', err.message);
         }
-    }
-
-    if (message.fromMe) {
-        // 2. Set a timer to delete the message after 1 minute (60,000 ms)
-        setTimeout(async () => {
-            try {
-                // Pass 'true' to delete it for everyone
-                await message.delete(true);
-            } catch (err) {
-                // Gracefully handle cases where it's already deleted or out of window
-                console.warn("[AUTO-DELETE ERROR]:", err.message);
-            }
-        }, 60000); // 60,000 milliseconds = 1 minute
     }
 
     try {
