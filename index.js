@@ -617,18 +617,14 @@ const commandReactions = {
     contactowner: '📞', ownercontact: '📞', owner: '🔐'
 };
 
-    // 🎨 TYPING INDICATOR + EMOJI REPLY
+    // 🎨 EMOJI MESSAGE REPLY (Auto-React Replacement)
     if (message.body && message.body.startsWith('!')) {
         try {
-            // 1. Fetch the chat object asynchronously and trigger typing
-            const chat = await message.getChat();
-            await chat.sendStateTyping();
-
             const cleanCommand = message.body.slice(1).trim().split(/\s+/)[0].toLowerCase();
             const emoji = commandReactions[cleanCommand];
 
             if (emoji) {
-                // 2. Send the matching emoji as a quick message reply
+                // Sends the matching emoji as a clean quoted message reply
                 await message.reply(emoji);
             }
         } catch (err) {
