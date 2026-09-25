@@ -409,23 +409,23 @@ function initializeChaosBot(options) {
 
     client.on('message_revoke_everyone', async (after, before) => {
         try {
-            if (!before || !before.body) return;
-            
-            // Ignore bot's own messages if they get deleted
-            if (before.fromMe) return;
-
-            const sender = await before.getContact();
-            const chat = await before.getChat();
-
-            await chat.sendMessage(
-                `👀 *Caught in 4K!* @${sender.id.user} deleted a message:\n\n` +
-                `> "${before.body}"`,
-                {
-                    mentions: [sender]
-                }
-            );
+            // 'before' contains the original message details before it was deleted
+            if (before) {
+                const chat = await before.getChat();
+                const senderId = before.author || before.from;
+                const deletedContent = before.body || '[Media or Non-text message]';
+    
+                // Sends the notification straight into the chat where the message was deleted
+                await chat.sendMessage(
+                    `🗑️ *ANTI-DELETE LOG*\n━━━━━━━━━━━━━━━━━━\n` +
+                    `👤 *Sender:* @${senderId.split('@')[0]}\n` +
+                    `💬 *Deleted Message:* "${deletedContent}"`,
+                    { mentions: [senderId] }
+                );
+            }
         } catch (err) {
-            console.error('[REVOKE ERROR]', err.message);
+            // Gracefully handles any internal WhatsApp Web evaluation glitches
+            console.warn("[REVOKE LOG ERROR]:", err.message);
         }
     });
 
