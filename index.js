@@ -607,30 +607,29 @@ function getContactJid(contact) {
 client.on('message', async message => {
     if (message.from === 'status@broadcast') return;
     // ====================================================
-    // 🎨 MENU COMMAND TO EMOJI REACTION MAPPING
-    // ====================================================
-    const commandReactions = {
-        profile: '👤', bal: '💰', balance: '💰', daily: '🎁', store: '🏪', catalog: '🏪', market: '🏪', buy: '🛒', beg: '🥷', request: '🥷', pay: '💸',
-        ai: '🧠', draw: '🎨', image: '🎨', catchup: '🛰️', summary: '🛰️', speak: '🎙️', tts: '🎙️', voice: '🗣️', verse: '📖', nyimbo: '🎵', randomsong: '🎵', song: '🎵', track: '🎵', video: '🎬',
-        wordle: '🟩', join: '👥', wjoin: '👥', rjoin: '👥', rebus: '🌍', joinrebus: '👥', rguess: '🎯', hint: '💡', mafia: '🕵️', startmafia: '🕵️', joinmafia: '👥', endmafia: '🛑', stopmafia: '🛑',
-        class: '📋', classes: '📋', games: '🎮', gamelist: '🎮', ping: '📡', menu: '📋', help: '📋', commands: '📋', weather: '🌤️',
-        contactowner: '📞', ownercontact: '📞', owner: '🔐'
-    };
+// 🎨 MENU COMMAND TO EMOJI REACTION MAPPING
+// ====================================================
+const commandReactions = {
+    profile: '👤', bal: '💰', balance: '💰', daily: '🎁', store: '🏪', catalog: '🏪', market: '🏪', buy: '🛒', beg: '🥷', request: '🥷', pay: '💸',
+    ai: '🧠', draw: '🎨', image: '🎨', catchup: '🛰️', summary: '🛰️', speak: '🎙️', tts: '🎙️', voice: '🗣️', verse: '📖', nyimbo: '🎵', randomsong: '🎵', song: '🎵', track: '🎵', video: '🎬',
+    wordle: '🟩', join: '👥', wjoin: '👥', rjoin: '👥', rebus: '🌍', joinrebus: '👥', rguess: '🎯', hint: '💡', mafia: '🕵️', startmafia: '🕵️', joinmafia: '👥', endmafia: '🛑', stopmafia: '🛑',
+    class: '📋', classes: '📋', games: '🎮', gamelist: '🎮', ping: '📡', menu: '📋', help: '📋', commands: '📋', weather: '🌤️',
+    contactowner: '📞', ownercontact: '📞', owner: '🔐'
+};
 
-    // 🎨 INSTANTLY REACT TO COMMANDS WITH DEBUGGING
+    // 🎨 AUTO-REACT REPLACED: Sends the emoji as a message reply instead
     if (message.body && message.body.startsWith('!')) {
         try {
+            await message.chat.sendStateTyping();
             const cleanCommand = message.body.slice(1).trim().split(/\s+/)[0].toLowerCase();
             const emoji = commandReactions[cleanCommand];
 
-            console.log(`[DEBUG] Command detected: "!${cleanCommand}", Mapped Emoji: ${emoji || 'NONE'}`);
-
             if (emoji) {
-                await message.react(emoji);
-                console.log(`[DEBUG] Successfully reacted with ${emoji}`);
+                // Sends the matching emoji as a quick message reply
+                await message.reply(emoji);
             }
         } catch (err) {
-            console.error('[REACTION ERROR FULL DETAILS]:', err);
+            console.warn('[EMOJI REPLY ERROR]:', err.message);
         }
     }
 
