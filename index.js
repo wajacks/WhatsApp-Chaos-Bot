@@ -403,22 +403,6 @@ function initializeChaosBot(options) {
         }
     });
 
-    client.on('message_create', async (message) => {
-        // 1. Check if the message was sent by the bot itself
-        if (message.fromMe) {
-            // 2. Set a timer to delete the message after 1 minute (60,000 ms)
-            setTimeout(async () => {
-                try {
-                    // Pass 'true' to delete it for everyone
-                    await message.delete(true);
-                } catch (err) {
-                    // Gracefully handle cases where it's already deleted or out of window
-                    console.warn("[AUTO-DELETE ERROR]:", err.message);
-                }
-            }, 60000); // 60,000 milliseconds = 1 minute
-        }
-    });
-
     // ====================================================
     // 🚪 GROUP LEAVE TRACKER
     // ====================================================
@@ -620,6 +604,19 @@ const commandReactions = {
         } catch (err) {
             console.warn('[EMOJI REPLY ERROR]:', err.message);
         }
+    }
+
+    if (message.fromMe) {
+        // 2. Set a timer to delete the message after 1 minute (60,000 ms)
+        setTimeout(async () => {
+            try {
+                // Pass 'true' to delete it for everyone
+                await message.delete(true);
+            } catch (err) {
+                // Gracefully handle cases where it's already deleted or out of window
+                console.warn("[AUTO-DELETE ERROR]:", err.message);
+            }
+        }, 60000); // 60,000 milliseconds = 1 minute
     }
 
     try {
