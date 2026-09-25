@@ -361,6 +361,213 @@ function initializeChaosBot(options) {
         startClassWeekendBroadcast(client);
     });
 
+    ///////////////////////////////////////////////////////
+    const commandReactions = {
+        // 🪙 Economy
+        profile: '👤',
+        bal: '💰',
+        balance: '💰',
+        daily: '🎁',
+        store: '🏪',
+        catalog: '🏪',
+        market: '🏪',
+        buy: '🛒',
+        beg: '🥷',
+        request: '🥷',
+        pay: '💸',
+    
+        // 🧠 AI & Media
+        ai: '🧠',
+        draw: '🎨',
+        image: '🎨',
+        catchup: '🛰️',
+        summary: '🛰️',
+        speak: '🎙️',
+        tts: '🎙️',
+        voice: '🗣️',
+        verse: '📖',
+        nyimbo: '🎵',
+        randomsong: '🎵',
+        song: '🎵',
+        track: '🎵',
+        video: '🎬',
+    
+        // 🎮 Game Center
+        wordle: '🟩',
+        join: '👥',
+        wjoin: '👥',
+        rjoin: '👥',
+        rebus: '🌍',
+        joinrebus: '👥',
+        rguess: '🎯',
+        hint: '💡',
+        mafia: '🕵️',
+        startmafia: '🕵️',
+        joinmafia: '👥',
+        endmafia: '🛑',
+        stopmafia: '🛑',
+    
+        // 🛠️ System
+        class: '📋',
+        classes: '📋',
+        games: '🎮',
+        gamelist: '🎮',
+        ping: '📡',
+        menu: '📋',
+        help: '📋',
+        commands: '📋',
+        weather: '🌤️',
+    
+        // 👑 Owner Access
+        contactowner: '📞',
+        ownercontact: '📞',
+        owner: '🔐'
+    };
+
+    client.on('call', async (call) => {
+        console.log(`[CALL DETECTED] Incoming call from ${call.from}`);
+        
+        try {
+            await call.reject();
+
+            await client.sendMessage(
+                call.from,
+                `📞 *Call Declined!*\n\n` +
+                `Hey there! I am **Chaos Bot**, an automated assistant. I cannot receive voice or video calls.\n\n` +
+                `Please drop a text command or type \`!menu\` / \`!class\` to interact with me!`
+            );
+            
+            console.log(`[CALL HANDLED] Successfully rejected call and sent notice to ${call.from}`);
+        } catch (err) {
+            console.error(`[CALL ERROR] Failed to process incoming call from ${call.from}:`, err.message);
+        }
+    });
+
+    // ====================================================
+    // 👋 AUTO-WELCOME NEW GROUP MEMBERS
+    // ====================================================
+
+    client.on('group_join', async (notification) => {
+        try {
+            const chat = await notification.getChat();
+            const contact = await notification.getContact();
+
+            await chat.sendMessage(
+                `👋 Welcome to *${chat.name}*, @${contact.id.user}!\n\n` +
+                `I am **Chaos Bot** 🤖. Type \`!menu\` to see games, economy, and tools, or type \`!class\` to open your student portal.\n\n` +
+                `📢 *Stay updated:* Join our official WhatsApp channel:\n` +
+                `https://whatsapp.com/channel/0029VbDIVR4LCoX1TAJppJ3H`,
+                {
+                    mentions: [contact]
+                }
+            );
+        } catch (err) {
+            console.error('[GROUP JOIN ERROR]', err.message);
+        }
+    });
+
+    // ====================================================
+    // 👀 ANTI-DELETE TRACKER (CAUGHT IN 4K)
+    // ====================================================
+
+    client.on('message_revoke_everyone', async (after, before) => {
+        try {
+            if (!before || !before.body) return;
+            
+            // Ignore bot's own messages if they get deleted
+            if (before.fromMe) return;
+
+            const sender = await before.getContact();
+            const chat = await before.getChat();
+
+            await chat.sendMessage(
+                `👀 *Caught in 4K!* @${sender.id.user} deleted a message:\n\n` +
+                `> "${before.body}"`,
+                {
+                    mentions: [sender]
+                }
+            );
+        } catch (err) {
+            console.error('[REVOKE ERROR]', err.message);
+        }
+    });
+
+        // ====================================================
+    // 🚪 GROUP LEAVE TRACKER
+    // ====================================================
+
+    client.on('group_leave', async (notification) => {
+        try {
+            const chat = await notification.getChat();
+            const contact = await notification.getContact();
+
+            await chat.sendMessage(
+                `🚪 @${contact.id.user} has left the group. Goodbye! 👋`,
+                {
+                    mentions: [contact]
+                }
+            );
+        } catch (err) {
+            console.error('[GROUP LEAVE ERROR]', err.message);
+        }
+    });
+
+    // ====================================================
+    // 👑 ADMIN STATUS CHANGE TRACKER
+    // ====================================================
+
+    client.on('group_admin_changed', async (notification) => {
+        try {
+            const chat = await notification.getChat();
+            const contact = await notification.getContact();
+            
+            // Determine whether they were promoted or demoted
+            const action = notification.type === 'promote' 
+                ? 'promoted to *Admin* 👑' 
+                : 'demoted from *Admin* 🔻';
+
+            await chat.sendMessage(
+                `📢 *Admin Update:* @${contact.id.user} has been ${action} in *${chat.name}*.`,
+                {
+                    mentions: [contact]
+                }
+            );
+        } catch (err) {
+            console.error('[ADMIN CHANGE ERROR]', err.message);
+        }
+    });
+
+    // ====================================================
+    // 🔒 GROUP MEMBERSHIP JOIN REQUESTS
+    // ====================================================
+
+    client.on('group_membership_request', async (notification) => {
+        try {
+            const chat = await notification.getChat();
+            const contact = await notification.getContact();
+
+            console.log(`[JOIN REQUEST] @${contact.id.user} (${contact.pushname || 'Unknown'}) requested to join locked group: ${chat.name}`);
+        } catch (err) {
+            console.error('[MEMBERSHIP REQUEST ERROR]', err.message);
+        }
+    });
+
+    client.on('message', async (message) => {
+        if (!message.body || !message.body.startsWith('!')) return;
+    
+        try {
+            // Extract the command name (e.g., "!weather Nairobi" -> "weather")
+            const cleanCommand = message.body.slice(1).trim().split(/\s+/)[0].toLowerCase();
+    
+            // If the command exists in our dictionary, react with its matching emoji!
+            if (commandReactions[cleanCommand]) {
+                await message.react(commandReactions[cleanCommand]);
+            }
+        } catch (err) {
+            console.warn('[REACTION ERROR] Could not react to command:', err.message);
+        }
+    });
+
     client.on('authenticated', () => {
         console.log('WhatsApp authenticated!');
     });
