@@ -617,15 +617,20 @@ client.on('message', async message => {
         contactowner: '📞', ownercontact: '📞', owner: '🔐'
     };
 
-     // 🎨 INSTANTLY REACT TO COMMANDS
+    // 🎨 INSTANTLY REACT TO COMMANDS WITH DEBUGGING
     if (message.body && message.body.startsWith('!')) {
         try {
             const cleanCommand = message.body.slice(1).trim().split(/\s+/)[0].toLowerCase();
-            if (commandReactions[cleanCommand]) {
-                await message.react(commandReactions[cleanCommand]);
+            const emoji = commandReactions[cleanCommand];
+
+            console.log(`[DEBUG] Command detected: "!${cleanCommand}", Mapped Emoji: ${emoji || 'NONE'}`);
+
+            if (emoji) {
+                await message.react(emoji);
+                console.log(`[DEBUG] Successfully reacted with ${emoji}`);
             }
         } catch (err) {
-            console.warn('[REACTION ERROR]', err.message);
+            console.error('[REACTION ERROR FULL DETAILS]:', err);
         }
     }
 
