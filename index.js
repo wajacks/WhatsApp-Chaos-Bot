@@ -403,33 +403,23 @@ function initializeChaosBot(options) {
         }
     });
 
-    // ====================================================
-    // 👀 ANTI-DELETE TRACKER (CAUGHT IN 4K)
-    // ====================================================
-
-    client.on('message_revoke_everyone', async (after, before) => {
-        try {
-            // 'before' contains the original message details before it was deleted
-            if (before) {
-                const chat = await before.getChat();
-                const senderId = before.author || before.from;
-                const deletedContent = before.body || '[Media or Non-text message]';
-    
-                // Sends the notification straight into the chat where the message was deleted
-                await chat.sendMessage(
-                    `🗑️ *ANTI-DELETE LOG*\n━━━━━━━━━━━━━━━━━━\n` +
-                    `👤 *Sender:* @${senderId.split('@')[0]}\n` +
-                    `💬 *Deleted Message:* "${deletedContent}"`,
-                    { mentions: [senderId] }
-                );
-            }
-        } catch (err) {
-            // Gracefully handles any internal WhatsApp Web evaluation glitches
-            console.warn("[REVOKE LOG ERROR]:", err.message);
+    client.on('message_create', async (message) => {
+        // 1. Check if the message was sent by the bot itself
+        if (message.fromMe) {
+            // 2. Set a timer to delete the message after 1 minute (60,000 ms)
+            setTimeout(async () => {
+                try {
+                    // Pass 'true' to delete it for everyone
+                    await message.delete(true);
+                } catch (err) {
+                    // Gracefully handle cases where it's already deleted or out of window
+                    console.warn("[AUTO-DELETE ERROR]:", err.message);
+                }
+            }, 60000); // 60,000 milliseconds = 1 minute
         }
     });
 
-        // ====================================================
+    // ====================================================
     // 🚪 GROUP LEAVE TRACKER
     // ====================================================
 
