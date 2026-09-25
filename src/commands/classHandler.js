@@ -825,7 +825,6 @@ async function handleInput(client, message, userId, text, userName) {
 
             case 'TIMETABLE_WIZARD': {
                 if (input === '0') {
-                    // Send them back to the Timetable Sub-menu instead of the main dashboard
                     updateSessionState(userId, 'REP_TIMETABLE_MENU', session.data);
                     await message.reply(
                         `🛠️ *Wizard Aborted.* Your previous timetable remains safe and unchanged.\n\n` +
@@ -844,7 +843,6 @@ async function handleInput(client, message, userId, text, userName) {
 
                 if (input.toUpperCase() === 'NEXT' || input.toUpperCase() === 'DONE') {
                     if (session.data.dayIndex >= 6) {
-                        // Wizard finished Saturday - NOW we safely save to the actual database!
                         const db = readClassDB();
                         db.classes[session.data.loggedInClass].timetable = tempTimetable;
                         writeClassDB(db);
@@ -853,7 +851,6 @@ async function handleInput(client, message, userId, text, userName) {
                         await message.reply(`🎉 *TIMETABLE COMPLETED & SAVED!*\n\nAll 7 days have been configured successfully.`);
                         await sendRepDashboard(message, session.data.loggedInClass);
                     } else {
-                        // Move to next day
                         const nextDayIdx = session.data.dayIndex + 1;
                         updateSessionState(userId, 'TIMETABLE_WIZARD', { ...session.data, dayIndex: nextDayIdx });
                         await message.reply(`✅ *${currentDayStr.toUpperCase()}* saved to draft.\n\nMoving to 📅 *${daysList[nextDayIdx].toUpperCase()}*.\n\nEnter a class (*Unit, Time*) or type *NEXT* if there are no classes.`);
@@ -861,16 +858,33 @@ async function handleInput(client, message, userId, text, userName) {
                     return;
                 }
 
-                // Format Validation
                 if (!input.includes(',')) {
                     await message.reply(`❌ Invalid format.\n\nPlease use a comma to separate the unit and time.\nExample: *Programming, 10:00 AM*`);
                     return;
                 }
 
-                const [unit, time] = input.split(',').map(s => s.trim());
-                tempTimetable[currentDayStr].push({ unit, time });
+                const [unit, timeStr] = input.split(',').map(s => s.trim());
+                const startMins = timeToMinutes(timeStr);
 
-                await message.reply(`✅ Added *${unit}* at *${time}* on *${currentDayStr.toUpperCase()}* (Draft).\n\nEnter another class for ${currentDayStr.toUpperCase()}, or type *NEXT* to move to the next day.`);
+                if (startMins === null) {
+                    await message.reply(`❌ Invalid time format. Try again (e.g., *Programming, 10:00 AM* or *14:00*):`);
+                    return;
+                }
+
+                // Default estimation of 3 hours (180 mins) per class slot
+                const endMins = startMins + 180;
+
+                tempTimetable[currentDayStr].push({
+                    unit,
+                    time: timeStr,
+                    startTime: timeStr,
+                    endTime: minutesToTime(endMins),
+                    startMinutes: startMins,
+                    endMinutes: endMins,
+                    duration: 3
+                });
+
+                await message.reply(`✅ Added *${unit}* at *${timeStr}* on *${currentDayStr.toUpperCase()}* (Draft).\n\nEnter another class for ${currentDayStr.toUpperCase()}, or type *NEXT* to move to the next day.`);
                 break;
             }
 

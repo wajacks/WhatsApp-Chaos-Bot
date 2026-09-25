@@ -274,7 +274,7 @@ function startTimetableMonitor(client) {
                 if (isCancelled) continue; // Skip all alerts
 
                 // 1. THE 45-MINUTE WARNING (With Anti-Spam)
-                if (cls.startMinutes - currentMinutes === 45) {
+                if (cls.startMinutes - currentMinutes === 60) {
                     let shouldWarn = true;
                     // Anti-Spam Check: Did a class just end?
                     if (i > 0) {
@@ -290,7 +290,11 @@ function startTimetableMonitor(client) {
 
                 // 2. THE START TRIGGER & AUTO-ROLL CALL
                 if (currentMinutes === cls.startMinutes) {
-                    const msg = `🟢 *CLASS IS STARTING*\n\n🏫 *Unit:* ${cls.unit}\n⏰ *Time:* ${cls.startTime} - ${cls.endTime}\n\n_The attendance register is now open. Type !class to sign in._`;
+                    const msg = `🟢 *CLASS IS STARTING*\n\n🏫 *Unit:* ${cls.unit}\n⏰ *Time:* ${cls.startTime} - ${cls.endTime}\n\n` +
+                                `_The attendance register is now open. Choose how to sign in:_\n` +
+                                `1️⃣ Reply with *PRESENT*\n` +
+                                `2️⃣ Type *!class* ➔ Open Student Hub ➔ Select option *8* (Sign Attendance)`;
+                    
                     broadcastToClass(client, classData, msg);
                     
                     // Auto-open the database roll call flag
@@ -319,7 +323,12 @@ function startTimetableMonitor(client) {
                 if (makeupClass.status === 'MOVED') {
                     // Start Trigger
                     if (currentMinutes === makeupClass.startMinutes) {
-                        broadcastToClass(client, classData, `🟢 *MAKEUP CLASS STARTING*\n\n🏫 *Unit:* ${makeupClass.unit}\n⏰ *Time:* ${makeupClass.startTime} - ${makeupClass.endTime}\n\n_The attendance register is now open. Type !class to sign in._`);
+                        const makeupMsg = `🟢 *MAKEUP CLASS STARTING*\n\n🏫 *Unit:* ${makeupClass.unit}\n⏰ *Time:* ${makeupClass.startTime} - ${makeupClass.endTime}\n\n` +
+                                          `_The attendance register is now open. Choose how to sign in:_\n` +
+                                          `1️⃣ Reply with *PRESENT*\n` +
+                                          `2️⃣ Type *!class* ➔ Open Student Hub ➔ Select option *8* (Sign Attendance)`;
+
+                        broadcastToClass(client, classData, makeupMsg);
                         classData.activeRollCall = {
                             unit: makeupClass.unit,
                             date: todayDateKey,
@@ -339,6 +348,57 @@ function startTimetableMonitor(client) {
 
         if (dbChanged) writeClassDB(db);
     }, { scheduled: true, timezone: "Africa/Nairobi" });
+}
+
+function startClassWeekendBroadcast(client) {
+    // Runs every Friday at 5:00 PM (17:00) East Africa Time
+    cron.schedule('0 17 * * 5', async () => {
+        console.log("[CLASS PORTAL] 🥳 Broadcasting Friday Weekend Wish to class members...");
+        const db = readClassDB();
+        const classes = db.classes || {};
+
+        const weekendMessage = 
+            `🎉 *HAPPY WEEKEND, SCHOLARS!* 🎉\n` +
+            `━━━━━━━━━━━━━━━━━━\n\n` +
+            `The week's academic hustle is finally wrapped up! Whether you're resting up, catching up on assignments, or stepping away from your laptop—make it count.\n\n` +
+            `Have a safe, restful weekend, and let's bring the energy back next week! 🚀\n\n` +
+            `_— Automated Class Portal Weekend Wish_`;
+
+        for (const className in classes) {
+            const classData = classes[className];
+            const recipients = new Set();
+
+            // 1. Collect Class Rep
+            if (classData.repId) recipients.add(classData.repId);
+            
+            // 2. Collect Assistant Reps
+            if (classData.assistantReps) {
+                classData.assistantReps.forEach(id => recipients.add(id));
+            }
+            
+            // 3. Collect all registered Students
+            const members = classData.members || {};
+            for (const mKey in members) {
+                if (members[mKey].phoneId) {
+                    recipients.add(members[mKey].phoneId);
+                }
+            }
+
+            // 4. Blast with a safe 1-second delay between DMs to prevent spam flagging
+            for (const recipientId of recipients) {
+                try {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await client.sendMessage(recipientId, weekendMessage);
+                } catch (e) {
+                    console.warn(`[CLASS PORTAL] Failed to send weekend wish to ${recipientId}`);
+                }
+            }
+        }
+        console.log("[CLASS PORTAL] ✅ Weekend broadcast completed.");
+    }, {
+        scheduled: true,
+        timezone: "Africa/Nairobi"
+    });
 }
 
 // Helper to blast all students
@@ -493,5 +553,6 @@ module.exports = {
     startTimetableMonitor,
     getPortalMetrics,
     startPollMonitor,
-    startDailyReminders
+    startDailyReminders,
+    startClassWeekendBroadcast,
 };
