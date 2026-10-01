@@ -1,4 +1,4 @@
-﻿require('dotenv').config();
+require('dotenv').config();
 
 const fs = require('fs');
 const path = require('path');
@@ -3087,28 +3087,8 @@ const commandReactions = {
         }
 
         // ====================================================
-        // MAFIA (UNDER MAINTENANCE)
+        // MAFIA
         // ====================================================
-
-        const IS_MAFIA_UNDER_MAINTENANCE = true; // Set to false when fixed
-
-        if (
-            lowerText === '!mafia' || 
-            lowerText === '!startmafia' || 
-            lowerText === '!joinmafia' || 
-            lowerText === '!endmafia' || 
-            lowerText === '!stopmafia'
-        ) {
-            if (IS_MAFIA_UNDER_MAINTENANCE) {
-                await message.reply(
-                    '⚠️ *GAME MAINTENANCE NOTICE*\n\n' +
-                    'Project Mafia is currently offline for critical bug fixes and improvements.\n\n' +
-                    '🛠️ *Status:* Under Active Maintenance\n' +
-                    '📢 *Notice:* Stay tuned for the next system patch update!'
-                );
-                return;
-            }
-        }
 
         // --- Active Game Logic ---
 

@@ -1,4 +1,4 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 
 const {
     getUser,
@@ -7,6 +7,11 @@ const {
     readDB,
     writeDB
 } = require('../database/db');
+
+const {
+    getKnownPlayerLinks,
+    rememberPlayerIdentities
+} = require('../database/mafiadb');
 
 class MafiaGame {
 
@@ -60,6 +65,12 @@ class MafiaGame {
         // 123456789@lid
         // to one canonical player identity.
         this.identityAliases = new Map();
+
+        // Keep links learned in earlier lobbies so a WhatsApp LID received in a
+        // DM can still resolve to the phone JID used when the player joined.
+        for (const [alias, canonicalId] of getKnownPlayerLinks()) {
+            this.identityAliases.set(alias, canonicalId);
+        }
     }
 
     sleep(ms) {
@@ -185,6 +196,11 @@ class MafiaGame {
                 cleanCanonical
             );
         }
+
+        // This registry deliberately stores identity links only—not roles, votes,
+        // or other game state—so private messages can be associated with the
+        // player who registered from a group without exposing a running game.
+        rememberPlayerIdentities(cleanCanonical, aliases);
 
         console.log(
             `[IDENTITY ALIAS] Registered aliases for ${cleanCanonical}:`,
@@ -590,8 +606,6 @@ class MafiaGame {
 
         this.votes.clear();
 
-        this.identityAliases.clear();
-
         this.endingGame = false;
     }
 
@@ -925,8 +939,6 @@ class MafiaGame {
         this.ghosts = [];
 
         this.votes.clear();
-
-        this.identityAliases.clear();
 
         // Extract bot's own phone number for the wa.me link
         const botNumber = this.client.info?.wid?.user || '';
@@ -2814,6 +2826,9 @@ class MafiaGame {
 }
 
 module.exports = {
+
+    // Exported for focused identity-link tests and integrations.
+    MafiaGame,
 
     // ============================================================
     // START
