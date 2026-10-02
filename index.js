@@ -60,6 +60,14 @@ const {
     handleStealCommand
 } = require('./src/games/rebuscountry');
 
+const {
+    startScrambleLobby,
+    joinScrambleLobby,
+    processScrambleGuess,
+    processScrambleHint,
+    endScrambleGame
+} = require('./src/games/scramble');
+
 const { getGamesList } = require('./src/commands/gameslist');
 const { handleBalanceCommand } = require('./src/commands/balance');
 const { getWeather } = require('./src/tools/weather');
@@ -541,7 +549,7 @@ client.on('message', async message => {
 const commandReactions = {
     profile: '👤', bal: '💰', balance: '💰', daily: '🎁', store: '🏪', catalog: '🏪', market: '🏪', buy: '🛒', beg: '🥷', request: '🥷', pay: '💸',
     ai: '🧠', draw: '🎨', image: '🎨', catchup: '🛰️', summary: '🛰️', speak: '🎙️', tts: '🎙️', voice: '🗣️', verse: '📖', nyimbo: '🎵', randomsong: '🎵', song: '🎵', track: '🎵', video: '🎬',
-    wordle: '🟩', join: '👥', wjoin: '👥', rjoin: '👥', rebus: '🌍', joinrebus: '👥', rguess: '🎯', hint: '💡', mafia: '🕵️', startmafia: '🕵️', joinmafia: '👥', endmafia: '🛑', stopmafia: '🛑',
+    wordle: '🟩', join: '👥', wjoin: '👥', rjoin: '👥', rebus: '🌍', joinrebus: '👥', rguess: '🎯', hint: '💡', scramble: '🔀', joinscramble: '👥', scramblehint: '💡', stopscramble: '🛑', mafia: '🕵️', startmafia: '🕵️', joinmafia: '👥', endmafia: '🛑', stopmafia: '🛑',
     class: '📋', classes: '📋', games: '🎮', gamelist: '🎮', ping: '📡', menu: '📋', help: '📋', commands: '📋', weather: '🌤️',
     contactowner: '📞', ownercontact: '📞', owner: '🔐'
 };
@@ -3087,6 +3095,31 @@ const commandReactions = {
         }
 
         // ====================================================
+        // SCRAMBLED WORD
+        // ====================================================
+
+        if (lowerText === '!scramble') {
+            await message.reply(startScrambleLobby(chatId, client));
+            return;
+        }
+
+        if (lowerText === '!joinscramble') {
+            await message.reply(joinScrambleLobby(chatId, senderId, userName));
+            return;
+        }
+
+        if (lowerText === '!scramblehint') {
+            await message.reply(processScrambleHint(chatId, senderId, client));
+            return;
+        }
+
+        if (lowerText === '!stopscramble') {
+            const response = endScrambleGame(chatId, null);
+            await message.reply(response || '❌ There is no active Scrambled Word match to end.');
+            return;
+        }
+
+        // ====================================================
         // MAFIA
         // ====================================================
 
@@ -3147,6 +3180,15 @@ const commandReactions = {
         if (wordleResponse) {
             await message.reply(wordleResponse);
             return;
+        }
+
+        // ====================================================
+        // SCRAMBLED WORD DIRECT CHAT GUESS
+        // ====================================================
+
+        if (text && !text.startsWith('!')) {
+            const handled = processScrambleGuess(chatId, text, senderId, userName, client);
+            if (handled) return;
         }
 
         // ====================================================

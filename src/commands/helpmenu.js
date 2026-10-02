@@ -87,6 +87,15 @@
 │💡 \`!hint\`
 │     ☞『_*Get a clue*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🔀 \`!scramble\`
+│     ☞『_*Start Scrambled Word*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│👥 \`!joinscramble\`
+│     ☞『_*Join Scrambled Word*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│💡 \`!scramblehint\`
+│     ☞『_*Get a private scramble clue*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🕵️ \`!mafia\`
 │     ☞『_*Start Mafia*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
