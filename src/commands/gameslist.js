@@ -19,7 +19,12 @@ function getGamesList() {
 • Minimum 2 players
 • Each player has 10 seconds to submit a valid word
 
-🕵️ **4. Mafia (Case Game)**
+🔀 **4. Scrambled Word**
+• Race to unscramble the word before the timer ends!
+• Commands: \`!scramble\`, \`!joinscramble\`, \`!scramblehint\`, \`!stopscramble\`
+• Fast solves, streaks, automatic hints, and special rounds earn more points.
+
+🕵️ **5. Mafia (Case Game)**
 • Social deduction chaos! Unmask the killer or survive the night.
 • Commands: \`!mafia\` (or \`!startmafia\`), \`!joinmafia\`, \`stopmafia\`, \`!vote @user\`
 • *(Night actions are handled via private message DM to the bot: \`!kill\`, \`!save\`, \`!investigate\`)*
