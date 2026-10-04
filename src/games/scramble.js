@@ -150,7 +150,7 @@ function startScrambleLobby(chatId, client) {
         startNextRound(chatId, client);
     }, LOBBY_TIME_MS);
 
-    return `🔀 *SCRAMBLED WORD LOBBY OPEN!*\n━━━━━━━━━━━━━━━━━━━━━\nRace to unscramble words before everyone else!\n\nType \`!joinscramble\` to join.\n\n🏁 *12 rounds* | ⏱️ *120 seconds per round*\n💡 Automatic hints unlock as time runs out.\n🔒 Private hint: \`!scramblehint\` (-${HINT_COST} coins; reduced reward)\n\n⌛ Lobby closes in *60 seconds*...`;
+    return `🔀 *SCRAMBLED WORD LOBBY OPEN!*\n━━━━━━━━━━━━━━━━━━━━━\nRace to unscramble words before everyone else!\n\nType \`!joinscramble\` to join.\n\n🏁 *15 rounds* | ⏱️ *120 seconds per round*\n💡 Automatic hints unlock as time runs out.\n🔒 Private hint: \`!scramblehint\` (-${HINT_COST} coins; reduced reward)\n\n⌛ Lobby closes in *60 seconds*...`;
 }
 
 function joinScrambleLobby(chatId, senderId, userName) {
