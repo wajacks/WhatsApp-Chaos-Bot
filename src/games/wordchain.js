@@ -30,7 +30,7 @@ const LOBBY_STATE = 'LOBBY';
 const PLAYING_STATE = 'PLAYING';
 
 const GAME_DURATION = 5 * 60 * 1000;
-const TURN_DURATION = 10 * 1000;
+const TURN_DURATION = 15 * 1000;
 
 const POINTS_3_4 = 1;
 const POINTS_5_6 = 2;
