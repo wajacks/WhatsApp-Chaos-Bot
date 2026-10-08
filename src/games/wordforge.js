@@ -300,6 +300,10 @@ function startWordForgeLobby(groupId, playerId, userName, client, aliases) {
         return '❌ Word Forge could not open because its database is unavailable.';
     }
 
+    safeSend(client, bundle.canonical,
+        'Your private Word Forge leaderboard ID is *' + game.players[bundle.canonical].anonymousId +
+        '*; only you will know this ID until the final reveal.');
+
     const timerSet = getTimerSet(groupId);
     timerSet.lobby = setTimeout(() => {
         const current = activeGames.get(groupId);
@@ -309,7 +313,7 @@ function startWordForgeLobby(groupId, playerId, userName, client, aliases) {
     if (timerSet.lobby.unref) timerSet.lobby.unref();
 
     return '⚒️ WORD FORGE LOBBY OPEN!\n\n' +
-        '*' + safeName(userName) + '* is registered as ' + game.players[bundle.canonical].anonymousId + '.\n' +
+        '*' + safeName(userName) + '* is registered.\n' +
         'Players: use !joinforge to register (2–10 players).\n' +
         'Host: use !startforge when ready.\n\n' +
         'The match has 8 rounds. Each round lasts up to 90 seconds, followed by a 10-second anonymous break leaderboard. ' +
@@ -336,7 +340,10 @@ function joinWordForgeLobby(groupId, playerId, userName, client, aliases) {
         return '❌ Your registration could not be saved. Please try again.';
     }
 
-    return '✅ *' + player.name + '* joined Word Forge as ' + player.anonymousId + '. (' +
+    safeSend(client, player.id,
+        'Your private Word Forge leaderboard ID is *' + player.anonymousId +
+        '*; only you will know this ID until the final reveal.');
+    return '✅ *' + player.name + '* joined Word Forge. (' +
         game.playerOrder.length + '/' + MAX_PLAYERS + ')\n\nOnly the host can start with !startforge.';
 }
 
@@ -899,10 +906,12 @@ function handleWordForgeStealCommand(groupId, senderId, mentionedJid, client, se
     const winnerId = bundle.canonical;
     if (!winnerId) return null;
 
+    let pendingKey = winnerId;
     let steal = wordForgeDB.getPendingSteal(winnerId);
     if (!steal) {
-        for (const candidate of Object.values(wordForgeDB.loadPendingSteals())) {
+        for (const [key, candidate] of Object.entries(wordForgeDB.loadPendingSteals())) {
             if ((candidate.aliases || []).some(alias => bundle.aliases.includes(alias))) {
+                pendingKey = key;
                 steal = candidate;
                 break;
             }
@@ -916,7 +925,7 @@ function handleWordForgeStealCommand(groupId, senderId, mentionedJid, client, se
         }
         return '⌛ Your Word Forge steal window has expired.';
     }
-    if (steal.groupId !== groupId) return '❌ You can only use this Word Forge steal in the group where you won.';
+    if (steal.groupId !== groupId) return null;
     if (!mentionedJid) return '⚠️ Tag the losing player you want to steal from.';
 
     const targetBundle = identityBundle(mentionedJid, []);
@@ -934,7 +943,7 @@ function handleWordForgeStealCommand(groupId, senderId, mentionedJid, client, se
     if (!transfer.success) return transfer.message || '❌ The wallet transfer could not be completed.';
 
     try {
-        wordForgeDB.removePendingSteal(winnerId);
+        wordForgeDB.removePendingSteal(pendingKey);
     } catch (error) {
         console.error('[WORD FORGE DB] Could not consume completed steal:', error.message);
     }
