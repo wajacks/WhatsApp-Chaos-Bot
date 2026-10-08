@@ -1,191 +1,84 @@
 #!/usr/bin/env bash
+set -Eeuo pipefail
 
-set -e
+RED=$'\033[0;31m'
+GREEN=$'\033[0;32m'
+YELLOW=$'\033[1;33m'
+RESET=$'\033[0m'
 
-# Color definitions for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+info() { printf '%b[INFO]%b %s\n' "$GREEN" "$RESET" "$1"; }
+warn() { printf '%b[WARN]%b %s\n' "$YELLOW" "$RESET" "$1"; }
+fail() { printf '%b[ERROR]%b %s\n' "$RED" "$RESET" "$1" >&2; exit 1; }
 
-info() { echo -e "${GREEN}[INFO]${NC} $1"; }
-warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-err()  { echo -e "${RED}[ERROR]${NC} $1"; }
+SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
+cd "$SCRIPT_DIR"
 
-info "Starting environment setup for WhatsApp-Chaos-Bot..."
+info "Preparing WhatsApp Chaos Bot..."
 
-# 0. Check Git status for potential drift
-if [ -d .git ]; then
-    info "Checking Git repository status..."
-    if [[ -n $(git status -s) ]]; then
-        warn "You have uncommitted changes or untracked files on this VPS!"
-        warn "Consider committing or stashing them before deployment to prevent drift."
-    else
-        info "Git working tree is clean."
+if (( EUID == 0 )); then
+    fail "Run setup as the regular bot account, not root. Use sudo only for the operating-system commands in README.md."
+fi
+
+if [[ "$(uname -s)" != "Linux" ]]; then
+    fail "This setup script supports Linux. See README.md for the supported deployment path."
+fi
+
+if [[ ! -r /etc/os-release ]]; then
+    fail "Cannot identify this Linux distribution. See README.md for supported systems."
+fi
+
+. /etc/os-release
+if [[ "$ID" != "ubuntu" && "$ID" != "debian" ]]; then
+    fail "This setup script supports Ubuntu and Debian. Your system is: $PRETTY_NAME"
+fi
+
+if [[ ! -f package.json || ! -f package-lock.json || ! -f index.js ]]; then
+    fail "Run setup.sh from a WhatsApp Chaos Bot checkout containing package.json, package-lock.json, and index.js."
+fi
+
+for command_name in node npm git; do
+    if ! command -v "$command_name" >/dev/null 2>&1; then
+        fail "$command_name is required but was not found in PATH. Install the prerequisites listed in README.md and run setup again."
     fi
+done
+
+node_major="$(node -p 'Number(process.versions.node.split(".")[0])')"
+node_minor="$(node -p 'Number(process.versions.node.split(".")[1])')"
+if (( node_major < 22 || (node_major == 22 && node_minor < 12) )); then
+    fail "Node.js 22.12 or newer is required. Detected $(node --version). Upgrade Node.js, then run setup again."
 fi
 
-# 1. Create required directories
-info "Creating required project directories..."
-mkdir -p logs data downloads temp
+info "Node.js $(node --version); npm $(npm --version)"
+info "Creating the bot's runtime folders..."
+mkdir -p data/session downloads
 
-# 2. Environment Configuration (.env) Setup
-info "Checking environment variables..."
-
-if [ ! -f .env ]; then
-    warn ".env file not found. Creating from template..."
-    
-    read -p "Enter your Google Gemini API Key (GEMINI_API_KEY): " user_gemini_key
-    read -p "Enter your OpenWeatherMap API Key (OPENWEATHERMAP_API_KEY): " user_weather_key
-    read -p "Enter your Azure OpenAI Key (AZURE_OPENAI_KEY): " user_azure_key
-    read -p "Enter your Azure OpenAI Endpoint (AZURE_OPENAI_ENDPOINT): " user_azure_endpoint
-    read -p "Enter Bot Owner Phone Number (e.g., 254712345678@c.us): " user_owner_number
-    read -p "Enter Bot Phone Number for Pairing (or press Enter to use QR Code): " user_pairing_number
-    
-    cat <<EOF > .env
-# WhatsApp Chaos Bot Configuration
-GEMINI_API_KEY=${user_gemini_key}
-OPENWEATHERMAP_API_KEY=${user_weather_key}
-
-# Azure OpenAI (Handles !analyze Vision and !ai Chat Fallback)
-AZURE_OPENAI_KEY=${user_azure_key}
-AZURE_OPENAI_ENDPOINT=${user_azure_endpoint}
-
-# Bot Owner Configuration
-OWNER_NUMBER=${user_owner_number}
-
-# WhatsApp Authentication (Leave blank to default to QR Code)
-PAIRING_NUMBER=${user_pairing_number}
-
-# Model Deployments
-AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4o-mini
-
-# Server Port
-PORT=3000
-EOF
-    info ".env file created successfully."
-else
-    info ".env file exists."
-fi
-
-# Validate key existence in .env
-if ! grep -q "GEMINI_API_KEY=." .env; then
-    warn "GEMINI_API_KEY appears to be empty in .env."
-fi
-
-if ! grep -q "OPENWEATHERMAP_API_KEY=." .env; then
-    warn "OPENWEATHERMAP_API_KEY appears to be empty in .env. Weather features may fail."
-fi
-
-# 3. Check optional runtime assets
-info "Verifying optional game/audio assets..."
-[ -f cookies.txt ] && info "Found cookies.txt for YouTube downloads." || warn "cookies.txt missing. YouTube audio streaming may hit rate-limits."
-[ -f rules.pdf ] && info "Found rules.pdf for Mafia." || warn "rules.pdf missing. Mafia case file will skip sending the document."
-[ -f briefing.mp3 ] || [ -f briefing.ogg ] && info "Found Mafia briefing audio." || warn "briefing audio missing. Mafia dispatch audio will be skipped."
-
-# 4. Check Node.js & npm
-info "Checking Node.js..."
-if ! command -v node &> /dev/null; then
-    err "Node.js is not installed. Please install Node.js (v18+ recommended)."
-    exit 1
-fi
-info "Node.js version: $(node -v)"
-
-if ! command -v npm &> /dev/null; then
-    err "npm is not installed."
-    exit 1
-fi
-
-# 5. Check & Install PM2 globally
-if ! command -v pm2 &> /dev/null; then
-    info "Installing PM2 globally..."
-    npm install -g pm2
-else
-    info "PM2 is already installed."
-fi
-
-# 6. Check/Install System Dependencies & Memory Swap
-info "Configuring Memory Swap and System Dependencies..."
-
-if [ ! -f /swapfile ]; then
-    info "Creating 2GB swap file for deployment stability..."
-    sudo fallocate -l 2G /swapfile
-    sudo chmod 600 /swapfile
-    sudo mkswap /swapfile
-    sudo swapon /swapfile
-    echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-fi
-
-if ! command -v ffmpeg &> /dev/null || ! dpkg -s libnss3 &> /dev/null; then
-    warn "Installing FFmpeg, Python3, and Chromium dependencies..."
-    if command -v apt-get &> /dev/null; then
-        sudo apt-get update 
-        
-        # Install FFmpeg and Python
-        sudo apt-get install -y ffmpeg python3 python3-pip curl
-        
-        # Install required Chromium/Puppeteer dependencies
-        sudo apt-get install -y \
-            ca-certificates fonts-liberation libasound2 libatk-bridge2.0-0 \
-            libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 \
-            libexpat1 libfontconfig1 libgbm1 libgcc1 libglib2.0-0 \
-            libgtk-3-0 libnspr4 libnss3 libpango-1.0-0 \
-            libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 \
-            libxcb1 libxcomposite1 libxcursor1 libxdamage1 \
-            libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 \
-            libxss1 libxtst6 lsb-release wget xdg-utils
-    else
-        err "Please install FFmpeg and Chromium dependencies manually."
-        exit 1
+if [[ ! -f .env ]]; then
+    if [[ ! -f .env.example ]]; then
+        fail ".env.example is missing. Restore it from the repository before running setup."
     fi
+    cp .env.example .env
+    chmod 600 .env
+    info "Created .env from .env.example."
 else
-    info "System dependencies are already installed."
+    chmod 600 .env
+    info "Kept your existing .env and restricted its permissions."
 fi
 
-# 7. Install/Update yt-dlp & bgutil-ytdlp-pot-provider
-info "Installing/Updating yt-dlp and bgutil provider..."
-$PIP_CMD install --upgrade yt-dlp bgutil-ytdlp-pot-provider
+info "Installing the locked Node.js dependencies with npm ci..."
+npm ci
 
-# 8. Install Node.js npm dependencies
-info "Installing Node.js dependencies..."
-npm install
-
-# 9. Start/Restart services via PM2
-info "Configuring PM2 services..."
-
-# bgutil PO Token Provider service (Runs strictly on port 4416)
-if pm2 list | grep -q "bgutil-pot"; then
-    info "Restarting bgutil-pot service..."
-    pm2 restart bgutil-pot
-else
-    info "Starting bgutil-pot service..."
-    pm2 start bgutil-ytdlp-pot-provider --name "bgutil-pot" -- run
+if ! grep -Eq '^AZURE_OPENAI_KEY=.+$' .env || ! grep -Eq '^AZURE_OPENAI_ENDPOINT=https?://.+' .env; then
+    warn "Add AZURE_OPENAI_KEY and AZURE_OPENAI_ENDPOINT to .env before starting the bot; the current app initializes Azure OpenAI during startup."
 fi
 
-# WhatsApp Chaos Bot service
-if pm2 list | grep -q "chaos-bot"; then
-    info "Restarting chaos-bot service..."
-    pm2 restart chaos-bot
-else
-    info "Starting chaos-bot service..."
-    pm2 start index.js --name "chaos-bot"
+if ! grep -Eq '^OWNER_NUMBER=.+$' .env; then
+    warn "Set OWNER_NUMBER in .env to enable owner-only controls."
 fi
 
-# 10. Save PM2 state
-info "Saving PM2 process configuration..."
-pm2 save
-
-# 11. Verify bgutil server health
-info "Verifying bgutil PO Token server status..."
-sleep 3
-
-HEALTH_URL="http://127.0.0.1:4416/ping"
-if command -v curl &> /dev/null; then
-    if curl -s --head --request GET "$HEALTH_URL" | grep -E "200|404|302" > /dev/null; then
-        info "bgutil server is up and listening on port 4416!"
-    else
-        warn "bgutil server did not respond on $HEALTH_URL. Check logs: 'pm2 logs bgutil-pot'"
-    fi
-fi
-
-info "Setup completed successfully! Use 'pm2 logs chaos-bot' to monitor output and scan the QR code."
+printf '\n'
+info "Core setup is complete."
+printf '%s\n' "Next:"
+printf '%s\n' "  1. Review .env and configure the required Azure OpenAI credentials."
+printf '%s\n' "  2. Install the Chromium system libraries listed in README.md."
+printf '%s\n' "  3. Start the bot with: node index.js"
+printf '%s\n' "Optional media tools and PM2 setup are documented in README.md."
