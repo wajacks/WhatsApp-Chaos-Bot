@@ -258,6 +258,29 @@ function safeSend(client, chatId, content) {
     }
 }
 
+function scheduleGuardedTimeout(groupId, delayMs, callback, client, pauseMatch = true) {
+    const timer = setTimeout(() => {
+        try {
+            callback();
+        } catch (error) {
+            console.error('[WORD FORGE TIMER] Scheduled action failed:', error.message);
+            const game = activeGames.get(groupId);
+            if (pauseMatch && game) {
+                game.phase = 'PAUSED';
+                clearGameTimers(groupId);
+                try {
+                    wordForgeDB.saveMatch(groupId, game);
+                } catch (saveError) {
+                    console.error('[WORD FORGE DB] Could not persist paused match:', saveError.message);
+                }
+            }
+            safeSend(client, groupId, '⚠️ Word Forge paused after an internal timer error. The last saved match state is preserved.');
+        }
+    }, Math.max(0, delayMs));
+    if (timer.unref) timer.unref();
+    return timer;
+}
+
 function saveGame(game, client) {
     try {
         wordForgeDB.saveMatch(game.groupId, game);
@@ -305,11 +328,11 @@ function startWordForgeLobby(groupId, playerId, userName, client, aliases) {
         '*; only you will know this ID until the final reveal.');
 
     const timerSet = getTimerSet(groupId);
-    timerSet.lobby = setTimeout(() => {
+    timerSet.lobby = scheduleGuardedTimeout(groupId, LOBBY_DURATION_MS, () => {
         const current = activeGames.get(groupId);
         if (current !== game || current.phase !== 'LOBBY') return;
         cancelMatch(groupId, client, '⌛ The Word Forge lobby expired before the host started the match.');
-    }, LOBBY_DURATION_MS);
+    }, client);
     if (timerSet.lobby.unref) timerSet.lobby.unref();
 
     return '⚒️ WORD FORGE LOBBY OPEN!\n\n' +
@@ -458,7 +481,7 @@ function sendPuzzleToPlayer(game, player, client, resumed) {
         'Your anonymous ID: *' + player.anonymousId + '*\n' +
         'Letter rack: *' + player.puzzle.rack + '*\n' +
         'Round rule: *' + player.puzzle.rule.label + '*\n\n' +
-        'Send one word only in this DM. Your word must be in the English dictionary, use only these letters (each tile once), and follow the rule above.\n' +
+        'Send one word only in this DM. Your word must be in the English dictionary, use only these letters, never more times than they appear in your rack; you do not need to use every tile, and follow the rule above.\n' +
         'The first valid word locks your score. Wrong guesses earn 0 points, but you may try again.\n' +
         'Score: 10 points per letter + up to 20 speed points.\n' +
         'Time remaining: ' + Math.max(1, Math.ceil((game.roundEndsAt - Date.now()) / 1000)) + ' seconds.' +
@@ -526,10 +549,10 @@ function scheduleRound(game, client) {
 
     for (const mark of [30 * 1000, 60 * 1000]) {
         if (elapsed < mark) {
-            const timer = setTimeout(() => {
+            const timer = scheduleGuardedTimeout(groupId, mark - Math.max(0, elapsed), () => {
                 if (activeGames.get(groupId) !== game || game.phase !== 'ACTIVE' || game.currentRound !== roundNumber) return;
                 postRoundStatus(game, client, mark);
-            }, mark - Math.max(0, elapsed));
+            }, client);
             if (timer.unref) timer.unref();
             timerSet.comments.push(timer);
         }
@@ -541,10 +564,10 @@ function scheduleRound(game, client) {
         return;
     }
 
-    timerSet.round = setTimeout(() => {
+    timerSet.round = scheduleGuardedTimeout(groupId, remaining, () => {
         if (activeGames.get(groupId) !== game || game.phase !== 'ACTIVE' || game.currentRound !== roundNumber) return;
         endRound(game, client, '⏰ Time is up.');
-    }, remaining);
+    }, client);
     if (timerSet.round.unref) timerSet.round.unref();
 }
 
@@ -630,10 +653,10 @@ function endRound(game, client, reason) {
 
     const timerSet = getTimerSet(groupId);
     const roundNumber = game.currentRound;
-    timerSet.break = setTimeout(() => {
+    timerSet.break = scheduleGuardedTimeout(groupId, BREAK_DURATION_MS, () => {
         if (activeGames.get(groupId) !== game || game.phase !== 'BREAK' || game.currentRound !== roundNumber) return;
         advanceAfterBreak(game, client);
-    }, BREAK_DURATION_MS);
+    }, client);
     if (timerSet.break.unref) timerSet.break.unref();
 }
 
@@ -729,7 +752,7 @@ function buildFinalLeaderboard(game, winner) {
 
 function scheduleStealExpiry(winnerId, steal, client) {
     const timerSet = getTimerSet(steal.groupId);
-    const timer = setTimeout(() => {
+    const timer = scheduleGuardedTimeout(steal.groupId, steal.expiresAt - Date.now(), () => {
         const current = wordForgeDB.getPendingSteal(winnerId);
         if (!current || current.expiresAt !== steal.expiresAt) return;
         try {
@@ -738,7 +761,7 @@ function scheduleStealExpiry(winnerId, steal, client) {
             console.error('[WORD FORGE DB] Could not expire a steal:', error.message);
         }
         safeSend(client, steal.groupId, '⌛ ' + steal.winnerName + '’s Word Forge steal window has expired.');
-    }, Math.max(0, steal.expiresAt - Date.now()));
+    }, client, false);
     if (timer.unref) timer.unref();
     timerSet.steal.push(timer);
 }
@@ -864,6 +887,15 @@ function processWordForgeDmMessage(senderId, senderContact, text, client) {
         return { handled: true, response };
     }
 
+    const previousPlayerState = {
+        score: player.score,
+        solvedRounds: player.solvedRounds,
+        cumulativeSolveMs: player.cumulativeSolveMs,
+        roundSolved: player.roundSolved,
+        roundGuess: player.roundGuess,
+        roundPoints: player.roundPoints,
+        roundElapsedMs: player.roundElapsedMs
+    };
     const elapsedMs = Math.max(0, Date.now() - game.roundStartedAt);
     const score = calculatePoints(validation.word.length, elapsedMs);
     player.roundSolved = true;
@@ -884,7 +916,15 @@ function processWordForgeDmMessage(senderId, senderContact, text, client) {
     };
 
     if (!saveGame(game, client)) {
-        return { handled: true, response: '⚠️ Your word was valid, but the score database failed. The match has been paused; contact the group host.' };
+        player.score = previousPlayerState.score;
+        player.solvedRounds = previousPlayerState.solvedRounds;
+        player.cumulativeSolveMs = previousPlayerState.cumulativeSolveMs;
+        player.roundSolved = previousPlayerState.roundSolved;
+        player.roundGuess = previousPlayerState.roundGuess;
+        player.roundPoints = previousPlayerState.roundPoints;
+        player.roundElapsedMs = previousPlayerState.roundElapsedMs;
+        delete result.results[player.id];
+        return { handled: true, response: '⚠️ The score database failed, so this guess was not saved or scored. The match has been paused.' };
     }
 
     const reply = '✅ *VALID WORD — SCORE LOCKED*\n\n' +
@@ -994,11 +1034,11 @@ function restoreWordForgeGames(client) {
                 cancelMatch(game.groupId, client, '⌛ The Word Forge lobby expired while the bot was offline.');
             } else {
                 const timerSet = getTimerSet(game.groupId);
-                timerSet.lobby = setTimeout(() => {
+                timerSet.lobby = scheduleGuardedTimeout(game.groupId, delay, () => {
                     if (activeGames.get(game.groupId) === game && game.phase === 'LOBBY') {
                         cancelMatch(game.groupId, client, '⌛ The Word Forge lobby expired before the host started the match.');
                     }
-                }, delay);
+                }, client);
                 if (timerSet.lobby.unref) timerSet.lobby.unref();
             }
         } else if (game.phase === 'ACTIVE') {
@@ -1016,11 +1056,11 @@ function restoreWordForgeGames(client) {
             if (delay <= 0) advanceAfterBreak(game, client);
             else {
                 const timerSet = getTimerSet(game.groupId);
-                timerSet.break = setTimeout(() => {
+                timerSet.break = scheduleGuardedTimeout(game.groupId, delay, () => {
                     if (activeGames.get(game.groupId) === game && game.phase === 'BREAK') {
                         advanceAfterBreak(game, client);
                     }
-                }, delay);
+                }, client);
                 if (timerSet.break.unref) timerSet.break.unref();
             }
         }
