@@ -274,7 +274,9 @@ function scheduleGuardedTimeout(groupId, delayMs, callback, client, pauseMatch =
                     console.error('[WORD FORGE DB] Could not persist paused match:', saveError.message);
                 }
             }
-            safeSend(client, groupId, '⚠️ Word Forge paused after an internal timer error. The last saved match state is preserved.');
+            safeSend(client, groupId, pauseMatch
+                ? '⚠️ Word Forge paused after an internal timer error. The last saved match state is preserved.'
+                : '⚠️ A Word Forge steal timer failed; no match state was changed.');
         }
     }, Math.max(0, delayMs));
     if (timer.unref) timer.unref();
@@ -340,8 +342,8 @@ function startWordForgeLobby(groupId, playerId, userName, client, aliases) {
         'Players: use !joinforge to register (2–10 players).\n' +
         'Host: use !startforge when ready.\n\n' +
         'The match has 8 rounds. Each round lasts up to 90 seconds, followed by a 10-second anonymous break leaderboard. ' +
-        'Every player receives a different letter rack and rule privately in DM. Send one word at a time; wrong guesses score zero and you can retry. ' +
-        'Your first valid word locks your round score.';
+        'Every player receives a different rack and rule privately in DM. A word must be in the English dictionary, use rack letters no more times than shown, and obey your rule. ' +
+        'Wrong guesses score zero but may be retried; the first valid word locks your round. Score is 10 per letter plus up to 20 speed points.';
 }
 
 function joinWordForgeLobby(groupId, playerId, userName, client, aliases) {
@@ -972,7 +974,7 @@ function handleWordForgeStealCommand(groupId, senderId, mentionedJid, client, se
         player.id === targetBundle.canonical ||
         (player.aliases || []).some(alias => targetBundle.aliases.includes(alias))
     );
-    if (!eligible) return '❌ You can only steal from another registered player in this Word Forge match.';
+    if (!eligible) return null;
 
     const balance = getBalance(eligible.id);
     const amount = Math.floor(balance * STEAL_FRACTION);
@@ -1046,9 +1048,11 @@ function restoreWordForgeGames(client) {
                 endRound(game, client, '✅ Everyone eligible had already locked a valid word before restart.');
             } else {
                 scheduleRound(game, client);
-                for (const playerId of game.playerOrder) {
-                    const player = game.players[playerId];
-                    if (player.puzzle && !player.roundSolved) sendPuzzleToPlayer(game, player, client, true);
+                if (game.phase === 'ACTIVE') {
+                    for (const playerId of game.playerOrder) {
+                        const player = game.players[playerId];
+                        if (player.puzzle && !player.roundSolved) sendPuzzleToPlayer(game, player, client, true);
+                    }
                 }
             }
         } else if (game.phase === 'BREAK') {
