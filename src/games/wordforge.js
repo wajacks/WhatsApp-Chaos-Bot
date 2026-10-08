@@ -129,8 +129,11 @@ function matchesIdentity(player, bundle) {
     if (!player || !bundle) return false;
     const candidates = new Set(bundle.aliases || []);
     if (bundle.canonical) candidates.add(bundle.canonical);
+
+    // FIX: Checks if the new player matches the existing player, without mixing their IDs!
+    if (player.id && candidates.has(player.id)) return true;
+
     const stored = player.identityAliases || [];
-    if (player.id) candidates.add(player.id);
     for (const alias of stored) {
         if (candidates.has(alias)) return true;
         const canonical = identityAliases.get(alias);
