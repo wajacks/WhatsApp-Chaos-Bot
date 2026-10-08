@@ -96,6 +96,18 @@
 │💡 \`!scramblehint\`
 │     ☞『_*Get a private scramble clue*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│⚒️ `!wordforge`
+│     ☞『_*Start Word Forge*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│👥 `!joinforge`
+│     ☞『_*Join Word Forge*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🚀 `!startforge`
+│     ☞『_*Start the match*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🛑 `!stopforge`
+│     ☞『_*Stop Word Forge*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🕵️ \`!mafia\`
 │     ☞『_*Start Mafia*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
