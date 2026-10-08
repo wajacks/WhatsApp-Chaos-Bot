@@ -84,7 +84,7 @@ Package names can vary by distribution release. See Puppeteer’s [Linux trouble
 Clone the repository using the URL and authentication method available to you, then enter the project folder:
 
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/wajacks/WhatsApp-Chaos-Bot.git
 cd WhatsApp-Chaos-Bot
 bash setup.sh
 ```
