@@ -21,6 +21,6 @@
     "openai": "^7.15.0",
     "qrcode-terminal": "^0.12.0",
     "wav": "^1.0.2",
-    "whatsapp-web.js": "github:wwebjs/whatsapp-web.js#main"
+    "whatsapp-web.js": "git+https://github.com/wwebjs/whatsapp-web.js.git#942d236a11ad68807308b058303ba5256915979c"
   }
 }
