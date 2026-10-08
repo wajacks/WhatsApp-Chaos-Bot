@@ -96,16 +96,16 @@
 │💡 \`!scramblehint\`
 │     ☞『_*Get a private scramble clue*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│⚒️ `!wordforge`
+│⚒️ \`!wordforge\`
 │     ☞『_*Start Word Forge*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│👥 `!joinforge`
+│👥 \`!joinforge\`
 │     ☞『_*Join Word Forge*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🚀 `!startforge`
+│🚀 \`!startforge\`
 │     ☞『_*Start the match*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🛑 `!stopforge`
+│🛑 \`!stopforge\`
 │     ☞『_*Stop Word Forge*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🕵️ \`!mafia\`
