@@ -164,47 +164,47 @@ These tools are separate from the core setup. Add them only when you need the re
 
 Install FFmpeg on Ubuntu/Debian:
 
-\`\`\`bash
+```bash
 sudo apt-get install -y ffmpeg
-\`\`\`
+```
 
 ### YouTube downloads
 
-The media downloader needs \`yt-dlp\`; audio extraction and media conversion also use FFmpeg. The current \`!video\` handler is marked as under maintenance, so installing these tools does not enable it.
+The media downloader needs `yt-dlp`; audio extraction and media conversion also use FFmpeg. The current `!video` handler is marked as under maintenance, so installing these tools does not enable it.
 
 <details>
 <summary><strong>Optional yt-dlp and bgutil setup</strong></summary>
 
 Use a Python virtual environment so the media packages do not modify the server’s system Python:
 
-\`\`\`bash
+```bash
 sudo apt-get install -y python3-venv
 python3 -m venv "$HOME/.venvs/chaos-media"
 "$HOME/.venvs/chaos-media/bin/python" -m pip install --upgrade pip yt-dlp bgutil-ytdlp-pot-provider
 export PATH="$HOME/.venvs/chaos-media/bin:$PATH"
 yt-dlp --version
-\`\`\`
+```
 
 The bgutil package installed above is the yt-dlp plugin. Its HTTP token server is a separate Node application. Follow the [upstream setup guide](https://github.com/Brainicism/bgutil-ytdlp-pot-provider#installation) and choose matching plugin/server versions. The native server setup is:
 
-\`\`\`bash
+```bash
 git clone --single-branch --branch 2.0.2 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git "$HOME/bgutil-ytdlp-pot-provider"
 cd "$HOME/bgutil-ytdlp-pot-provider/server"
 npm ci
 npx tsc
 node build/main.js
-\`\`\`
+```
 
-The example uses provider release \`2.0.2\`; check the upstream guide for the current matching release before installing. The server listens locally on port \`4416\` by default. Keep it on localhost and never expose that port publicly. To manage it with PM2, install PM2 as described below and start the built \`server/build/main.js\` process from the server directory.
+The example uses provider release `2.0.2`; check the upstream guide for the current matching release before installing. The server listens locally on port `4416` by default. Keep it on localhost and never expose that port publicly. To manage it with PM2, install PM2 as described below and start the built `server/build/main.js` process from the server directory.
 
-The bot’s current video code passes a project-root \`cookies.txt\` file to yt-dlp. If you re-enable that handler, provide a valid cookies file or remove the cookie argument in code. Keep cookies private and out of Git.
+The bot’s current video code passes a project-root `cookies.txt` file to yt-dlp. If you re-enable that handler, provide a valid cookies file or remove the cookie argument in code. Keep cookies private and out of Git.
 
 </details>
 
 ### Optional game assets
 
-- **Mafia:** \`rules.pdf\` and either \`briefing.mp3\` or \`briefing.ogg\` may be placed in the project root. Missing files are skipped by the game.
-- **Random songs:** OGG files belong under \`src/assets\`. The current random-song handler is marked as under maintenance.
+- **Mafia:** `rules.pdf` and either `briefing.mp3` or `briefing.ogg` may be placed in the project root. Missing files are skipped by the game.
+- **Random songs:** OGG files belong under `src/assets`. The current random-song handler is marked as under maintenance.
 
 ### Memory and swap
 
