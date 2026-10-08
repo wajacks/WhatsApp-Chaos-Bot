@@ -24,7 +24,12 @@ function getGamesList() {
 • Commands: \`!scramble\`, \`!joinscramble\`, \`!scramblehint\`, \`!stopscramble\`
 • Fast solves, streaks, automatic hints, and special rounds earn more points.
 
-🕵️ **5. Mafia (Case Game)**
+⚒️ **5. Word Forge**
+• Build a valid word from your private letter rack while obeying your private round rule.
+• Commands: `!wordforge`, `!joinforge`, `!startforge`, `!stopforge`
+• 90-second rounds, anonymous 10-second break boards, then a full final reveal.
+
+🕵️ **6. Mafia (Case Game)**
 • Social deduction chaos! Unmask the killer or survive the night.
 • Commands: \`!mafia\` (or \`!startmafia\`), \`!joinmafia\`, \`stopmafia\`, \`!vote @user\`
 • *(Night actions are handled via private message DM to the bot: \`!kill\`, \`!save\`, \`!investigate\`)*
