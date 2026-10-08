@@ -36,7 +36,7 @@ function readStore() {
 }
 
 function writeStore(store) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
     const temporaryPath = DB_PATH + '.tmp';
 
     try {
