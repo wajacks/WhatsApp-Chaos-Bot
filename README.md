@@ -1,377 +1,221 @@
-# WhatsApp Chaos Bot
+<div align="center">
+<h1>⚡ WhatsApp Chaos Bot ⚡</h1>
+<p><strong>Turn the group chat into a game lobby.</strong></p>
+<p>Multiplayer games, friendly rivalries, rewards, AI tools, and plenty of chaos.</p>
 
-A WhatsApp group entertainment bot built with Node.js and `whatsapp-web.js`.
-
-The bot includes games, economy features, AI, music playback, weather information, and other group features.
-
-## Features
-
-* 🎮 Group games
-* 💰 Economy system
-* 🤖 AI assistant
-* 🎵 YouTube music playback
-* 🌦️ Weather information
-* 🏆 XP and rewards
-* 👥 WhatsApp group interaction
-* 🔐 WhatsApp session persistence
-* ⚡ PM2 always-online deployment
-
-## Requirements
-
-The recommended deployment environment is:
-
-* Ubuntu 22.04 or newer
-* Node.js 22+
-* npm
-* Python 3
-* FFmpeg
-* Git
-* Internet connection
-* WhatsApp account
-
-The setup script automatically installs/checks most of these requirements.
+<img alt="Node.js 22.12+" src="https://img.shields.io/badge/Node.js-22.12%2B-339933?logo=nodedotjs&logoColor=white">
+<img alt="WhatsApp Web.js" src="https://img.shields.io/badge/WhatsApp-Web.js-25D366?logo=whatsapp&logoColor=white">
+<img alt="MIT License" src="https://img.shields.io/badge/License-MIT-blue.svg">
+</div>
 
 ---
 
-# Installation
+## ✨ What’s inside
 
-## 1. Clone the repository
+- **Game night:** Country Rebus, Wordle, Word Chain, Scrambled Word, Word Forge, and Mafia.
+- **Progression:** profiles, levels, XP, coins, daily rewards, and a shop.
+- **AI and utilities:** AI chat, image generation, Bible verses, hymns, weather, and class tools.
+- **Group and private play:** several games use group lobbies with private-message actions or clues.
+
+Open `!menu` for the command center or `!games` for the current game list.
+
+## 🎮 Game lineup
+
+| Game | How to start |
+|---|---|
+| Country Rebus | `!rebus` → players join with `!joinrebus`; use `!hint` for a clue |
+| Wordle | `!wordle` → players join with `!join` |
+| Word Chain | `!wordchain` → join with `!wjoin`, then the host uses `!startwordchain` |
+| Scrambled Word | `!scramble` → join with `!joinscramble` |
+| Word Forge | `!wordforge` → join with `!joinforge`, then the host uses `!startforge` |
+| Mafia | `!mafia` → join with `!joinmafia`; voting and night actions happen in the group and DMs |
+
+Use `!games` in WhatsApp for the latest command list. Hosts can use the game-specific stop command shown in `!menu`.
+
+## 🚀 First-time setup
+
+The included `setup.sh` is deliberately small. It checks the environment, creates the bot’s local runtime folders, creates a private `.env` from `.env.example` if needed, and installs the locked Node.js dependencies with `npm ci`.
+
+It does **not** install system packages, change swap settings, install media download tools, install PM2, or start the bot. The steps below cover those choices.
+
+### 1. Prepare the server
+
+The documented server setup targets **Ubuntu 22.04+ or Debian 12+**, with a regular non-root account for running the bot.
+
+Install:
+
+- Node.js **22.12 or newer**, npm, and Git.
+- Internet access to GitHub and the npm registry.
+- The Chromium shared libraries listed in the next step.
+
+Install Node.js from the [official Node.js downloads page](https://nodejs.org/en/download), then confirm:
 
 ```bash
-git clone YOUR_REPOSITORY_URL
+node --version
+npm --version
+git --version
 ```
 
-Enter the project:
+The bot’s WhatsApp Web client uses Puppeteer and Chrome. Puppeteer downloads its matching browser during dependency installation; Linux still needs the browser’s shared system libraries.
+
+<details>
+<summary><strong>Ubuntu / Debian: install Chrome system libraries</strong></summary>
+
+Run this once on the server:
 
 ```bash
+sudo apt-get update
+sudo apt-get install -y \\
+  ca-certificates fonts-liberation libasound2 libatk-bridge2.0-0 \\
+  libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 \\
+  libfontconfig1 libgbm1 libgcc1 libglib2.0-0 libgtk-3-0 \\
+  libnspr4 libnss3 libpango-1.0-0 libpangocairo-1.0-0 \\
+  libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 \\
+  libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 \\
+  libxrandr2 libxrender1 libxss1 libxtst6 lsb-release wget xdg-utils
+```
+
+Package names can vary by distribution release. See Puppeteer’s [Linux troubleshooting guide](https://pptr.dev/troubleshooting#chrome-doesnt-launch-on-linux) if apt reports a package as unavailable.
+
+</details>
+
+### 2. Get the bot and install its core dependencies
+
+Clone the repository using the URL and authentication method available to you, then enter the project folder:
+
+```bash
+git clone <your-repository-url>
 cd WhatsApp-Chaos-Bot
+bash setup.sh
 ```
 
-## 2. Run the setup script
+The setup script requires Node.js 22.12+, npm, and Git. It does not need root privileges. The lockfile fetches the public WhatsApp Web.js dependency over HTTPS.
 
-```bash
-chmod +x setup.sh
-./setup.sh
-```
+### 3. Configure the bot
 
-The setup script installs and configures:
-
-* Node.js dependencies
-* FFmpeg
-* yt-dlp
-* Python dependencies
-* bgutil PO-token provider
-* PM2
-* required bot directories
-* the bot process
-* the bgutil PO-token process
-
----
-
-# Environment Variables
-
-Create your `.env` file:
+The first setup creates `.env` and restricts it to your account. Edit it before starting:
 
 ```bash
 nano .env
 ```
 
-Add the API keys required by your installation.
+| Variable | Required? | Purpose |
+|---|---|---|
+| `AZURE_OPENAI_KEY` | **Yes for startup** | Azure OpenAI credential. The current app constructs this client during startup. |
+| `AZURE_OPENAI_ENDPOINT` | **Yes for startup** | Azure resource endpoint, for example `https://your-resource.openai.azure.com/`. |
+| `AZURE_OPENAI_CHAT_DEPLOYMENT` | Recommended | The deployment name configured in your Azure resource. The code falls back to `gpt-4o-mini`. |
+| `OWNER_NUMBER` | Recommended | Owner controls. Use the full international number with digits only, such as `254712345678`. |
+| `GEMINI_API_KEY` | Optional | Enables Gemini-powered features. |
+| `OPENWEATHERMAP_API_KEY` | Optional | Enables live weather lookups. |
+| `PAIRING_NUMBER` | Optional | Request a WhatsApp pairing code. Leave blank to use a QR code. |
 
-Never commit `.env` to GitHub.
+The Azure key and endpoint are needed even if you do not plan to use the AI commands, because the current app initializes the Azure client when it starts. Keep your real `.env` private; never commit it or paste its contents into an issue.
 
-A recommended approach is to provide a `.env.example` file containing variable names but no real secrets.
+### 4. Link WhatsApp and start the bot
 
-Example:
-
-```env
-GEMINI_API_KEY=
-OPENWEATHERMAP_API_KEY=
-```
-
-Fill in the actual values on the server.
-
----
-
-# YouTube / Music Setup
-
-The bot uses `yt-dlp` for YouTube media.
-
-The setup script installs the bgutil PO-token provider because YouTube may require proof-of-origin tokens for media extraction.
-
-The provider is installed separately from the bot:
-
-```text
-~/bgutil-ytdlp-pot-provider
-```
-
-It runs as a PM2 process:
-
-```text
-bgutil-pot
-```
-
-The WhatsApp bot runs as:
-
-```text
-chaos-bot
-```
-
-YouTube cookies are intentionally **not included in the repository**.
-
-If cookies are required by the current YouTube extraction environment, create:
-
-```text
-cookies.txt
-```
-
-in the project directory.
-
-Never upload this file to GitHub.
-
----
-
-# Starting the Bot
-
-After setup:
+Start the bot in the foreground for the first login:
 
 ```bash
-pm2 status
+node index.js
 ```
 
-You should see:
+A QR code appears in the terminal. On the WhatsApp account you want the bot to use, open **Linked devices → Link a device** and scan it. Keep the terminal running while you confirm that the bot connects.
 
-```text
-bgutil-pot
-chaos-bot
-```
+If you set `PAIRING_NUMBER`, follow the pairing-code instructions printed by the bot instead. Use a dedicated WhatsApp account where possible.
 
-Both should show:
+## 🔁 Keep it online with PM2 (optional)
 
-```text
-online
-```
-
----
-
-# PM2 Commands
-
-View bot logs:
+Run the bot as the same non-root account that owns the project and WhatsApp session:
 
 ```bash
+npm install --global pm2
+pm2 start index.js --name chaos-bot --cwd "$PWD"
 pm2 logs chaos-bot
 ```
 
-View bgutil logs:
+To restore the process after a server reboot, configure PM2’s startup service once:
 
 ```bash
-pm2 logs bgutil-pot
+pm2 startup
 ```
 
-Restart the bot:
+PM2 prints a system command. Run that command, then save the process list:
 
 ```bash
-pm2 restart chaos-bot
+pm2 save
 ```
 
-Restart bgutil:
+See the [PM2 startup guide](https://pm2.keymetrics.io/docs/usage/startup/) for details. The setup script intentionally leaves process-manager installation and boot configuration to you.
 
-```bash
-pm2 restart bgutil-pot
-```
-
-Restart both:
-
-```bash
-pm2 restart all
-```
-
-View processes:
+Useful commands:
 
 ```bash
 pm2 status
-```
-
----
-
-# Checking bgutil
-
-The bgutil PO-token server runs locally on port `4416`.
-
-Test it with:
-
-```bash
-curl http://127.0.0.1:4416/ping
-```
-
-A successful response looks similar to:
-
-```json
-{
-  "server_uptime": 123,
-  "version": "2.0.0"
-}
-```
-
----
-
-# WhatsApp Authentication
-
-When the bot starts for the first time, `whatsapp-web.js` will generate a QR code.
-
-Scan the QR code using WhatsApp.
-
-The authenticated session is stored locally and is ignored by Git.
-
-Do not commit the session directory to GitHub.
-
----
-
-# Updating the Bot
-
-Pull the latest code:
-
-```bash
-git pull
-```
-
-Install any new dependencies:
-
-```bash
-npm install
-```
-
-Restart the bot:
-
-```bash
-pm2 restart chaos-bot
-```
-
----
-
-# Troubleshooting
-
-## Bot is offline
-
-Check:
-
-```bash
-pm2 status
-```
-
-Then:
-
-```bash
 pm2 logs chaos-bot
+pm2 restart chaos-bot
+pm2 stop chaos-bot
 ```
 
-## YouTube playback fails
+## 🎵 Optional media features
 
-Check bgutil:
+These are separate from the bot’s core setup:
+
+- **Voice and audio conversion:** install FFmpeg with `sudo apt-get install -y ffmpeg`.
+- **YouTube downloads:** require `yt-dlp`; FFmpeg is also used for audio extraction and media conversion. Some YouTube requests may require a private `cookies.txt` file.
+- **PO-token support:** bgutil has a separate yt-dlp plugin and HTTP server. Follow the [upstream installation guide](https://github.com/Brainicism/bgutil-ytdlp-pot-provider#installation), keep the service bound to localhost, and do not expose port `4416` publicly.
+- **Local random songs:** audio files, when used, belong under `src/assets`.
+
+The current video and random-song handlers are marked as under maintenance in the code. Installing optional tools does not remove those maintenance notices; the handlers must be re-enabled separately.
+
+Keep `cookies.txt` private and out of Git. Do not install media tools unless you need those features.
+
+## 💾 Sessions, data, and moving servers
+
+The WhatsApp login is saved under `data/session`. User economy data and game state are stored as local files under `data/`; they are not in Git.
+
+- Keep the bot running as the same operating-system user so it can read its session and data.
+- Back up `data/` securely before replacing a server or reinstalling.
+- Stop the old instance before moving the WhatsApp session to another server. Do not run two bot instances with the same WhatsApp session at once.
+- Treat backups of `data/` as private: they can contain authentication state and player identifiers.
+
+## 🧰 Troubleshooting
+
+**The bot exits with an Azure credentials error**  
+Set both `AZURE_OPENAI_KEY` and `AZURE_OPENAI_ENDPOINT` in `.env`, then start it again.
+
+**Chrome fails to launch or reports a missing shared library**  
+Install the Ubuntu/Debian libraries above. Puppeteer’s [troubleshooting guide](https://pptr.dev/troubleshooting#chrome-doesnt-launch-on-linux) has the current package list.
+
+**WhatsApp asks for a new QR code**  
+Check that the bot runs as the same user and that `data/session` is writable and persistent. If you moved servers, link the device again if the saved session cannot be reused.
+
+**YouTube downloads fail**  
+Confirm `yt-dlp` and FFmpeg are installed, then check whether your network or YouTube requires cookies or the optional bgutil provider. The provider does not guarantee that YouTube will allow a download.
+
+## 🔄 Updating
+
+Stop the process, update the checkout, install the locked dependencies, and restart:
 
 ```bash
-pm2 status
+pm2 stop chaos-bot
+git pull --ff-only
+npm ci
+pm2 restart chaos-bot
 ```
 
-Then:
+For a foreground run, stop it with **Ctrl+C**, update the code, then run `node index.js` again.
 
-```bash
-pm2 logs bgutil-pot
-```
+## 🔐 Keep these files private
 
-Test the server:
+Do not commit or publicly share:
 
-```bash
-curl http://127.0.0.1:4416/ping
-```
+- `.env` — API keys and configuration
+- `data/` — WhatsApp session, player profiles, and game state
+- `cookies.txt` — YouTube cookies, if used
+- `downloads/` — requested media files
 
-Check yt-dlp:
-
-```bash
-yt-dlp --version
-```
-
-## Check the PO-token provider
-
-Run:
-
-```bash
-yt-dlp -v "https://www.youtube.com/watch?v=VIDEO_ID" 2>&1 | grep -E "PO Token Providers|bgutil|LOGIN_REQUIRED|Sign in"
-```
-
-You should see:
-
-```text
-bgutil:http-2.0.0
-```
-
----
-
-# Security
-
-Never commit:
-
-```text
-.env
-cookies.txt
-data/
-node_modules/
-downloads/
-```
-
-These may contain credentials, authentication sessions, private data, or generated media.
-
----
-
-# Project Structure
-
-```text
-WhatsApp-Chaos-Bot/
-│
-├── index.js
-├── setup.sh
-├── .gitignore
-├── README.md
-├── package.json
-├── package-lock.json
-│
-├── src/
-│   ├── commands/
-│   ├── games/
-│   └── assets/
-│
-├── downloads/
-└── data/
-```
-
-The bgutil provider is intentionally kept outside the bot repository:
-
-```text
-~/bgutil-ytdlp-pot-provider/
-```
-
-This keeps the bot repository focused on the WhatsApp bot itself.
-
----
-
-# Running on a VPS
-
-For a production VPS deployment, PM2 is recommended.
-
-The setup script automatically creates:
-
-```text
-bgutil-pot
-chaos-bot
-```
-
-and saves the PM2 process list.
-
-This allows the services to be restored after a server reboot.
+These paths are ignored by Git where applicable. Check `git status` before pushing deployment changes.
 
 ## 📜 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-```
-```
+This project is released under the [MIT License](LICENSE).
