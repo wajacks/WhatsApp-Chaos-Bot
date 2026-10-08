@@ -235,7 +235,7 @@ Confirm `yt-dlp` and FFmpeg are installed, then check whether your network or Yo
 
 ## 🔄 Updating
 
-Stop the process, update the checkout, install the locked dependencies, and restart:
+If the bot runs under PM2:
 
 ```bash
 pm2 stop chaos-bot
@@ -244,7 +244,7 @@ npm ci
 pm2 restart chaos-bot
 ```
 
-For a foreground run, stop it with **Ctrl+C**, update the code, then run `node index.js` again.
+For a foreground run, stop it with **Ctrl+C**, update the checkout with `git pull --ff-only`, run `npm ci`, then start it with `node index.js`.
 
 ## 🔐 Keep these files private
 
