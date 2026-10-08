@@ -189,7 +189,7 @@ function makePlayer(game, bundle, name) {
 
 function createMatch(groupId, playerId, userName, bundle) {
     const game = {
-        id: crypto.randomBytes(4).toString('hex').toUpperCase(),
+        id: crypto.randomBytes(8).toString('hex').toUpperCase(),
         groupId,
         hostId: playerId,
         phase: 'LOBBY',
@@ -826,6 +826,15 @@ function cancelMatch(groupId, client, reason) {
         wordForgeDB.archiveMatch(groupId, game);
     } catch (error) {
         console.error('[WORD FORGE DB] Could not archive cancelled match:', error.message);
+        game.phase = 'PAUSED';
+        activeGames.set(groupId, game);
+        try {
+            wordForgeDB.saveMatch(groupId, game);
+        } catch (saveError) {
+            console.error('[WORD FORGE DB] Could not persist paused cancelled match:', saveError.message);
+        }
+        safeSend(client, groupId, '⚠️ Word Forge could not safely archive this match, so it remains paused. Try !stopforge again later.');
+        return false;
     }
 
     activeGames.delete(groupId);
@@ -838,8 +847,8 @@ function stopWordForgeGame(groupId, senderId, client, aliases) {
     if (!game) return '❌ There is no active Word Forge match in this group.';
     const bundle = identityBundle(senderId, aliases);
     if (!matchesIdentity(game.players[game.hostId], bundle)) return '❌ Only the host can stop this Word Forge match.';
-    cancelMatch(groupId, client, '🛑 The host stopped this Word Forge match.');
-    return '🛑 Word Forge stopped.';
+    const stopped = cancelMatch(groupId, client, '🛑 The host stopped this Word Forge match.');
+    return stopped ? '🛑 Word Forge stopped.' : '⚠️ Word Forge could not be stopped safely; its state is paused.';
 }
 
 function processWordForgeDmMessage(senderId, senderContact, text, client) {
