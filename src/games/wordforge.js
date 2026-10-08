@@ -38,6 +38,7 @@ const wordList = Array.from(dictionary);
 const activeGames = new Map();
 const timers = new Map();
 const identityAliases = new Map(getKnownPlayerLinks());
+let gamesRestored = false;
 
 function randomIndex(length) {
     return length > 1 ? crypto.randomInt(length) : 0;
@@ -80,7 +81,7 @@ function collectIdentityAliases(value, result, seen) {
     }
 }
 
-function identityBundle(primary, extraIdentities) {
+function identityBundle(primary, extraIdentities, persistAliases = true) {
     const aliases = new Set();
     const seen = new Set();
     collectIdentityAliases(primary, aliases, seen);
@@ -104,12 +105,15 @@ function identityBundle(primary, extraIdentities) {
 
     if (canonical) {
         aliases.add(canonical);
-        try {
-            rememberPlayerIdentities(canonical, Array.from(aliases));
-            for (const alias of aliases) identityAliases.set(alias, canonical);
-            identityAliases.set(canonical, canonical);
-        } catch (error) {
-            console.error('[WORD FORGE] Could not save player identity aliases:', error.message);
+        const needsPersistence = Array.from(aliases).some(alias => identityAliases.get(alias) !== canonical);
+        if (persistAliases && needsPersistence) {
+            try {
+                rememberPlayerIdentities(canonical, Array.from(aliases));
+                for (const alias of aliases) identityAliases.set(alias, canonical);
+                identityAliases.set(canonical, canonical);
+            } catch (error) {
+                console.error('[WORD FORGE] Could not save player identity aliases:', error.message);
+            }
         }
     }
 
@@ -810,9 +814,10 @@ function processWordForgeDmMessage(senderId, senderContact, text, client) {
     const body = String(text || '').trim();
     if (!/^[A-Za-z]+$/.test(body)) return { handled: false };
 
-    const bundle = identityBundle(senderId, [senderContact]);
+    let bundle = identityBundle(senderId, [senderContact], false);
     const found = findPlayerInAnyMatch(bundle);
     if (!found) return { handled: false };
+    bundle = identityBundle(senderId, [senderContact], true);
 
     const game = found.game;
     const player = found.player;
@@ -942,6 +947,8 @@ function resolveStealTimer(winnerId, steal, client) {
 }
 
 function restoreWordForgeGames(client) {
+    if (gamesRestored) return;
+    gamesRestored = true;
     for (const game of wordForgeDB.loadActiveMatches()) {
         if (!game || !game.groupId || !game.players || !game.playerOrder) continue;
         game.timers = null;
