@@ -74,13 +74,17 @@ function removeMatch(groupId) {
     writeStore(store);
 }
 
-function archiveMatch(groupId, match) {
+function archiveMatch(groupId, match, pendingSteal) {
     const store = readStore();
     delete store.activeMatches[groupId];
 
     if (match && typeof match === 'object') {
         store.history.unshift(match);
         store.history = store.history.slice(0, HISTORY_LIMIT);
+    }
+
+    if (pendingSteal && pendingSteal.id) {
+        store.pendingSteals[pendingSteal.id] = pendingSteal;
     }
 
     writeStore(store);
