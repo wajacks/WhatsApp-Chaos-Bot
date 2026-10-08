@@ -346,8 +346,8 @@ function startWordForgeGame(groupId, senderId, client, aliases) {
 
     clearTimer(getTimerSet(groupId), 'lobby');
     game.phase = 'ACTIVE';
-    if (!saveGame(game, client)) return '❌ Word Forge could not start because its database is unavailable.';
     startRound(game, client);
+    if (game.phase !== 'ACTIVE') return '❌ Word Forge could not start because its database is unavailable.';
     return '⚒️ Word Forge is starting. Check your DM for your private rack and round rule.';
 }
 
@@ -367,10 +367,11 @@ function countVowels(word) {
 }
 
 function chooseRule(seed) {
+    const containsLetter = seed[randomIndex(seed.length)];
     const options = [
         { kind: 'starts', value: seed[0], label: 'Your word must start with ' + seed[0].toUpperCase() + '.' },
         { kind: 'ends', value: seed[seed.length - 1], label: 'Your word must end with ' + seed[seed.length - 1].toUpperCase() + '.' },
-        { kind: 'contains', value: seed[randomIndex(seed.length)], label: 'Your word must include the letter ' + seed[randomIndex(seed.length)].toUpperCase() + '.' }
+        { kind: 'contains', value: containsLetter, label: 'Your word must include the letter ' + containsLetter.toUpperCase() + '.' }
     ];
 
     if (seed.length >= 4) options.push({ kind: 'minLength', value: 4, label: 'Your word must be at least 4 letters long.' });
@@ -459,6 +460,7 @@ function startRound(game, client, resumed) {
     clearRoundTimers(game.groupId);
 
     game.currentRound++;
+    if (game.tiebreakCandidates) game.tiebreakCount++;
     game.phase = 'ACTIVE';
     game.roundStartedAt = Date.now();
     game.roundEndsAt = game.roundStartedAt + ROUND_DURATION_MS;
@@ -742,6 +744,7 @@ function finishMatch(game, client, winner) {
             groupId: game.groupId,
             winnerId: winner.id,
             winnerName: winner.name,
+            aliases: winner.identityAliases || [],
             eligiblePlayers: game.playerOrder
                 .filter(id => id !== winner.id)
                 .map(id => ({
