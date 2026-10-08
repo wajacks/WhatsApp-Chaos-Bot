@@ -329,7 +329,7 @@ function joinWordForgeLobby(groupId, playerId, userName, client, aliases) {
     if (!bundle.canonical) return '❌ I could not identify you for Word Forge.';
 
     const alreadyJoined = findPlayer(game, bundle);
-    if (alreadyJoined) return '⚠️ You are already registered as ' + alreadyJoined.anonymousId + '.';
+    if (alreadyJoined) return '⚠️ You are already registered in this Word Forge match.';
     if (findPlayerInAnyMatch(bundle)) return '⚠️ You are already registered in another active Word Forge match.';
     if (game.playerOrder.length >= MAX_PLAYERS) return '❌ This Word Forge lobby is full (10 players maximum).';
 
@@ -752,6 +752,7 @@ function finishMatch(game, client, winner) {
     let pendingSteal = null;
     if (winner && winner.score > 0) {
         pendingSteal = {
+            id: 'WFSTEAL-' + game.id,
             groupId: game.groupId,
             winnerId: winner.id,
             winnerName: winner.name,
@@ -767,8 +768,7 @@ function finishMatch(game, client, winner) {
     }
 
     try {
-        if (pendingSteal) wordForgeDB.savePendingSteal(winner.id, pendingSteal);
-        wordForgeDB.archiveMatch(game.groupId, game);
+        wordForgeDB.archiveMatch(game.groupId, game, pendingSteal);
     } catch (error) {
         console.error('[WORD FORGE DB] Could not archive completed match:', error.message);
         game.phase = 'PAUSED';
@@ -786,7 +786,7 @@ function finishMatch(game, client, winner) {
 
     safeSend(client, game.groupId, buildFinalLeaderboard(game, winner));
     if (pendingSteal) {
-        scheduleStealExpiry(winner.id, pendingSteal, client);
+        scheduleStealExpiry(pendingSteal.id, pendingSteal, client);
     }
 }
 
@@ -902,33 +902,32 @@ function processWordForgeDmMessage(senderId, senderContact, text, client) {
 }
 
 function handleWordForgeStealCommand(groupId, senderId, mentionedJid, client, senderContact) {
-    const bundle = identityBundle(senderId, [senderContact]);
+    const bundle = identityBundle(senderId, [senderContact], false);
     const winnerId = bundle.canonical;
     if (!winnerId) return null;
 
-    let pendingKey = winnerId;
-    let steal = wordForgeDB.getPendingSteal(winnerId);
-    if (!steal) {
-        for (const [key, candidate] of Object.entries(wordForgeDB.loadPendingSteals())) {
-            if ((candidate.aliases || []).some(alias => bundle.aliases.includes(alias))) {
-                pendingKey = key;
-                steal = candidate;
-                break;
-            }
-        }
-    }
-    if (!steal) return null;
+    const pendingEntries = Object.entries(wordForgeDB.loadPendingSteals())
+        .filter(([, candidate]) =>
+            candidate.winnerId === winnerId ||
+            (candidate.aliases || []).some(alias => bundle.aliases.includes(alias))
+        )
+        .sort((a, b) => a[1].expiresAt - b[1].expiresAt);
+    const selected = pendingEntries.find(([, candidate]) => candidate.groupId === groupId);
+    if (!selected) return null;
 
+    const pendingKey = selected[0];
+    const steal = selected[1];
     if (Date.now() >= steal.expiresAt) {
-        try { wordForgeDB.removePendingSteal(steal.winnerId || winnerId); } catch (error) {
+        try {
+            wordForgeDB.removePendingSteal(pendingKey);
+        } catch (error) {
             console.error('[WORD FORGE DB] Could not remove expired steal:', error.message);
         }
         return '⌛ Your Word Forge steal window has expired.';
     }
-    if (steal.groupId !== groupId) return null;
     if (!mentionedJid) return '⚠️ Tag the losing player you want to steal from.';
 
-    const targetBundle = identityBundle(mentionedJid, []);
+    const targetBundle = identityBundle(mentionedJid, [], false);
     const eligible = (steal.eligiblePlayers || []).find(player =>
         player.id === targetBundle.canonical ||
         (player.aliases || []).some(alias => targetBundle.aliases.includes(alias))
@@ -939,14 +938,41 @@ function handleWordForgeStealCommand(groupId, senderId, mentionedJid, client, se
     const amount = Math.floor(balance * STEAL_FRACTION);
     if (amount <= 0) return '💸 That player has too few coins for a 25% steal. Your steal chance is still available.';
 
-    const transfer = transferCoins(eligible.id, winnerId, amount);
-    if (!transfer.success) return transfer.message || '❌ The wallet transfer could not be completed.';
-
+    const winnerBalanceBefore = getBalance(winnerId);
     try {
         wordForgeDB.removePendingSteal(pendingKey);
     } catch (error) {
-        console.error('[WORD FORGE DB] Could not consume completed steal:', error.message);
+        console.error('[WORD FORGE DB] Could not claim steal:', error.message);
+        return '❌ The steal could not be safely claimed. No wallet was changed.';
     }
+
+    let transfer;
+    try {
+        transfer = transferCoins(eligible.id, winnerId, amount);
+    } catch (error) {
+        console.error('[WORD FORGE] Wallet transfer failed:', error.message);
+        try {
+            wordForgeDB.savePendingSteal(pendingKey, steal);
+        } catch (restoreError) {
+            console.error('[WORD FORGE DB] Could not restore failed steal:', restoreError.message);
+        }
+        return '❌ The wallet transfer failed. Your steal chance remains available.';
+    }
+
+    const victimBalanceAfter = getBalance(eligible.id);
+    const winnerBalanceAfter = getBalance(winnerId);
+    if (!transfer.success ||
+        victimBalanceAfter !== balance - amount ||
+        winnerBalanceAfter !== winnerBalanceBefore + amount) {
+        try {
+            wordForgeDB.savePendingSteal(pendingKey, steal);
+        } catch (error) {
+            console.error('[WORD FORGE DB] Could not restore an uncompleted steal:', error.message);
+        }
+        return (transfer && transfer.message) ||
+            '❌ The wallet transfer could not be confirmed. Your steal chance remains available.';
+    }
+
     return '🥷 *WORD FORGE STEAL COMPLETE!*\n\nYou stole *' + amount + ' coins* (25%) from @' +
         String(eligible.id).split('@')[0] + '.';
 }
