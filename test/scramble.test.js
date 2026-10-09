@@ -13,7 +13,8 @@ test('scramble preserves all letters and does not return the original word', () 
 
 test('speed scoring rewards faster solves and applies special-round multiplier', () => {
     assert.equal(_test.calculatePoints(4000, 25000), 100);
-    assert.equal(_test.calculatePoints(11000, 25000), 50);
+    assert.equal(_test.calculatePoints(11000, 25000), 75);
+    assert.equal(_test.calculatePoints(20000, 25000), 50);
     assert.equal(_test.calculatePoints(4000, 25000, 2), 200);
 });
 
