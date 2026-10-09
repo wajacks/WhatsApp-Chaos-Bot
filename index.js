@@ -967,12 +967,12 @@ const commandReactions = {
                     }
                 );
 
-                console.log('✅ Azure image generated with ' + deployment + ' in ' + ((Date.now() - generationStartedAt) / 1000).toFixed(1) + 's.');
                 const imageData = response.data?.data?.[0]?.b64_json;
                 if (!imageData) {
                     throw new Error('Azure returned no base64 image data.');
                 }
 
+                console.log('✅ Azure image generated with ' + deployment + ' in ' + ((Date.now() - generationStartedAt) / 1000).toFixed(1) + 's.');
                 return new MessageMedia('image/png', imageData, 'chaos-image.png');
             };
 
