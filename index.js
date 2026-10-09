@@ -569,7 +569,7 @@ client.on('message', async message => {
 // ====================================================
 const commandReactions = {
     profile: '👤', bal: '💰', balance: '💰', daily: '🎁', store: '🏪', catalog: '🏪', market: '🏪', buy: '🛒', beg: '🥷', request: '🥷', pay: '💸',
-    ai: '🧠', draw: '🎨', catchup: '🛰️', summary: '🛰️', speak: '🎙️', tts: '🎙️', voice: '🗣️', verse: '📖', nyimbo: '🎵', randomsong: '🎵', song: '🎵', track: '🎵', video: '🎬',
+    ai: '🧠', analyze: '🔎', draw: '🎨', catchup: '🛰️', summary: '🛰️', speak: '🎙️', tts: '🎙️', voice: '🗣️', verse: '📖', nyimbo: '🎵', randomsong: '🎵', song: '🎵', track: '🎵', video: '🎬',
     wordle: '🟩', join: '👥', wjoin: '👥', rjoin: '👥', rebus: '🌍', joinrebus: '👥', rguess: '🎯', hint: '💡', scramble: '🔀', joinscramble: '👥', scramblehint: '💡', stopscramble: '🛑', wordforge: '🧩', joinforge: '👥', startforge: '🚀', stopforge: '🛑', mafia: '🕵️', startmafia: '🕵️', joinmafia: '👥', endmafia: '🛑', stopmafia: '🛑',
     class: '📋', classes: '📋', games: '🎮', gamelist: '🎮', ping: '📡', menu: '📋', help: '📋', commands: '📋', weather: '🌤️',
     contactowner: '📞', ownercontact: '📞', owner: '🔐'
