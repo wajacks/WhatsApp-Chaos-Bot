@@ -2,7 +2,7 @@ const { MessageMedia } = require('whatsapp-web.js');
 const path = require('path');
 const fs = require('fs');
 
-const IS_SONG_UNDER_MAINTENANCE = true;
+const IS_SONG_UNDER_MAINTENANCE = false;
 
 let shuffledPlaylist = [];
 

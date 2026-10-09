@@ -3,7 +3,7 @@ const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const IS_VIDEO_UNDER_MAINTENANCE = true;
+const IS_VIDEO_UNDER_MAINTENANCE = false;
 
 // Active video requests store: Map<userChatId, { targetQuery, timeoutId }>
 const pendingVideoRequests = new Map();
