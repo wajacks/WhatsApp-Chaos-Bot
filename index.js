@@ -1156,6 +1156,10 @@ const commandReactions = {
                 await message.reply('🔎 Analyzing your image with the Azure vision model...');
                 const imageMedia = await imageMessage.downloadMedia();
                 const imageContent = buildImageAnalysisContent(imageMedia, question);
+                if (!canUseImageFeatures(senderId)) {
+                    await message.reply(IMAGE_ACCESS_DENIED_MESSAGE);
+                    return;
+                }
                 const response = await azureClient.chat.completions.create({
                     model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || 'gpt-4o-mini',
                     messages: [
