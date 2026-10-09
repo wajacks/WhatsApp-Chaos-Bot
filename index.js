@@ -175,6 +175,8 @@ const MAX_AI_MEMORY = 8;
 // Cooldown Maps
 const aiCooldowns = new Map();
 const drawCooldowns = new Map();
+let drawGenerationInProgress = false;
+let lastDrawAt = 0;
 const analyzeCooldowns = new Map();
 const speakCooldowns = new Map();
 const voiceCooldowns = new Map();
@@ -293,6 +295,7 @@ const VOICE_COOLDOWN_MS = 8000;
 // Cooldown Durations (in milliseconds)
 const AI_COOLDOWN_MS = 5000;       // 5 seconds for !ai
 const DRAW_COOLDOWN_MS = 15000;    // 15 seconds for !draw (DALL-E 3 is heavy)
+const DRAW_GLOBAL_COOLDOWN_MS = 12500; // Keep requests below the default GPT-image-2 rate limit
 const ANALYZE_COOLDOWN_MS = 10000; // 10 seconds for !analyze (GPT-4o Vision)
 const SPEAK_COOLDOWN_MS = 8000;    // 8 seconds for !speak (TTS)
 
@@ -865,14 +868,29 @@ const commandReactions = {
         }
 
         // ============================================================
-        // FREE IMAGE GENERATOR (!draw / !image) VIA POLLINATIONS
+        // AZURE IMAGE GENERATOR (!draw / !image)
         // ============================================================
 
-        if (lowerText.startsWith('!draw ') || lowerText.startsWith('!image ')) {
-            const prompt = text.replace(/^!(draw|image)\s+/i, '').trim();
+        if (/^!(draw|image)(?:\s|$)/i.test(text)) {
+            const prompt = text.replace(/^!(draw|image)\s*/i, '').trim();
 
             if (!prompt) {
-                await message.reply('🎨 Please provide a prompt.\n\n*Example:* `!draw a cyberpunk lion in Nairobi`');
+                await message.reply('🎨 Please provide a prompt.\n\nExample: !draw a cyberpunk lion in Nairobi');
+                return;
+            }
+
+            if (prompt.length > 4000) {
+                await message.reply('✂️ Please keep the image prompt under 4,000 characters.');
+                return;
+            }
+
+            if (!process.env.AZURE_OPENAI_KEY || !process.env.AZURE_OPENAI_ENDPOINT) {
+                await message.reply('⚙️ Azure image generation is not configured. Ask the bot owner to check the Azure settings.');
+                return;
+            }
+
+            if (drawGenerationInProgress) {
+                await message.reply('🎨 Another image is being generated right now. Please try again shortly.');
                 return;
             }
 
@@ -880,25 +898,63 @@ const commandReactions = {
             const lastUsed = drawCooldowns.get(senderId) || 0;
             if (now - lastUsed < DRAW_COOLDOWN_MS) {
                 const remaining = Math.ceil((DRAW_COOLDOWN_MS - (now - lastUsed)) / 1000);
-                await message.reply(`⏳ *Image Studio Cooling Down...*\nPlease wait ${remaining}s.`);
+                await message.reply('⏳ *Image Studio Cooling Down...*\nPlease wait ' + remaining + 's.');
                 return;
             }
-            drawCooldowns.set(senderId, now);
 
-            await message.reply('🎨 *Generative Studio Active...*\nSynthesizing image (Free Engine)...');
+            const globalRemaining = DRAW_GLOBAL_COOLDOWN_MS - (now - lastDrawAt);
+            if (globalRemaining > 0) {
+                await message.reply('⏳ Image Studio is pacing requests. Please wait ' + Math.ceil(globalRemaining / 1000) + 's.');
+                return;
+            }
+
+            const deployment = process.env.AZURE_OPENAI_IMAGE_DEPLOYMENT || 'gpt-image-2';
+            drawCooldowns.set(senderId, now);
+            lastDrawAt = now;
+            drawGenerationInProgress = true;
 
             try {
-                const encodedPrompt = encodeURIComponent(prompt);
-                const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true`;
-                
-                // Let the library natively fetch, encode, and format the media buffer
-                const imageMedia = await MessageMedia.fromUrl(imageUrl, { unsafeMime: true });
-                
-                await client.sendMessage(chatId, imageMedia, { caption: `🎨 *Prompt:* "${prompt}"\n` + `\t\t\t\t\`wantam\`👆😅` });
-            
+                await message.reply('🎨 *Azure Image Studio Active...*\nCreating with ' + deployment + ' (usually takes 10–30 seconds).');
+
+                const endpoint = process.env.AZURE_OPENAI_ENDPOINT.replace(/\/+$/, '');
+                const response = await axios.post(
+                    endpoint + '/openai/v1/images/generations?api-version=preview',
+                    {
+                        model: deployment,
+                        prompt,
+                        size: '1024x1024',
+                        n: 1,
+                        quality: 'high',
+                        output_format: 'png'
+                    },
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'api-key': process.env.AZURE_OPENAI_KEY
+                        },
+                        timeout: 120000
+                    }
+                );
+
+                const imageData = response.data?.data?.[0]?.b64_json;
+                if (!imageData) {
+                    throw new Error('Azure returned no base64 image data.');
+                }
+
+                const imageMedia = new MessageMedia('image/png', imageData, 'chaos-image.png');
+                const captionPrompt = prompt.length > 800 ? prompt.slice(0, 797) + '...' : prompt;
+                const caption = '🎨 *Prompt:* "' + captionPrompt + '"\n\\t\\t\\t\\t`wantam`👆😅';
+                await client.sendMessage(chatId, imageMedia, { caption });
             } catch (imgErr) {
-                console.error('❌ Image Generation Error:', imgErr);
-                await message.reply(`❌ Failed to generate image.\n\nError: ${imgErr.message}`);
+                const azureMessage = imgErr.response?.data?.error?.message || imgErr.message || 'Unknown Azure image error';
+                console.error('❌ Azure Image Generation Error:', {
+                    status: imgErr.response?.status,
+                    code: imgErr.code,
+                    message: azureMessage
+                });
+                await message.reply('❌ Azure image generation failed. Please check the image deployment, Azure quota, and bot logs.');
+            } finally {
+                drawGenerationInProgress = false;
             }
 
             return;
