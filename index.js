@@ -1683,7 +1683,7 @@ const commandReactions = {
                 'BOT COMMANDS & ENGINES:\n' +
                 '- !ai <prompt> — General text chat & reasoning.\n' +
                 '- !draw <prompt> — AI image generation (Powered by Azure DALL-E 3).\n' +
-                '- !analyze [question] — Analyze an attached or replied-to image using Azure vision.\\n' +
+                '- !analyze [question] — Analyze an attached or replied-to image using Azure vision.\n' +
                 '- !speak <text> — Voice Note generation (Powered by Azure Text-to-Speech).\n' +
                 '- !profile — View stats and assets.\n' +
                 '- !daily — Claim the 24-hour bonus.\n' +
