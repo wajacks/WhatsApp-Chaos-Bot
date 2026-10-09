@@ -51,6 +51,8 @@ Attach a photo with a caption such as `!analyze What is happening here?`, or rep
 
 Supported formats are JPEG, PNG, WebP, and GIF. Images must be smaller than 10 MB. The command uses `AZURE_OPENAI_CHAT_DEPLOYMENT` and consumes Azure usage. If WhatsApp cannot download the image, resend it as a regular photo rather than a view-once image.
 
+Image generation and analysis are available to the configured owner by default. The owner can grant temporary access with `!owner allow <WhatsApp number> <duration>`; for example, `!owner allow 254712345678 2h`. Durations use `m`, `h`, or `d` and can be up to 365 days. Use `!owner revoke <WhatsApp number>` to end a grant early and `!owner allowed` to see active grants. Grants are saved in the ignored `data/` directory and survive bot restarts.
+
 ## 🚀 First-time setup
 
 The included `setup.sh` is deliberately small. It checks the environment, creates the bot’s local runtime folders, creates a private `.env` from `.env.example` if needed, and installs the locked Node.js dependencies with `npm ci`.
