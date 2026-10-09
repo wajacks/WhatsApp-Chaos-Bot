@@ -44,6 +44,9 @@
 │🎨 \`!draw <prompt>\`
 │     ☞『_*Generate an AI image*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🔎 \\`!analyze [question]\\`
+│     ☞『_*Analyze a photo*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🛰️ \`!catchup\`
 │     ☞『_*Recover missed context*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
