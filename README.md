@@ -120,6 +120,7 @@ nano .env
 | `AZURE_OPENAI_CHAT_DEPLOYMENT` | Recommended | The deployment name configured in your Azure resource. The code falls back to `gpt-4o-mini`. |
 | `AZURE_OPENAI_IMAGE_DEPLOYMENT` | Optional | Deployment used by `!draw --gpt-image-2`; defaults to `gpt-image-2`. |
 | `AZURE_OPENAI_IMAGE_DEPLOYMENT_SUNBURST` | Optional | Deployment used by `!draw --sunburst`; defaults to `gpt-image-2.5-sunburst`. |
+| `AZURE_OPENAI_IMAGE_TIMEOUT_MS` | Optional | Azure image request timeout in milliseconds; defaults to 300000 (5 minutes). |
 | `OWNER_NUMBER` | Recommended | Owner controls. Use the full international number with digits only, such as `254712345678`. |
 | `GEMINI_API_KEY` | Optional | Enables Gemini-powered features. |
 | `OPENWEATHERMAP_API_KEY` | Optional | Enables live weather lookups. |
