@@ -34,16 +34,15 @@ Use `!games` in WhatsApp for the latest command list. Hosts can use the game-spe
 
 ## 🎨 Image Studio
 
-Use `!draw <prompt>` (or `!image <prompt>`) to generate with Azure GPT-image-2. Select another provider with an option:
+Use one command: `!draw <prompt>`. The bot shows the available image models from the strongest Azure option to the free fallback:
 
-| Command | Image generator |
-|---|---|
-| `!draw --gpt-image-2 <prompt>` | Azure GPT-image-2 |
-| `!draw --sunburst <prompt>` | Azure GPT-image-2.5-Sunburst |
-| `!draw --pollinations <prompt>` | Pollinations |
-| `!draw --compare <prompt>` | Sends one result from each of the three generators |
+1. **GPT-image-2.5-Sunburst** — highest-capability Azure option (uses Azure credits)
+2. **GPT-image-2** — strong general-purpose Azure option (uses Azure credits)
+3. **Pollinations** — free fallback
 
-Comparison mode makes two Azure image requests, which use your Azure credits. Configure the Azure deployment names with `AZURE_OPENAI_IMAGE_DEPLOYMENT` and `AZURE_OPENAI_IMAGE_DEPLOYMENT_SUNBURST` in `.env`; both default names match the deployments shown in Azure.
+Reply with `1`, `2`, or `3` within 60 seconds to generate with that model. Reply `cancel` to stop. Each request generates one image with the model you choose; Azure choices use Azure credits.
+
+Configure the Azure deployment names with `AZURE_OPENAI_IMAGE_DEPLOYMENT` and `AZURE_OPENAI_IMAGE_DEPLOYMENT_SUNBURST` in `.env`; both default names match the deployments shown in Azure. Azure image requests wait up to five minutes by default; set `AZURE_OPENAI_IMAGE_TIMEOUT_MS` to change that limit.
 
 
 ## 🚀 First-time setup
@@ -120,6 +119,7 @@ nano .env
 | `AZURE_OPENAI_CHAT_DEPLOYMENT` | Recommended | The deployment name configured in your Azure resource. The code falls back to `gpt-4o-mini`. |
 | `AZURE_OPENAI_IMAGE_DEPLOYMENT` | Optional | Deployment used by `!draw --gpt-image-2`; defaults to `gpt-image-2`. |
 | `AZURE_OPENAI_IMAGE_DEPLOYMENT_SUNBURST` | Optional | Deployment used by `!draw --sunburst`; defaults to `gpt-image-2.5-sunburst`. |
+| `AZURE_OPENAI_IMAGE_TIMEOUT_MS` | Optional | Azure image request timeout in milliseconds; defaults to 300000 (5 minutes). |
 | `OWNER_NUMBER` | Recommended | Owner controls. Use the full international number with digits only, such as `254712345678`. |
 | `GEMINI_API_KEY` | Optional | Enables Gemini-powered features. |
 | `OPENWEATHERMAP_API_KEY` | Optional | Enables live weather lookups. |
