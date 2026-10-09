@@ -32,6 +32,20 @@ Open `!menu` for the command center or `!games` for the current game list.
 
 Use `!games` in WhatsApp for the latest command list. Hosts can use the game-specific stop command shown in `!menu`.
 
+## 🎨 Image Studio
+
+Use `!draw <prompt>` (or `!image <prompt>`) to generate with Azure GPT-image-2. Select another provider with an option:
+
+| Command | Image generator |
+|---|---|
+| `!draw --gpt-image-2 <prompt>` | Azure GPT-image-2 |
+| `!draw --sunburst <prompt>` | Azure GPT-image-2.5-Sunburst |
+| `!draw --pollinations <prompt>` | Pollinations |
+| `!draw --compare <prompt>` | Sends one result from each of the three generators |
+
+Comparison mode makes two Azure image requests, which use your Azure credits. Configure the Azure deployment names with `AZURE_OPENAI_IMAGE_DEPLOYMENT` and `AZURE_OPENAI_IMAGE_DEPLOYMENT_SUNBURST` in `.env`; both default names match the deployments shown in Azure.
+
+
 ## 🚀 First-time setup
 
 The included `setup.sh` is deliberately small. It checks the environment, creates the bot’s local runtime folders, creates a private `.env` from `.env.example` if needed, and installs the locked Node.js dependencies with `npm ci`.
@@ -104,6 +118,8 @@ nano .env
 | `AZURE_OPENAI_KEY` | **Yes for startup** | Azure OpenAI credential. The current app constructs this client during startup. |
 | `AZURE_OPENAI_ENDPOINT` | **Yes for startup** | Azure resource endpoint, for example `https://your-resource.openai.azure.com/`. |
 | `AZURE_OPENAI_CHAT_DEPLOYMENT` | Recommended | The deployment name configured in your Azure resource. The code falls back to `gpt-4o-mini`. |
+| `AZURE_OPENAI_IMAGE_DEPLOYMENT` | Optional | Deployment used by `!draw --gpt-image-2`; defaults to `gpt-image-2`. |
+| `AZURE_OPENAI_IMAGE_DEPLOYMENT_SUNBURST` | Optional | Deployment used by `!draw --sunburst`; defaults to `gpt-image-2.5-sunburst`. |
 | `OWNER_NUMBER` | Recommended | Owner controls. Use the full international number with digits only, such as `254712345678`. |
 | `GEMINI_API_KEY` | Optional | Enables Gemini-powered features. |
 | `OPENWEATHERMAP_API_KEY` | Optional | Enables live weather lookups. |
