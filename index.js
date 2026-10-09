@@ -146,6 +146,14 @@ const { handleSongCommand } = require('./src/commands/song');
 // Video Command Handler
 const { handleVideoCommand, handleVideoQualityReply } = require('./src/commands/video');
 const { buildImageAnalysisContent } = require('./src/tools/imageAnalysis');
+const {
+    normalizeWhatsAppNumber,
+    parseDuration,
+    grantImageAccess,
+    revokeImageAccess,
+    hasImageAccess,
+    listImageAccess
+} = require('./src/database/imageAccess');
 
 // ============================================================
 // CHAOS NEURAL CORE GEMINI INITIALIZATION
@@ -203,11 +211,23 @@ const knownPrivateChats = new Set();
 const OWNER_NUMBER = process.env.OWNER_NUMBER;
 
 function isOwner(senderId) {
-    if (!senderId) return false;
+    if (!senderId || !OWNER_NUMBER) return false;
 
     // Clean and match the incoming sender ID against the environment variable
     const cleanOwnerNumber = OWNER_NUMBER.replace(/[^\d]/g, '');
     return senderId === `${cleanOwnerNumber}@c.us`;
+}
+
+const IMAGE_ACCESS_DENIED_MESSAGE = '🔒 Image generation and analysis are owner-only. Ask the bot owner for temporary access.';
+
+function canUseImageFeatures(senderId) {
+    if (isOwner(senderId)) return true;
+    try {
+        return hasImageAccess(senderId);
+    } catch (error) {
+        console.error('[IMAGE ACCESS] Grant data could not be read; access denied:', error.message);
+        return false;
+    }
 }
 
 function getOwnerMenu() {
@@ -235,6 +255,15 @@ function getOwnerMenu() {
 
         '📡 *!owner broadcast <message>*\n' +
         'Broadcast an announcement to all groups.\n\n' +
+
+        '🖼️ *!owner allow <WhatsApp number> <duration>*\n' +
+        'Temporarily allow image generation and analysis; duration: 1m–365d.\n\n' +
+
+        '🚫 *!owner revoke <WhatsApp number>*\n' +
+        'Remove someone’s image access immediately.\n\n' +
+
+        '📋 *!owner allowed*\n' +
+        'List active temporary image access grants.\n\n' +
 
         'ℹ️ *!owner help*\n' +
         'Show this owner panel.\n\n' +
@@ -609,6 +638,10 @@ const commandReactions = {
         const lowerText = text.toLowerCase();
 
         const generateSelectedImage = async (prompt, choice) => {
+            if (!canUseImageFeatures(senderId)) {
+                await message.reply(IMAGE_ACCESS_DENIED_MESSAGE);
+                return;
+            }
             if (drawGenerationInProgress) {
                 await message.reply('🎨 Another image job is running. Please try again shortly.');
                 return;
@@ -721,6 +754,12 @@ const commandReactions = {
         }
 
         if (pendingDrawChoice && /^\d+$/.test(text)) {
+            if (!canUseImageFeatures(senderId)) {
+                clearTimeout(pendingDrawChoice.timer);
+                pendingDrawChoices.delete(imageChoiceKey);
+                await message.reply(IMAGE_ACCESS_DENIED_MESSAGE);
+                return;
+            }
             const choice = IMAGE_MODEL_CHOICES.find((item) => item.number === text);
             if (!choice) {
                 await message.reply('Choose 1, 2, or 3, or reply `cancel`.');
@@ -1024,6 +1063,10 @@ const commandReactions = {
 
         const drawCommandMatch = text.match(/^!draw(?:\s+([\s\S]*))?$/i);
         if (drawCommandMatch) {
+            if (!canUseImageFeatures(senderId)) {
+                await message.reply(IMAGE_ACCESS_DENIED_MESSAGE);
+                return;
+            }
             const prompt = (drawCommandMatch[1] || '').trim();
             if (!prompt) {
                 await message.reply('🎨 Use one command: !draw <prompt>. I will show you the image model menu.');
@@ -1064,6 +1107,10 @@ const commandReactions = {
 
         const analyzeCommandMatch = text.match(/^!analyze(?:\s+([\s\S]*))?$/i);
         if (analyzeCommandMatch) {
+            if (!canUseImageFeatures(senderId)) {
+                await message.reply(IMAGE_ACCESS_DENIED_MESSAGE);
+                return;
+            }
             const question = (analyzeCommandMatch[1] || '').trim();
             let imageMessage = message;
 
@@ -1100,6 +1147,10 @@ const commandReactions = {
                 return;
             }
 
+            if (!canUseImageFeatures(senderId)) {
+                await message.reply(IMAGE_ACCESS_DENIED_MESSAGE);
+                return;
+            }
             analyzeCooldowns.set(senderId, Date.now());
             try {
                 await message.reply('🔎 Analyzing your image with the Azure vision model...');
@@ -1982,6 +2033,90 @@ const commandReactions = {
 
             if (ownerCommand === 'help') {
                 await message.reply(getOwnerMenu());
+                return;
+            }
+
+            // --------------------------------------------
+            // !owner allow <WhatsApp number> <duration>
+            // --------------------------------------------
+
+            if (ownerCommand === 'allow') {
+                const durationMs = parseDuration(ownerArgs[ownerArgs.length - 1]);
+                const recipientInput = ownerArgs.slice(2, -1).join(' ');
+                const recipientJid = normalizeWhatsAppNumber(recipientInput);
+                const ownerJid = normalizeWhatsAppNumber(OWNER_NUMBER || '');
+
+                if (!recipientJid || !durationMs) {
+                    await message.reply(
+                        'Usage: !owner allow <WhatsApp number> <duration>\n' +
+                        'Examples: !owner allow 254712345678 2h, !owner allow +254 712 345 678 7d\n' +
+                        'Duration units: m, h, or d; maximum 365 days.'
+                    );
+                    return;
+                }
+
+                if (recipientJid === ownerJid) {
+                    await message.reply('👑 The owner already has permanent access to image generation and analysis.');
+                    return;
+                }
+
+                try {
+                    const grant = grantImageAccess(recipientJid, durationMs, senderId);
+                    const grantedNumber = grant.number.slice(0, -'@c.us'.length);
+                    await message.reply(
+                        '✅ Temporary image access enabled for +' + grantedNumber + '.\n' +
+                        'Access covers !draw and !analyze until ' + new Date(grant.expiresAt).toLocaleString() + '.'
+                    );
+                } catch (error) {
+                    console.error('[IMAGE ACCESS] Could not grant access:', error.message);
+                    await message.reply('❌ I could not save that access grant. Check the bot data folder and logs.');
+                }
+                return;
+            }
+
+            // --------------------------------------------
+            // !owner revoke <WhatsApp number>
+            // --------------------------------------------
+
+            if (ownerCommand === 'revoke') {
+                const recipientJid = normalizeWhatsAppNumber(ownerArgs.slice(2).join(' '));
+                if (!recipientJid) {
+                    await message.reply('Usage: !owner revoke <WhatsApp number>');
+                    return;
+                }
+
+                try {
+                    const revoked = revokeImageAccess(recipientJid);
+                    await message.reply(revoked
+                        ? '✅ Temporary image access revoked for +' + recipientJid.slice(0, -'@c.us'.length) + '.'
+                        : 'ℹ️ That number has no saved image access grant.');
+                } catch (error) {
+                    console.error('[IMAGE ACCESS] Could not revoke access:', error.message);
+                    await message.reply('❌ I could not update image access. Check the bot data folder and logs.');
+                }
+                return;
+            }
+
+            // --------------------------------------------
+            // !owner allowed
+            // --------------------------------------------
+
+            if (ownerCommand === 'allowed') {
+                try {
+                    const grants = listImageAccess();
+                    if (grants.length === 0) {
+                        await message.reply('📋 There are no active temporary image access grants.');
+                        return;
+                    }
+                    const lines = grants.map((grant, index) =>
+                        (index + 1) + '. +' + grant.number.slice(0, -'@c.us'.length) +
+                        ' — expires ' + new Date(grant.expiresAt).toLocaleString()
+                    );
+                    await message.reply('📋 *Active image access grants*\n\n' + lines.join('\n'));
+                } catch (error) {
+                    console.error('[IMAGE ACCESS] Could not list grants:', error.message);
+                    await message.reply('❌ I could not read image access grants. Check the bot data folder and logs.');
+                }
                 return;
             }
 
