@@ -303,7 +303,7 @@ const VOICE_COOLDOWN_MS = 8000;
 const AI_COOLDOWN_MS = 5000;       // 5 seconds for !ai
 const DRAW_COOLDOWN_MS = 15000;    // 15 seconds per sender for Azure image generation
 const DRAW_GLOBAL_COOLDOWN_MS = 12500; // Keep requests below the default GPT-image-2 rate limit
-const ANALYZE_COOLDOWN_MS = 10000; // 10 seconds for !analyze (GPT-4o Vision)
+const ANALYZE_COOLDOWN_MS = 10000; // 10 seconds for !analyze (Azure vision)
 const SPEAK_COOLDOWN_MS = 8000;    // 8 seconds for !speak (TTS)
 
 
