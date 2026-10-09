@@ -45,6 +45,12 @@ Reply with `1`, `2`, or `3` within 60 seconds to generate with that model. Reply
 Configure the Azure deployment names with `AZURE_OPENAI_IMAGE_DEPLOYMENT` and `AZURE_OPENAI_IMAGE_DEPLOYMENT_SUNBURST` in `.env`; both default names match the deployments shown in Azure. Azure image requests wait up to five minutes by default; set `AZURE_OPENAI_IMAGE_TIMEOUT_MS` to change that limit.
 
 
+## 🔍 Image Analysis
+
+Attach a photo with a caption such as `!analyze What is happening here?`, or reply to a photo with `!analyze <question>`. The bot sends the image and question to the Azure vision-capable chat deployment and replies with a text analysis.
+
+Supported formats are JPEG, PNG, WebP, and GIF. Images must be smaller than 10 MB. The command uses `AZURE_OPENAI_CHAT_DEPLOYMENT` and consumes Azure usage. If WhatsApp cannot download the image, resend it as a regular photo rather than a view-once image.
+
 ## 🚀 First-time setup
 
 The included `setup.sh` is deliberately small. It checks the environment, creates the bot’s local runtime folders, creates a private `.env` from `.env.example` if needed, and installs the locked Node.js dependencies with `npm ci`.
