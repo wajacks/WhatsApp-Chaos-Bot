@@ -32,7 +32,7 @@ function buildImageAnalysisContent(media, question = '') {
         );
     }
 
-    const base64Data = media.data.replace(/\\s/g, '');
+    const base64Data = media.data.replace(/\s/g, '');
     if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64Data) || base64Data.length % 4 === 1) {
         throw createImageAnalysisError(
             'IMAGE_ANALYSIS_INVALID_DATA',
