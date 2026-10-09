@@ -145,6 +145,7 @@ const { handleSongCommand } = require('./src/commands/song');
 
 // Video Command Handler
 const { handleVideoCommand, handleVideoQualityReply } = require('./src/commands/video');
+const { buildImageAnalysisContent } = require('./src/tools/imageAnalysis');
 
 // ============================================================
 // CHAOS NEURAL CORE GEMINI INITIALIZATION
@@ -302,7 +303,7 @@ const VOICE_COOLDOWN_MS = 8000;
 const AI_COOLDOWN_MS = 5000;       // 5 seconds for !ai
 const DRAW_COOLDOWN_MS = 15000;    // 15 seconds per sender for Azure image generation
 const DRAW_GLOBAL_COOLDOWN_MS = 12500; // Keep requests below the default GPT-image-2 rate limit
-const ANALYZE_COOLDOWN_MS = 10000; // 10 seconds for !analyze (GPT-4o Vision)
+const ANALYZE_COOLDOWN_MS = 10000; // 10 seconds for !analyze (Azure vision)
 const SPEAK_COOLDOWN_MS = 8000;    // 8 seconds for !speak (TTS)
 
 
@@ -568,7 +569,7 @@ client.on('message', async message => {
 // ====================================================
 const commandReactions = {
     profile: '👤', bal: '💰', balance: '💰', daily: '🎁', store: '🏪', catalog: '🏪', market: '🏪', buy: '🛒', beg: '🥷', request: '🥷', pay: '💸',
-    ai: '🧠', draw: '🎨', catchup: '🛰️', summary: '🛰️', speak: '🎙️', tts: '🎙️', voice: '🗣️', verse: '📖', nyimbo: '🎵', randomsong: '🎵', song: '🎵', track: '🎵', video: '🎬',
+    ai: '🧠', analyze: '🔎', draw: '🎨', catchup: '🛰️', summary: '🛰️', speak: '🎙️', tts: '🎙️', voice: '🗣️', verse: '📖', nyimbo: '🎵', randomsong: '🎵', song: '🎵', track: '🎵', video: '🎬',
     wordle: '🟩', join: '👥', wjoin: '👥', rjoin: '👥', rebus: '🌍', joinrebus: '👥', rguess: '🎯', hint: '💡', scramble: '🔀', joinscramble: '👥', scramblehint: '💡', stopscramble: '🛑', wordforge: '🧩', joinforge: '👥', startforge: '🚀', stopforge: '🛑', mafia: '🕵️', startmafia: '🕵️', joinmafia: '👥', endmafia: '🛑', stopmafia: '🛑',
     class: '📋', classes: '📋', games: '🎮', gamelist: '🎮', ping: '📡', menu: '📋', help: '📋', commands: '📋', weather: '🌤️',
     contactowner: '📞', ownercontact: '📞', owner: '🔐'
@@ -1054,6 +1055,96 @@ const commandReactions = {
                 choice.number + '. ' + choice.label + ' — ' + choice.description + (choice.kind === 'azure' ? ' (Azure credits)' : ' (free)')
             ).join('\n');
             await message.reply('🎨 *Image Studio — best-first model choices*\n\n' + menu + '\n\nReply with 1, 2, or 3 within 60 seconds. Reply `cancel` to stop.');
+            return;
+        }
+
+        // ====================================================
+        // IMAGE ANALYSIS (!analyze)
+        // ====================================================
+
+        const analyzeCommandMatch = text.match(/^!analyze(?:\s+([\s\S]*))?$/i);
+        if (analyzeCommandMatch) {
+            const question = (analyzeCommandMatch[1] || '').trim();
+            let imageMessage = message;
+
+            if (!imageMessage.hasMedia && message.hasQuotedMsg) {
+                try {
+                    imageMessage = await message.getQuotedMessage();
+                } catch (quoteErr) {
+                    console.warn('[IMAGE ANALYSIS] Could not access the replied-to message:', quoteErr.message);
+                    imageMessage = null;
+                }
+            }
+
+            if (!imageMessage || !imageMessage.hasMedia) {
+                await message.reply(
+                    '🔎 Attach a photo with !analyze <question> in its caption, or reply to a photo with !analyze <question>.'
+                );
+                return;
+            }
+
+            if (imageMessage.type && imageMessage.type !== 'image') {
+                await message.reply('🖼️ I can analyze photos only. Please send a JPEG, PNG, WebP, or GIF image.');
+                return;
+            }
+
+            const lastAnalyzeAt = analyzeCooldowns.get(senderId) || 0;
+            const cooldownRemaining = ANALYZE_COOLDOWN_MS - (Date.now() - lastAnalyzeAt);
+            if (cooldownRemaining > 0) {
+                await message.reply('⏳ Please wait ' + Math.ceil(cooldownRemaining / 1000) + 's before analyzing another image.');
+                return;
+            }
+
+            if (!process.env.AZURE_OPENAI_KEY || !process.env.AZURE_OPENAI_ENDPOINT) {
+                await message.reply('⚙️ Azure image analysis is not configured. Ask the bot owner to check the Azure settings.');
+                return;
+            }
+
+            analyzeCooldowns.set(senderId, Date.now());
+            try {
+                await message.reply('🔎 Analyzing your image with the Azure vision model...');
+                const imageMedia = await imageMessage.downloadMedia();
+                const imageContent = buildImageAnalysisContent(imageMedia, question);
+                const response = await azureClient.chat.completions.create({
+                    model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || 'gpt-4o-mini',
+                    messages: [
+                        {
+                            role: 'system',
+                            content: 'You analyze user-provided images. Describe only what is visible, answer the user’s question, and be clear when a detail is uncertain.'
+                        },
+                        {
+                            role: 'user',
+                            content: imageContent
+                        }
+                    ],
+                    max_tokens: 800
+                });
+
+                const analysis = response.choices[0]?.message?.content?.trim();
+                if (!analysis) {
+                    await message.reply('⚠️ The vision model returned an empty analysis. Please try again.');
+                    return;
+                }
+
+                await message.reply('🖼️ *Image analysis*\n\n' + analysis);
+            } catch (analyzeErr) {
+                console.error('❌ Image Analysis Error:', {
+                    status: analyzeErr.response?.status,
+                    code: analyzeErr.code,
+                    message: analyzeErr.response?.data?.error?.message || analyzeErr.message
+                });
+
+                const knownFailureMessages = {
+                    IMAGE_ANALYSIS_MEDIA_MISSING: 'I could not download that photo. Please resend it as a regular image (not view-once) and try again.',
+                    IMAGE_ANALYSIS_UNSUPPORTED_TYPE: 'I can analyze JPEG, PNG, WebP, and GIF photos.',
+                    IMAGE_ANALYSIS_TOO_LARGE: 'That image is too large. Please send an image smaller than 10 MB.',
+                    IMAGE_ANALYSIS_INVALID_DATA: 'I could not read that image. Please resend the photo and try again.'
+                };
+                const failureMessage = knownFailureMessages[analyzeErr.code] ||
+                    '❌ Image analysis failed. Check the Azure vision deployment, quota, and bot logs.';
+                await message.reply(failureMessage);
+            }
+
             return;
         }
 
@@ -1592,7 +1683,7 @@ const commandReactions = {
                 'BOT COMMANDS & ENGINES:\n' +
                 '- !ai <prompt> — General text chat & reasoning.\n' +
                 '- !draw <prompt> — AI image generation (Powered by Azure DALL-E 3).\n' +
-                '- !analyze — Describe or analyze a quoted image (Powered by Azure GPT-4o Vision).\n' +
+                '- !analyze [question] — Analyze an attached or replied-to image using Azure vision.\n' +
                 '- !speak <text> — Voice Note generation (Powered by Azure Text-to-Speech).\n' +
                 '- !profile — View stats and assets.\n' +
                 '- !daily — Claim the 24-hour bonus.\n' +
