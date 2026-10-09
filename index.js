@@ -175,6 +175,12 @@ const MAX_AI_MEMORY = 8;
 // Cooldown Maps
 const aiCooldowns = new Map();
 const drawCooldowns = new Map();
+const pendingDrawChoices = new Map();
+const IMAGE_MODEL_CHOICES = [
+    { number: '1', label: 'GPT-image-2.5-Sunburst', description: 'Most capable overall', kind: 'azure', envName: 'AZURE_OPENAI_IMAGE_DEPLOYMENT_SUNBURST', defaultDeployment: 'gpt-image-2.5-sunburst' },
+    { number: '2', label: 'GPT-image-2', description: 'Strong general image generation', kind: 'azure', envName: 'AZURE_OPENAI_IMAGE_DEPLOYMENT', defaultDeployment: 'gpt-image-2' },
+    { number: '3', label: 'Pollinations', description: 'Free fallback', kind: 'pollinations' }
+];
 let drawGenerationInProgress = false;
 let lastDrawAt = 0;
 const analyzeCooldowns = new Map();
@@ -562,7 +568,7 @@ client.on('message', async message => {
 // ====================================================
 const commandReactions = {
     profile: '👤', bal: '💰', balance: '💰', daily: '🎁', store: '🏪', catalog: '🏪', market: '🏪', buy: '🛒', beg: '🥷', request: '🥷', pay: '💸',
-    ai: '🧠', draw: '🎨', image: '🎨', catchup: '🛰️', summary: '🛰️', speak: '🎙️', tts: '🎙️', voice: '🗣️', verse: '📖', nyimbo: '🎵', randomsong: '🎵', song: '🎵', track: '🎵', video: '🎬',
+    ai: '🧠', draw: '🎨', catchup: '🛰️', summary: '🛰️', speak: '🎙️', tts: '🎙️', voice: '🗣️', verse: '📖', nyimbo: '🎵', randomsong: '🎵', song: '🎵', track: '🎵', video: '🎬',
     wordle: '🟩', join: '👥', wjoin: '👥', rjoin: '👥', rebus: '🌍', joinrebus: '👥', rguess: '🎯', hint: '💡', scramble: '🔀', joinscramble: '👥', scramblehint: '💡', stopscramble: '🛑', wordforge: '🧩', joinforge: '👥', startforge: '🚀', stopforge: '🛑', mafia: '🕵️', startmafia: '🕵️', joinmafia: '👥', endmafia: '🛑', stopmafia: '🛑',
     class: '📋', classes: '📋', games: '🎮', gamelist: '🎮', ping: '📡', menu: '📋', help: '📋', commands: '📋', weather: '🌤️',
     contactowner: '📞', ownercontact: '📞', owner: '🔐'
@@ -592,11 +598,6 @@ const commandReactions = {
             knownPrivateChats.add(chatId);
         }
 
-        const wasHandledAsVideoReply = await handleVideoQualityReply(message);
-        if (wasHandledAsVideoReply) {
-            return;
-        }
-
         const isGroup = message.from.endsWith('@g.us');
         const senderContact = await getSenderContact(message);
         const senderId = await getSenderJid(message, senderContact);
@@ -605,6 +606,155 @@ const commandReactions = {
         const userName = senderContact?.pushname || senderContact?.name || 'Chaos Member';
         const text = message.body ? message.body.trim() : '';
         const lowerText = text.toLowerCase();
+
+        const generateSelectedImage = async (prompt, choice) => {
+            if (drawGenerationInProgress) {
+                await message.reply('🎨 Another image job is running. Please try again shortly.');
+                return;
+            }
+
+            const deployment = choice.kind === 'azure'
+                ? (process.env[choice.envName] || choice.defaultDeployment)
+                : null;
+            if (choice.kind === 'azure' && (!process.env.AZURE_OPENAI_KEY || !process.env.AZURE_OPENAI_ENDPOINT)) {
+                await message.reply('⚙️ Azure image generation is not configured. Ask the bot owner to check the Azure settings.');
+                return;
+            }
+
+            const now = Date.now();
+            const lastUsed = drawCooldowns.get(senderId) || 0;
+            if (now - lastUsed < DRAW_COOLDOWN_MS) {
+                const remaining = Math.ceil((DRAW_COOLDOWN_MS - (now - lastUsed)) / 1000);
+                await message.reply('⏳ *Image Studio Cooling Down...*\nPlease wait ' + remaining + 's.');
+                return;
+            }
+
+            const globalRemaining = DRAW_GLOBAL_COOLDOWN_MS - (now - lastDrawAt);
+            if (globalRemaining > 0) {
+                await message.reply('⏳ Image Studio is pacing requests. Please wait ' + Math.ceil(globalRemaining / 1000) + 's.');
+                return;
+            }
+
+            drawCooldowns.set(senderId, now);
+            lastDrawAt = now;
+            drawGenerationInProgress = true;
+
+            const providerStartedAt = Date.now();
+            try {
+                await message.reply('🎨 *Image Studio Active...* Generating with ' + choice.label + '.');
+                let imageMedia;
+
+                if (choice.kind === 'pollinations') {
+                    const encodedPrompt = encodeURIComponent(prompt);
+                    const imageUrl = 'https://image.pollinations.ai/prompt/' + encodedPrompt + '?width=1024&height=1024&nologo=true';
+                    imageMedia = await MessageMedia.fromUrl(imageUrl, { unsafeMime: true });
+                } else {
+                    const endpoint = process.env.AZURE_OPENAI_ENDPOINT.replace(/\/+$/, '');
+                    const configuredTimeout = Number(process.env.AZURE_OPENAI_IMAGE_TIMEOUT_MS);
+                    const imageTimeoutMs = Number.isFinite(configuredTimeout) && configuredTimeout > 0
+                        ? configuredTimeout
+                        : 300000;
+                    const response = await axios.post(
+                        endpoint + '/openai/v1/images/generations?api-version=preview',
+                        {
+                            model: deployment,
+                            prompt,
+                            size: '1024x1024',
+                            n: 1,
+                            quality: 'high',
+                            output_format: 'png'
+                        },
+                        {
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'api-key': process.env.AZURE_OPENAI_KEY
+                            },
+                            timeout: imageTimeoutMs
+                        }
+                    );
+
+                    const imageData = response.data?.data?.[0]?.b64_json;
+                    if (!imageData) {
+                        throw new Error('Azure returned no base64 image data.');
+                    }
+
+                    console.log('✅ Azure image generated with ' + deployment + ' in ' + ((Date.now() - providerStartedAt) / 1000).toFixed(1) + 's.');
+                    imageMedia = new MessageMedia('image/png', imageData, 'chaos-image.png');
+                }
+
+                const captionPrompt = prompt.length > 800 ? prompt.slice(0, 797) + '...' : prompt;
+                const caption = '🎨 *' + choice.label + '*\n*Prompt:* "' + captionPrompt + '"\n`wantam`👆😅';
+                await client.sendMessage(chatId, imageMedia, { caption });
+            } catch (imgErr) {
+                const providerMessage = imgErr.response?.data?.error?.message || imgErr.message || 'Unknown image generation error';
+                console.error('❌ Image Generation Error:', {
+                    provider: choice.label,
+                    status: imgErr.response?.status,
+                    code: imgErr.code,
+                    elapsedSeconds: ((Date.now() - providerStartedAt) / 1000).toFixed(1),
+                    message: providerMessage
+                });
+                await message.reply('❌ ' + choice.label + ' image generation failed. Check provider settings, Azure quota, and bot logs.');
+            } finally {
+                drawGenerationInProgress = false;
+            }
+        };
+
+        const imageChoiceKey = chatId + ':' + senderId;
+        let pendingDrawChoice = pendingDrawChoices.get(imageChoiceKey);
+        if (pendingDrawChoice && pendingDrawChoice.expiresAt <= Date.now()) {
+            clearTimeout(pendingDrawChoice.timer);
+            pendingDrawChoices.delete(imageChoiceKey);
+            if (/^[1-3]$/.test(text)) {
+                await message.reply('⌛ That image selection expired. Send !draw <prompt> to start again.');
+                return;
+            }
+            pendingDrawChoice = null;
+        }
+
+        if (pendingDrawChoice && /^(cancel|cancel draw)$/i.test(text)) {
+            clearTimeout(pendingDrawChoice.timer);
+            pendingDrawChoices.delete(imageChoiceKey);
+            await message.reply('🛑 Image generation cancelled.');
+            return;
+        }
+
+        if (pendingDrawChoice && /^\d+$/.test(text)) {
+            const choice = IMAGE_MODEL_CHOICES.find((item) => item.number === text);
+            if (!choice) {
+                await message.reply('Choose 1, 2, or 3, or reply `cancel`.');
+                return;
+            }
+            if (drawGenerationInProgress) {
+                await message.reply('🎨 Another image job is running. Your selection is still waiting; try again shortly.');
+                return;
+            }
+            const lastUsed = drawCooldowns.get(senderId) || 0;
+            const remaining = DRAW_COOLDOWN_MS - (Date.now() - lastUsed);
+            if (remaining > 0) {
+                await message.reply('⏳ Image Studio is cooling down. Reply ' + text + ' again in ' + Math.ceil(remaining / 1000) + 's.');
+                return;
+            }
+            const globalRemaining = DRAW_GLOBAL_COOLDOWN_MS - (Date.now() - lastDrawAt);
+            if (globalRemaining > 0) {
+                await message.reply('⏳ Image Studio is pacing requests. Reply ' + text + ' again in ' + Math.ceil(globalRemaining / 1000) + 's.');
+                return;
+            }
+            if (choice.kind === 'azure' && (!process.env.AZURE_OPENAI_KEY || !process.env.AZURE_OPENAI_ENDPOINT)) {
+                await message.reply('⚙️ Azure image generation is not configured. You can choose 3 for Pollinations instead.');
+                return;
+            }
+
+            clearTimeout(pendingDrawChoice.timer);
+            pendingDrawChoices.delete(imageChoiceKey);
+            await generateSelectedImage(pendingDrawChoice.prompt, choice);
+            return;
+        }
+
+        const wasHandledAsVideoReply = await handleVideoQualityReply(message);
+        if (wasHandledAsVideoReply) {
+            return;
+        }
 
         // Word Forge guesses are plain one-word DM messages; no quoted reply is required.
         if (!isGroup) {
@@ -867,25 +1017,15 @@ const commandReactions = {
             }
         }
 
-        // ============================================================
-        // IMAGE GENERATOR (!draw / !image): AZURE + POLLINATIONS
-        // ============================================================
+        // ====================================================
+        // IMAGE GENERATOR (!draw)
+        // ====================================================
 
-        const drawCommandMatch = text.match(/^!(?:draw|image)(?:\s+([\s\S]*))?$/i);
+        const drawCommandMatch = text.match(/^!draw(?:\s+([\s\S]*))?$/i);
         if (drawCommandMatch) {
-            const drawArgs = (drawCommandMatch[1] || '').trim();
-            const optionMatch = drawArgs.match(/^(--pollinations|--gpt-image-2|--sunburst|--compare)(?:\s+([\s\S]*))?$/i);
-            const mode = optionMatch ? optionMatch[1].toLowerCase() : '--gpt-image-2';
-            const prompt = optionMatch ? (optionMatch[2] || '').trim() : drawArgs;
-
+            const prompt = (drawCommandMatch[1] || '').trim();
             if (!prompt) {
-                await message.reply(
-                    '🎨 *Image Studio*\n\n' +
-                    '!draw <prompt> — Azure GPT-image-2\n' +
-                    '!draw --sunburst <prompt> — Azure GPT-image-2.5-Sunburst\n' +
-                    '!draw --pollinations <prompt> — Pollinations\n' +
-                    '!draw --compare <prompt> — generate all three (uses Azure credits)'
-                );
+                await message.reply('🎨 Use one command: !draw <prompt>. I will show you the image model menu.');
                 return;
             }
 
@@ -899,134 +1039,21 @@ const commandReactions = {
                 return;
             }
 
-            const defaultDeployment = process.env.AZURE_OPENAI_IMAGE_DEPLOYMENT || 'gpt-image-2';
-            const sunburstDeployment = process.env.AZURE_OPENAI_IMAGE_DEPLOYMENT_SUNBURST || 'gpt-image-2.5-sunburst';
-            let targets;
-
-            if (mode === '--pollinations') {
-                targets = [{ label: 'Pollinations', kind: 'pollinations' }];
-            } else if (mode === '--sunburst') {
-                targets = [{ label: 'Azure GPT-image-2.5-Sunburst', kind: 'azure', deployment: sunburstDeployment }];
-            } else if (mode === '--compare') {
-                targets = [
-                    { label: 'Pollinations', kind: 'pollinations' },
-                    { label: 'Azure GPT-image-2', kind: 'azure', deployment: defaultDeployment },
-                    { label: 'Azure GPT-image-2.5-Sunburst', kind: 'azure', deployment: sunburstDeployment }
-                ];
-            } else {
-                targets = [{ label: 'Azure GPT-image-2', kind: 'azure', deployment: defaultDeployment }];
-            }
-
-            if (targets.some((target) => target.kind === 'azure') &&
-                (!process.env.AZURE_OPENAI_KEY || !process.env.AZURE_OPENAI_ENDPOINT)) {
-                await message.reply('⚙️ Azure image generation is not configured. Ask the bot owner to check the Azure settings.');
-                return;
-            }
-
-            const now = Date.now();
-            const lastUsed = drawCooldowns.get(senderId) || 0;
-            if (now - lastUsed < DRAW_COOLDOWN_MS) {
-                const remaining = Math.ceil((DRAW_COOLDOWN_MS - (now - lastUsed)) / 1000);
-                await message.reply('⏳ *Image Studio Cooling Down...*\nPlease wait ' + remaining + 's.');
-                return;
-            }
-
-            const globalRemaining = DRAW_GLOBAL_COOLDOWN_MS - (now - lastDrawAt);
-            if (globalRemaining > 0) {
-                await message.reply('⏳ Image Studio is pacing requests. Please wait ' + Math.ceil(globalRemaining / 1000) + 's.');
-                return;
-            }
-
-            drawCooldowns.set(senderId, now);
-            lastDrawAt = now;
-            drawGenerationInProgress = true;
-
-            const generateAzureImage = async (deployment) => {
-                const endpoint = process.env.AZURE_OPENAI_ENDPOINT.replace(/\/+$/, '');
-                const configuredTimeout = Number(process.env.AZURE_OPENAI_IMAGE_TIMEOUT_MS);
-                const imageTimeoutMs = Number.isFinite(configuredTimeout) && configuredTimeout > 0
-                    ? configuredTimeout
-                    : 300000;
-                const generationStartedAt = Date.now();
-                const response = await axios.post(
-                    endpoint + '/openai/v1/images/generations?api-version=preview',
-                    {
-                        model: deployment,
-                        prompt,
-                        size: '1024x1024',
-                        n: 1,
-                        quality: 'high',
-                        output_format: 'png'
-                    },
-                    {
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'api-key': process.env.AZURE_OPENAI_KEY
-                        },
-                        timeout: imageTimeoutMs
-                    }
-                );
-
-                const imageData = response.data?.data?.[0]?.b64_json;
-                if (!imageData) {
-                    throw new Error('Azure returned no base64 image data.');
+            const existingChoice = pendingDrawChoices.get(imageChoiceKey);
+            if (existingChoice) clearTimeout(existingChoice.timer);
+            const pendingChoice = { prompt, expiresAt: Date.now() + 60000, timer: null };
+            pendingChoice.timer = setTimeout(() => {
+                if (pendingDrawChoices.get(imageChoiceKey) === pendingChoice) {
+                    pendingDrawChoices.delete(imageChoiceKey);
                 }
+            }, 60000);
+            if (typeof pendingChoice.timer.unref === 'function') pendingChoice.timer.unref();
+            pendingDrawChoices.set(imageChoiceKey, pendingChoice);
 
-                console.log('✅ Azure image generated with ' + deployment + ' in ' + ((Date.now() - generationStartedAt) / 1000).toFixed(1) + 's.');
-                return new MessageMedia('image/png', imageData, 'chaos-image.png');
-            };
-
-            const generatePollinationsImage = async () => {
-                const encodedPrompt = encodeURIComponent(prompt);
-                const imageUrl = 'https://image.pollinations.ai/prompt/' + encodedPrompt + '?width=1024&height=1024&nologo=true';
-                return MessageMedia.fromUrl(imageUrl, { unsafeMime: true });
-            };
-
-            try {
-                if (mode === '--compare') {
-                    await message.reply('🎨 Comparing Pollinations and both Azure models. This creates three images; two use Azure credits.');
-                } else {
-                    await message.reply('🎨 *Image Studio Active...* Generating with ' + targets[0].label + '.');
-                }
-
-                const failures = [];
-                for (const target of targets) {
-                    const providerStartedAt = Date.now();
-                    try {
-                        const imageMedia = target.kind === 'pollinations'
-                            ? await generatePollinationsImage()
-                            : await generateAzureImage(target.deployment);
-                        const captionPrompt = prompt.length > 800 ? prompt.slice(0, 797) + '...' : prompt;
-                        const caption = '🎨 *' + target.label + '*\n*Prompt:* "' + captionPrompt + '"\n`wantam`👆😅';
-                        await client.sendMessage(chatId, imageMedia, { caption });
-                    } catch (imgErr) {
-                        const providerMessage = imgErr.response?.data?.error?.message || imgErr.message || 'Unknown image generation error';
-                        console.error('❌ Image Generation Error:', {
-                            provider: target.label,
-                            status: imgErr.response?.status,
-                            code: imgErr.code,
-                            elapsedSeconds: ((Date.now() - providerStartedAt) / 1000).toFixed(1),
-                            message: providerMessage
-                        });
-                        failures.push(target.label);
-                        if (mode !== '--compare') break;
-                    }
-                }
-
-                if (failures.length) {
-                    if (mode === '--compare') {
-                        await message.reply('⚠️ Comparison could not generate: ' + failures.join(', ') + '. Successful results are above.');
-                    } else {
-                        await message.reply('❌ ' + failures[0] + ' image generation failed. Check provider settings, Azure quota, and bot logs.');
-                    }
-                }
-            } catch (imgErr) {
-                console.error('❌ Image Studio Error:', { code: imgErr.code, message: imgErr.message });
-                await message.reply('❌ The image request could not be completed. Please try again shortly.');
-            } finally {
-                drawGenerationInProgress = false;
-            }
-
+            const menu = IMAGE_MODEL_CHOICES.map((choice) =>
+                choice.number + '. ' + choice.label + ' — ' + choice.description + (choice.kind === 'azure' ? ' (Azure credits)' : ' (free)')
+            ).join('\n');
+            await message.reply('🎨 *Image Studio — best-first model choices*\n\n' + menu + '\n\nReply with 1, 2, or 3 within 60 seconds. Reply `cancel` to stop.');
             return;
         }
 
