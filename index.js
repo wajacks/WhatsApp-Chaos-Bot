@@ -294,7 +294,7 @@ const VOICE_COOLDOWN_MS = 8000;
 
 // Cooldown Durations (in milliseconds)
 const AI_COOLDOWN_MS = 5000;       // 5 seconds for !ai
-const DRAW_COOLDOWN_MS = 15000;    // 15 seconds for !draw (DALL-E 3 is heavy)
+const DRAW_COOLDOWN_MS = 15000;    // 15 seconds per sender for Azure image generation
 const DRAW_GLOBAL_COOLDOWN_MS = 12500; // Keep requests below the default GPT-image-2 rate limit
 const ANALYZE_COOLDOWN_MS = 10000; // 10 seconds for !analyze (GPT-4o Vision)
 const SPEAK_COOLDOWN_MS = 8000;    // 8 seconds for !speak (TTS)
@@ -943,7 +943,7 @@ const commandReactions = {
 
                 const imageMedia = new MessageMedia('image/png', imageData, 'chaos-image.png');
                 const captionPrompt = prompt.length > 800 ? prompt.slice(0, 797) + '...' : prompt;
-                const caption = '🎨 *Prompt:* "' + captionPrompt + '"\n\\t\\t\\t\\t`wantam`👆😅';
+                const caption = '🎨 *Prompt:* "' + captionPrompt + '"\n`wantam`👆😅';
                 await client.sendMessage(chatId, imageMedia, { caption });
             } catch (imgErr) {
                 const azureMessage = imgErr.response?.data?.error?.message || imgErr.message || 'Unknown Azure image error';
