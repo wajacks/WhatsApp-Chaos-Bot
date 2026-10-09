@@ -943,6 +943,11 @@ const commandReactions = {
 
             const generateAzureImage = async (deployment) => {
                 const endpoint = process.env.AZURE_OPENAI_ENDPOINT.replace(/\/+$/, '');
+                const configuredTimeout = Number(process.env.AZURE_OPENAI_IMAGE_TIMEOUT_MS);
+                const imageTimeoutMs = Number.isFinite(configuredTimeout) && configuredTimeout > 0
+                    ? configuredTimeout
+                    : 300000;
+                const generationStartedAt = Date.now();
                 const response = await axios.post(
                     endpoint + '/openai/v1/images/generations?api-version=preview',
                     {
@@ -958,10 +963,11 @@ const commandReactions = {
                             'Content-Type': 'application/json',
                             'api-key': process.env.AZURE_OPENAI_KEY
                         },
-                        timeout: 120000
+                        timeout: imageTimeoutMs
                     }
                 );
 
+                console.log('✅ Azure image generated with ' + deployment + ' in ' + ((Date.now() - generationStartedAt) / 1000).toFixed(1) + 's.');
                 const imageData = response.data?.data?.[0]?.b64_json;
                 if (!imageData) {
                     throw new Error('Azure returned no base64 image data.');
@@ -985,6 +991,7 @@ const commandReactions = {
 
                 const failures = [];
                 for (const target of targets) {
+                    const providerStartedAt = Date.now();
                     try {
                         const imageMedia = target.kind === 'pollinations'
                             ? await generatePollinationsImage()
@@ -998,6 +1005,7 @@ const commandReactions = {
                             provider: target.label,
                             status: imgErr.response?.status,
                             code: imgErr.code,
+                            elapsedSeconds: ((Date.now() - providerStartedAt) / 1000).toFixed(1),
                             message: providerMessage
                         });
                         failures.push(target.label);
