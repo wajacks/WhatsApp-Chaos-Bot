@@ -2548,7 +2548,6 @@ class MafiaGame {
             if (event === 'game_end') {
                 if (global.activeMafiaGame && global.activeMafiaGame !== this) return;
             } else if (
-            } else if (
                 !this.gameStarted ||
                 this.endingGame ||
                 this.channelId !== channelId ||
