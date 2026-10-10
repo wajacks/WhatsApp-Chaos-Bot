@@ -2595,7 +2595,10 @@ class MafiaGame {
             if (!comment || comment.includes('@')) return;
             const otherRoles = ['Mafia', 'Doctor', 'Detective'].filter(name => name !== role);
             if (otherRoles.some(name => new RegExp('\\b' + name + '\\b', 'i').test(comment))) return;
-            if (this.players.some(other => other !== player && other.username && comment.toLowerCase().includes(other.username.toLowerCase()))) return;
+            if (this.players.some(other => {
+                const otherName = String(other.username || '').trim();
+                return other !== player && otherName.length >= 4 && comment.toLowerCase().includes(otherName.toLowerCase());
+            })) return;
 
             await this.sendRoleDM(player, '🌙 *PRIVATE NIGHT NUDGE*\n\n' + comment);
         } catch (error) {
