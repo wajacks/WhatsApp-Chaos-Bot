@@ -189,31 +189,36 @@ const puzzleList = [
 // 🎮 GAME STATE
 // ============================================================
 
-const activeGames = new Map();     // groupId -> gameState
+const activeGames = new Map();
+const { claimGame, releaseGame } = require('./gameRegistry');     // groupId -> gameState
 const pendingSteals = new Map();   // winnerId -> { groupId, playerIds: Set<id> }
 
 // ============================================================
 // ⏱️ TIMERS & COSTS
 // ============================================================
 
-const LOBBY_TIME_MS = 120 * 1000;        // 2 minute
 const GAME_DURATION_MS = 10 * 60 * 1000; // 10 minutes
 const ROUND_DURATION_MS = 80 * 1000;    // 50 seconds
 const STEAL_WINDOW_MS = 120 * 1000;      // 2 minute
-const HINT_COST = 1000;                   // Coins deducted to use !hint
+const HINT_COST = 1000;                   // Dollars deducted to use !hint
 
 // ============================================================
 // 🚪 START LOBBY
 // ============================================================
 
-function startRebusLobby(groupId, client) {
+function startRebusLobby(groupId, client, hostId, hostName) {
 
     if (activeGames.has(groupId)) {
         return '⚠️ A Rebus game is already active or in lobby in this chat!';
     }
 
+    const claim = claimGame(groupId, 'rebus');
+    if (!claim.ok) return `⚠️ A ${claim.activeGame} game is already active in this group.`;
+
     const gameState = {
         groupId,
+        hostId,
+        hostName,
         status: 'LOBBY',
         players: new Map(),
         puzzlesPool: [...puzzleList].sort(() => 0.5 - Math.random()),
@@ -226,43 +231,11 @@ function startRebusLobby(groupId, client) {
 
     activeGames.set(groupId, gameState);
 
-    // Lobby countdown
-    setTimeout(() => {
-
-        if (!activeGames.has(groupId)) return;
-
-        const game = activeGames.get(groupId);
-
-        if (game.status !== 'LOBBY') return;
-
-        if (game.players.size < 2) {
-            client.sendMessage(
-                groupId,
-                '❌ Game canceled! Need at least 2 registered players.'
-            ).catch(() => {});
-
-            activeGames.delete(groupId);
-            return;
-        }
-
-        startActiveGame(groupId, client);
-
-    }, LOBBY_TIME_MS);
-
-    return `🧩 *REBUS COUNTRY QUIZ LOBBY OPEN!* 🧩
-━━━━━━━━━━━━━━━━━━━━━
-Decode country names using emoji clues!
-
-🎮 *HOW TO JOIN:*
-Type *!joinrebus* in this chat (Free entry!).
-
-⚠️ *Registered players guess directly in chat (no commands needed)!*
-💡 *Hint Cost:* \`${HINT_COST} coins\` (Type \`!hint\`)
-🏆 Correct answer = *+100 points*
-
-⏱️ Game duration: *5 minutes*
-
-⌛ Lobby closing in *40 seconds*...`;
+    return `🧩 *COUNTRY REBUS LOBBY OPEN*
+Host: *${hostName}* (host must also join with !joinrebus)
+Players: use !joinrebus. Minimum: 2.
+Only the host can use !startrebus or !stoprebus.
+The lobby stays open until the host starts or stops it.`;
 }
 
 // ============================================================
@@ -298,6 +271,27 @@ function joinRebusLobby(groupId, senderId, userName) {
 // 🚀 START GAME
 // ============================================================
 
+function startRebusGame(groupId, senderId, client) {
+    const game = activeGames.get(groupId);
+    if (!game || game.status !== 'LOBBY') return '❌ No Country Rebus lobby is waiting to start.';
+    if (senderId !== game.hostId) return '❌ Only the host can start this game.';
+    if (!game.players.has(senderId)) return '❌ The host must join with !joinrebus before starting.';
+    if (game.players.size < 2) return '❌ At least 2 registered players are required.';
+    startActiveGame(groupId, client);
+    return '🌍 Country Rebus has started.';
+}
+
+function stopRebusGame(groupId, senderId) {
+    const game = activeGames.get(groupId);
+    if (!game) return '❌ There is no Country Rebus game in this group.';
+    if (senderId !== game.hostId) return '❌ Only the host can stop this game.';
+    clearTimeout(game.roundTimer);
+    clearTimeout(game.gameTimer);
+    activeGames.delete(groupId);
+    releaseGame(groupId, 'rebus');
+    return '🛑 The host stopped Country Rebus.';
+}
+
 function startActiveGame(groupId, client) {
 
     const game = activeGames.get(groupId);
@@ -312,7 +306,7 @@ function startActiveGame(groupId, client) {
 You have *10 minutes* to score as many points as possible!
 
 💯 Correct answer = *+100 points*
-💡 Need a hint? Type \`!hint\` (-${HINT_COST} coins).
+💡 Need a hint? Type \`!hint\` (-$${HINT_COST}).
 
 🌍 Registered players, guess directly in chat! GO!`
     ).catch(() => {});
@@ -366,7 +360,7 @@ function nextRound(groupId, client) {
 ━━━━━━━━━━━━━━━━━━━━━
 
 ⏱️ *80 seconds!*
-💡 Need a hint? Type \`!hint\` (-${HINT_COST} coins)
+💡 Need a hint? Type \`!hint\` (-$${HINT_COST})
 
 🎯 Registered players, type your guess below!`
     ).catch(() => {});
@@ -427,7 +421,7 @@ function processRebusHint(groupId, senderId, client) {
     const userBalance = getBalance(senderId);
 
     if (userBalance < HINT_COST) {
-        return `❌ You don't have enough coins! A hint costs \`${HINT_COST} coins\`.`;
+        return `❌ You don't have enough dollars! A hint costs \`$${HINT_COST}\`.`;
     }
 
     // Deduct hint fee from user wallet and record the purchase
@@ -437,7 +431,7 @@ function processRebusHint(groupId, senderId, client) {
     // Send the hint PRIVATELY to the user who requested it
     client.sendMessage(
         senderId,
-`💡 *HINT — ROUND ${game.currentRound}* (\`-${HINT_COST} coins\`)
+`💡 *HINT — ROUND ${game.currentRound}* (\`-$${HINT_COST}\`)
 ━━━━━━━━━━━━━━━━━━━━━
 
 ${game.activePuzzle.hint}
@@ -447,7 +441,7 @@ ${game.activePuzzle.hint}
     ).catch(() => {});
 
     // Return a public confirmation to the group chat
-    return `✅ Hint sent to your DM! (-${HINT_COST} coins)\n\nCheck your private messages with me.`;
+    return `✅ Hint sent to your DM! (-$${HINT_COST})\n\nCheck your private messages with me.`;
 }
 
 // ============================================================
@@ -540,6 +534,7 @@ function endGame(groupId, client) {
         ).catch(() => {});
 
         activeGames.delete(groupId);
+        releaseGame(groupId, 'rebus');
         return;
     }
 
@@ -590,6 +585,7 @@ You have \`120 seconds\` to steal \`25%\` of any losing player's wallet savings!
     ).catch(() => {});
 
     activeGames.delete(groupId);
+    releaseGame(groupId, 'rebus');
 }
 
 // ============================================================
@@ -625,7 +621,7 @@ function handleStealCommand(
 
     if (victimBal <= 0) {
         pendingSteals.delete(senderId);
-        return '💸 Target player has no coins in their wallet! Steal wasted!';
+        return '💸 Target player has no dollars in their wallet! Steal wasted!';
     }
 
     // 12.5% = 1/8
@@ -646,7 +642,7 @@ function handleStealCommand(
     return `🥷 *BOOM! WALLET STOLEN!* 🥷
 ━━━━━━━━━━━━━━━━━━━━━
 
-Stole *${stealAmount} coins* from @${mentionedJid.split('@')[0]}!`;
+Stole *$${stealAmount}* from @${mentionedJid.split('@')[0]}!`;
 }
 
 // ============================================================
@@ -655,6 +651,8 @@ Stole *${stealAmount} coins* from @${mentionedJid.split('@')[0]}!`;
 
 module.exports = {
     startRebusLobby,
+    startRebusGame,
+    stopRebusGame,
     joinRebusLobby,
     processRebusGuess,
     processRebusHint,

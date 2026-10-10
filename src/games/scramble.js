@@ -90,7 +90,7 @@ const WORDS = [
 ];
 
 const activeScrambleGames = new Map();
-const LOBBY_TIME_MS = 60 * 1000;
+const { claimGame, releaseGame } = require('./gameRegistry');
 const ROUND_TIME_MS = 120 * 1000; // Increased to 120 seconds
 const MAX_ROUNDS = 15;
 const HINT_COST = 500;
@@ -128,29 +128,25 @@ function normalizeAnswer(text) {
     return String(text || '').trim().toUpperCase().replace(/[\s-]/g, '');
 }
 
-function startScrambleLobby(chatId, client) {
+function startScrambleLobby(chatId, client, hostId, hostName) {
     if (activeScrambleGames.has(chatId)) return '⚠️ A Scrambled Word game is already active or in its lobby in this chat!';
 
+    const claim = claimGame(chatId, 'scramble');
+    if (!claim.ok) return `⚠️ A ${claim.activeGame} game is already active in this group.`;
+
     const game = {
-        status: 'LOBBY', players: new Map(), wordPool: shuffle(WORDS), currentRound: 0,
-        activeWord: null, roundStartedAt: null, roundTimer: null, lobbyTimer: null,
+        status: 'LOBBY', hostId, hostName, players: new Map(), wordPool: shuffle(WORDS), currentRound: 0,
+        activeWord: null, roundStartedAt: null, roundTimer: null,
         categoryTimer: null, letterTimer: null, definitionTimer: null, roundDuration: ROUND_TIME_MS,
         isRoundActive: false // Flag to prevent multiple concurrent rounds and late answers
     };
     activeScrambleGames.set(chatId, game);
     
-    game.lobbyTimer = setTimeout(() => {
-        const current = activeScrambleGames.get(chatId);
-        if (!current || current.status !== 'LOBBY') return;
-        if (current.players.size < 2) {
-            activeScrambleGames.delete(chatId);
-            client.sendMessage(chatId, '❌ Scrambled Word canceled — at least 2 players are needed.').catch(() => {});
-            return;
-        }
-        startNextRound(chatId, client);
-    }, LOBBY_TIME_MS);
-
-    return `🔀 *SCRAMBLED WORD LOBBY OPEN!*\n━━━━━━━━━━━━━━━━━━━━━\nRace to unscramble words before everyone else!\n\nType \`!joinscramble\` to join.\n\n🏁 *15 rounds* | ⏱️ *120 seconds per round*\n💡 Automatic hints unlock as time runs out.\n🔒 Private hint: \`!scramblehint\` (-${HINT_COST} coins; reduced reward)\n\n⌛ Lobby closes in *60 seconds*...`;
+    return `🔀 *SCRAMBLE LOBBY OPEN*
+Host: *${hostName}* (host must also join with !joinscramble)
+Players: use !joinscramble. Minimum: 2.
+Only the host can use !startscramble or !stopscramble.
+The lobby stays open until the host starts or stops it.`;
 }
 
 function joinScrambleLobby(chatId, senderId, userName) {
@@ -167,6 +163,24 @@ function clearRoundTimers(game) {
         if (game[key]) clearTimeout(game[key]);
         game[key] = null;
     });
+}
+
+function startScrambleGame(chatId, senderId, client) {
+    const game = activeScrambleGames.get(chatId);
+    if (!game || game.status !== 'LOBBY') return '❌ No Scramble lobby is waiting to start.';
+    if (senderId !== game.hostId) return '❌ Only the host can start this game.';
+    if (!game.players.has(senderId)) return '❌ The host must join with !joinscramble before starting.';
+    if (game.players.size < 2) return '❌ At least 2 registered players are required.';
+    startNextRound(chatId, client);
+    return '🔀 Scrambled Word has started.';
+}
+
+function stopScrambleGame(chatId, senderId, client) {
+    const game = activeScrambleGames.get(chatId);
+    if (!game) return '❌ There is no Scrambled Word game in this group.';
+    if (senderId !== game.hostId) return '❌ Only the host can stop this game.';
+    endScrambleGame(chatId, null, '🛑 The host stopped Scrambled Word.');
+    return '🛑 Scrambled Word stopped.';
 }
 
 function startNextRound(chatId, client) {
@@ -235,13 +249,13 @@ function processScrambleGuess(chatId, text, senderId, userName, client) {
     const streakBonus = player.streak >= 3 ? 30 : player.streak === 2 ? 15 : 0;
     player.points += streakBonus;
     
-    const coins = Math.max(20, Math.round(points / 2));
-    addCoins(senderId, coins);
+    const dollars = Math.max(20, Math.round(points / 2));
+    addCoins(senderId, dollars);
     addXP(senderId, Math.max(10, Math.round(points / 3)), userName);
     
     const leaderboard = [...game.players.values()].sort((a, b) => b.points - a.points).slice(0, 3)
         .map((entry, index) => `${['🥇', '🥈', '🥉'][index]} *${entry.name}* — ${entry.points} pts`).join('\n');
-    client.sendMessage(chatId, `🎉 *SOLVED IN ${(elapsedMs / 1000).toFixed(1)} SECONDS!*\n\n👑 *${userName}* unscrambled *${game.activeWord.word}*\n⚡ +${points} pts | 💰 +${coins} coins${streakBonus ? ` | 🔥 +${streakBonus} streak bonus` : ''}\n\n🏆 *LIVE LEADERBOARD*\n${leaderboard}\n\n⏩ Next round shortly...`).catch(() => {});
+    client.sendMessage(chatId, `🎉 *SOLVED IN ${(elapsedMs / 1000).toFixed(1)} SECONDS!*\n\n👑 *${userName}* unscrambled *${game.activeWord.word}*\n⚡ +${points} pts | 💰 +$${dollars}${streakBonus ? ` | 🔥 +${streakBonus} streak bonus` : ''}\n\n🏆 *LIVE LEADERBOARD*\n${leaderboard}\n\n⏩ Next round shortly...`).catch(() => {});
     setTimeout(() => startNextRound(chatId, client), 3000);
     return true;
 }
@@ -252,10 +266,10 @@ function processScrambleHint(chatId, senderId, client) {
     const player = game.players.get(senderId);
     if (!player) return '⚠️ Only registered players can request a private hint.';
     if (player.usedHint) return '💡 You already used your private hint this round.';
-    if (getBalance(senderId) < HINT_COST) return `❌ You need ${HINT_COST} coins for a private hint.`;
+    if (getBalance(senderId) < HINT_COST) return `❌ You need $${HINT_COST} for a private hint.`;
     subtractCoins(senderId, HINT_COST);
     player.usedHint = true;
-    client.sendMessage(senderId, `💡 *PRIVATE SCRAMBLE HINT* (-${HINT_COST} coins)\n\n${game.activeWord.hint}\n\nYour correct-answer points will be reduced by 30% this round.`).catch(() => {});
+    client.sendMessage(senderId, `💡 *PRIVATE SCRAMBLE HINT* (-$${HINT_COST})\n\n${game.activeWord.hint}\n\nYour correct-answer points will be reduced by 30% this round.`).catch(() => {});
     return '✅ Private hint sent to your DM. Your reward is reduced by 30% this round.';
 }
 
@@ -263,15 +277,15 @@ function endScrambleGame(chatId, client, reason = '🛑 *Scrambled Word match en
     const game = activeScrambleGames.get(chatId);
     if (!game) return null;
     clearRoundTimers(game);
-    if (game.lobbyTimer) clearTimeout(game.lobbyTimer);
     const players = [...game.players.values()].sort((a, b) => b.points - a.points);
     const fastest = players.filter(player => player.fastestSolveMs !== null).sort((a, b) => a.fastestSolveMs - b.fastestSolveMs)[0];
     const streakLeader = players.filter(player => player.solves > 0).sort((a, b) => b.longestStreak - a.longestStreak)[0];
     const rows = players.map((player, index) => `${index + 1}. *${player.name}* — ${player.points} pts (${player.solves} solved)`).join('\n') || 'No scores recorded.';
     activeScrambleGames.delete(chatId);
+    releaseGame(chatId, 'scramble');
     const message = `${reason}\n\n🏆 *FINAL LEADERBOARD*\n━━━━━━━━━━━━━━━━━━━━━\n${rows}${fastest ? `\n\n⚡ Fastest solve: *${fastest.name}* —${(fastest.fastestSolveMs / 1000).toFixed(1)}s` : ''}${streakLeader ? `\n🔥 Longest streak: *${streakLeader.name}* —${streakLeader.longestStreak}` : ''}`;
     if (client) client.sendMessage(chatId, message).catch(() => {});
     return message;
 }
 
-module.exports = { startScrambleLobby, joinScrambleLobby, processScrambleGuess, processScrambleHint, endScrambleGame, _test: { shuffle, scrambleWord, calculatePoints, normalizeAnswer } };
+module.exports = { startScrambleLobby, startScrambleGame, stopScrambleGame, joinScrambleLobby, processScrambleGuess, processScrambleHint, endScrambleGame, _test: { shuffle, scrambleWord, calculatePoints, normalizeAnswer } };

@@ -1,41 +1,30 @@
 function getGamesList() {
-  return `🎮 **[G A M E  M O D E S ]** 🎮
+  return `🎮 *CHAOS GAMES*
 ━━━━━━━━━━━━━━━━━━━━━━━
 
-🧩 **1. Country Rebus**
-• Guess the hidden country from puzzle clues!
-• Commands: \`!rebus\`, \`!joinrebus\` (or \`guesscountry\`), \`!steal @user\`
+*Lobby commands*
+• Country Rebus — solve emoji clues to name the country. Open with \`!rebus\`
+• Wordle — guess the shared 5-letter word. Open with \`!wordle\`
+• Word Chain — take turns with words starting at the last letter. Open with \`!wordchain\`
+• Scrambled Word — race to unscramble each word. Open with \`!scramble\`
+• Word Forge — build words from a private rack and rule. Open with \`!wordforge\`
+• Mafia — discuss, vote, and use secret roles. Open with \`!mafia\`
 
-🟩 **2. Wordle**
-• Work together to guess the secret 5-letter word!
-• Commands: \`!wordle\`, \`!join\`, \`!stopwordle\`
+*How play works*
+1. The person who opens a lobby becomes its host and must also join as a player.
+2. Players use that game’s join command shown in the lobby.
+3. The host starts or stops the game with the commands shown in the lobby.
+4. Only one game can run in a group at a time. Lobbies stay open until the host starts or stops them.
 
-🔗 **3. Word Chain**
-• Turn-based word game! Each word must start with the last letter of the previous word.
-• Commands: \`!wordchain\`, \`!wjoin\`, \`!startwordchain\`, \`!stopwordchain\`
-• Host opens the lobby with \`!wordchain\`
-• Players join with \`!wjoin\`
-• Host starts the match with \`!startwordchain\`
-• Minimum 2 players
-• Each player has 10 seconds to submit a valid word
+*Game commands*
+• Rebus: \`!joinrebus\`, \`!rguess <answer>\`, \`!hint\`, \`!stoprebus\`
+• Wordle: \`!join\`, \`!startwordle\`, \`!stopwordle\`
+• Word Chain: \`!wjoin\`, \`!startwordchain\`, \`!stopwordchain\`
+• Scramble: \`!joinscramble\`, \`!scramblehint\`, \`!startscramble\`, \`!stopscramble\`
+• Word Forge: \`!joinforge\`, \`!startforge\`, \`!stopforge\`
+• Mafia: \`!joinmafia\`, host: \`!startmafia\` / \`!stopmafia\`; vote with \`!vote\` and use assigned night actions in DM.
 
-🔀 **4. Scrambled Word**
-• Race to unscramble the word before the timer ends!
-• Commands: \`!scramble\`, \`!joinscramble\`, \`!scramblehint\`, \`!stopscramble\`
-• Fast solves, streaks, automatic hints, and special rounds earn more points.
-
-⚒️ **5. Word Forge**
-• Build a valid word from your private letter rack while obeying your private round rule.
-• Commands: \`!wordforge\`, \`!joinforge\`, \`!startforge\`, \`!stopforge\`
-• 90-second rounds, anonymous 10-second break boards, then a full final reveal.
-
-🕵️ **6. Mafia (Case Game)**
-• Social deduction chaos! Unmask the killer or survive the night.
-• Commands: \`!mafia\` (or \`!startmafia\`), \`!joinmafia\`, \`stopmafia\`, \`!vote @user\`
-• *(Night actions are handled via private message DM to the bot: \`!kill\`, \`!save\`, \`!investigate\`)*
-
-━━━━━━━━━━━━━━━━━━━━━━━
-*Gather your friends and start a lobby!*`;
+Type \`!menu\` for the command center.`;
 }
 
 module.exports = { getGamesList };

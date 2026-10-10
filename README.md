@@ -13,7 +13,7 @@
 ## ✨ What’s inside
 
 - **Game night:** Country Rebus, Wordle, Word Chain, Scrambled Word, Word Forge, and Mafia.
-- **Progression:** profiles, levels, XP, coins, daily rewards, and a shop.
+- **Progression:** profiles, levels, XP, dollar balances, daily rewards, and a shop.
 - **AI and utilities:** AI chat, image generation, Bible verses, hymns, weather, and class tools.
 - **Group and private play:** several games use group lobbies with private-message actions or clues.
 
@@ -23,14 +23,14 @@ Open `!menu` for the command center or `!games` for the current game list.
 
 | Game | How to start |
 |---|---|
-| Country Rebus | `!rebus` → players join with `!joinrebus`; use `!hint` for a clue |
-| Wordle | `!wordle` → players join with `!join` |
+| Country Rebus | `!rebus` → join with `!joinrebus`; host starts with `!startrebus` |
+| Wordle | `!wordle` → join with `!join`; host starts with `!startwordle` |
 | Word Chain | `!wordchain` → join with `!wjoin`, then the host uses `!startwordchain` |
-| Scrambled Word | `!scramble` → join with `!joinscramble` |
+| Scrambled Word | `!scramble` → join with `!joinscramble`; host starts with `!startscramble` |
 | Word Forge | `!wordforge` → join with `!joinforge`, then the host uses `!startforge` |
-| Mafia | `!mafia` → join with `!joinmafia`; voting and night actions happen in the group and DMs |
+| Mafia | `!mafia` → join with `!joinmafia`; host starts with `!startmafia` |
 
-Use `!games` in WhatsApp for the latest command list. Hosts can use the game-specific stop command shown in `!menu`.
+The lobby host must also join as a player. Only the host can start or stop a game, and a group can run one game at a time. Lobbies stay open until the host acts. Use `!games` for exact join/start/stop commands. Economy amounts are shown in dollars; existing saved balances keep their values.
 
 ## 🎨 Image Studio
 

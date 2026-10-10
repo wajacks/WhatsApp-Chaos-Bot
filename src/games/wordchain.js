@@ -21,6 +21,7 @@ const wordSet = new Set(
 // ============================================================
 
 const activeWordChainGames = new Map();
+const { claimGame, releaseGame } = require('./gameRegistry');
 
 // ============================================================
 // CONSTANTS
@@ -102,17 +103,18 @@ async function startWordChainLobby(message) {
         contact?.name ||
         'Chaos Member';
 
+    const claim = claimGame(chatId, 'wordchain');
+    if (!claim.ok) {
+        await message.reply(`⚠️ A ${claim.activeGame} game is already active in this group.`);
+        return;
+    }
+
     activeWordChainGames.set(chatId, {
         state: LOBBY_STATE,
 
         host: hostId,
 
-        players: [
-            {
-                id: hostId,
-                name: userName
-            }
-        ],
+        players: [],
 
         scores: new Map(),
 
@@ -136,7 +138,7 @@ async function startWordChainLobby(message) {
         `Host: *${userName}*\n\n` +
         'Players can join using:\n' +
         '`!wjoin`\n\n' +
-        'Minimum players: *2*\n' +
+        'Host must also join with !wjoin. Minimum players: *2*\n' +
         'Game duration: *5 minutes*\n' +
         'Turn duration: *10 seconds*\n\n' +
         'When everyone is ready, the host can use:\n' +
@@ -241,6 +243,11 @@ async function startWordChainGame(message, client) {
             '❌ Only the host can start the Word Chain game.'
         );
 
+        return;
+    }
+
+    if (!game.players.some(player => player.id === game.host)) {
+        await message.reply('❌ The host must join with !wjoin before starting.');
         return;
     }
 
@@ -663,6 +670,7 @@ async function stopWordChain(
         activeWordChainGames.delete(
             chatId
         );
+        releaseGame(chatId, 'wordchain');
 
         if (client) {
             await client.sendMessage(
@@ -686,14 +694,14 @@ async function stopWordChain(
                         player.id
                     ) || 0;
 
-                const coins =
+                const dollars =
                     points *
                     COINS_PER_POINT;
 
                 return {
                     ...player,
                     points,
-                    coins
+                    dollars
                 };
             })
             .sort(
@@ -719,13 +727,13 @@ async function stopWordChain(
             leaderboardText +=
                 `${medal} @${player.id.split('@')[0]}\n` +
                 `   Points: *${player.points}*\n` +
-                `   Reward: *${player.coins.toLocaleString()} coins*\n\n`;
+                `   Reward: *$${player.dollars.toLocaleString()}*\n\n`;
         }
     );
 
     leaderboardText +=
         `Words played: *${game.usedWords.size}*\n` +
-        `Conversion: *1 point = ${COINS_PER_POINT.toLocaleString()} coins*`;
+        `Conversion: *1 point = $${COINS_PER_POINT.toLocaleString()}*`;
 
     if (client) {
         await client.sendMessage(
@@ -748,7 +756,7 @@ async function stopWordChain(
     const db = readDB();
 
     for (const player of leaderboard) {
-        if (player.coins <= 0) {
+        if (player.dollars <= 0) {
             continue;
         }
 
@@ -761,13 +769,13 @@ async function stopWordChain(
 
             user.coins =
                 (user.coins || 0) +
-                player.coins;
+                player.dollars;
 
             db[player.id] = user;
 
         } catch (err) {
             console.error(
-                `[WORD CHAIN] Could not award coins to ${player.id}:`,
+                `[WORD CHAIN] Could not award dollars to ${player.id}:`,
                 err
             );
         }
@@ -782,6 +790,7 @@ async function stopWordChain(
     activeWordChainGames.delete(
         chatId
     );
+    releaseGame(chatId, 'wordchain');
 }
 
 // ============================================================

@@ -32,12 +32,12 @@ function getCatalogMenu() {
     
     menu += "🚗 **VEHICLES:**\n";
     catalog.cars.forEach(c => {
-        menu += `• \`${c.id}\` - ${c.name} — **🪙 ${c.price.toLocaleString()}**\n`;
+        menu += `• \`${c.id}\` - ${c.name} — **$${c.price.toLocaleString()}**\n`;
     });
 
     menu += "\n🏠 **PROPERTIES:**\n";
     catalog.houses.forEach(h => {
-        menu += `• \`${h.id}\` - ${h.name} — **🪙 ${h.price.toLocaleString()}**\n`;
+        menu += `• \`${h.id}\` - ${h.name} — **$${h.price.toLocaleString()}**\n`;
     });
 
     return menu;

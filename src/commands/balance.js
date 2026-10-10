@@ -40,7 +40,7 @@ async function handleBalanceCommand(
     return `💰 *WALLET BALANCE* 💰\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
         `👤 *User:* @${tagFormatted}\n` +
-        `🪙 *Balance:* ${profile.balance.toLocaleString()} coins\n` +
+        `💵 *Balance:* $${profile.balance.toLocaleString()}\n` +
         `⭐ *Level:* ${profile.level} (${profile.xp} XP)\n` +
         `━━━━━━━━━━━━━━━━━━━━━`;
 }

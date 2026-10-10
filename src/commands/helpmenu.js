@@ -32,7 +32,7 @@
 │     ☞『_*Ask the streets*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │💸 \`!pay <amount>\`
-│     ☞『_*Transfer coins*_』
+│     ☞『_*Transfer dollars*_』
 │
 └──────────────────────────────┘
 
@@ -72,53 +72,23 @@
 
 ┌── ░◈ _*GAME CENTER*_ ◈░ ─────────┐
 │
-│🟩 \`!wordle\`
-│     ☞『_*Start Wordle*_』
+│🟩 `!wordle`
+│     ☞『_*Open a Wordle lobby*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│👥 \`!join\`
-│     ☞『_*Join Wordle*_』
+│🌍 `!rebus`
+│     ☞『_*Open a Country Rebus lobby*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🌍 \`!rebus\`
-│     ☞『_*Start Rebus Country*_』
+│🔀 `!scramble`
+│     ☞『_*Open a Scramble lobby*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│👥 \`!joinrebus\`
-│     ☞『_*Join Rebus*_』
+│🔗 `!wordchain`
+│     ☞『_*Open a Word Chain lobby*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🎯 \`!rguess <answer>\`
-│     ☞『_*Submit a guess*_』
+│⚒️ `!wordforge`
+│     ☞『_*Open a Word Forge lobby*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│💡 \`!hint\`
-│     ☞『_*Get a clue*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🔀 \`!scramble\`
-│     ☞『_*Start Scrambled Word*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│👥 \`!joinscramble\`
-│     ☞『_*Join Scrambled Word*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│💡 \`!scramblehint\`
-│     ☞『_*Get a private scramble clue*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│⚒️ \`!wordforge\`
-│     ☞『_*Start Word Forge*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│👥 \`!joinforge\`
-│     ☞『_*Join Word Forge*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🚀 \`!startforge\`
-│     ☞『_*Start the match*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🛑 \`!stopforge\`
-│     ☞『_*Stop Word Forge*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🕵️ \`!mafia\`
-│     ☞『_*Start Mafia*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│👥 \`!joinmafia\`
-│     ☞『_*Join the case*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🛑 \`!endmafia\`
-│     ☞『_*Stop active game*_』
+│🕵️ `!mafia`
+│     ☞『_*Open a Mafia lobby*_』
 │
 └──────────────────────────────┘
 
