@@ -16,10 +16,15 @@ const {
 
 class MafiaGame {
 
-    constructor(client, MessageMedia) {
+    constructor(client, MessageMedia, aiNarrator) {
 
         this.client = client;
         this.MessageMedia = MessageMedia;
+        this.aiNarrator = typeof aiNarrator === 'function' ? aiNarrator : null;
+        this.narrationPhaseToken = 0;
+        this.nightNumber = 0;
+        this.lastNightOutcome = 'unknown';
+        this.lastVotingOutcome = 'none';
 
         this.inLobby = false;
         this.gameStarted = false;
@@ -52,6 +57,7 @@ class MafiaGame {
 
         this.lobbyTimer = null;
         this.nightTimer = null;
+        this.nightReminderTimer = null;
         this.voteTimer = null;
 
         this.endingGame = false;
@@ -574,6 +580,11 @@ class MafiaGame {
             this.nightTimer = null;
         }
 
+        if (this.nightReminderTimer) {
+            clearTimeout(this.nightReminderTimer);
+            this.nightReminderTimer = null;
+        }
+
         if (this.voteTimer) {
 
             clearTimeout(
@@ -603,6 +614,11 @@ class MafiaGame {
         this.hostName = null;
         this.votingMessages = [];
         this.votingQuipsSent = 0;
+        this.lastVotingQuipAt = 0;
+        this.nightNumber = 0;
+        this.lastNightOutcome = 'unknown';
+        this.lastVotingOutcome = 'none';
+        this.narrationPhaseToken += 1;
 
         this.players = [];
         this.ghosts = [];
@@ -922,6 +938,11 @@ class MafiaGame {
                 error
             );
         }
+
+        void this.publishPublicNarration('game_end', {
+            winner,
+            livingPlayers: this.getAlivePlayers().length
+        });
 
         releaseGame(channelId, 'mafia');
         this.resetGameState();
@@ -1553,6 +1574,10 @@ class MafiaGame {
 
         this.inLobby = false;
         this.gameStarted = true;
+        this.nightNumber = 0;
+        this.lastNightOutcome = 'unknown';
+        this.lastVotingOutcome = 'none';
+        this.narrationPhaseToken += 1;
 
         this.channelId =
             channelId;
@@ -1793,6 +1818,9 @@ class MafiaGame {
 
         this.nightActive =
             true;
+        this.narrationPhaseToken += 1;
+        const phaseToken = this.narrationPhaseToken;
+        this.nightNumber += 1;
 
         this.votingActive =
             false;
@@ -1812,6 +1840,7 @@ class MafiaGame {
         this.votes.clear();
         const phaseDurationMs = this.getPhaseDurationMs();
         const phaseMinutes = Math.ceil(phaseDurationMs / 60000);
+        const livingPlayers = this.getAlivePlayers().length;
 
         await this.client.sendMessage(
             channelId,
@@ -1823,6 +1852,12 @@ class MafiaGame {
             'Detective: gather evidence (`!investigate [Letter]`).\n\n' +
             `Night lasts *${phaseMinutes} minute(s)*, based on the living player count.`
         );
+        void this.publishPublicNarration('night_fall', {
+            nightNumber: this.nightNumber,
+            livingPlayers,
+            previousVote: this.lastVotingOutcome
+        });
+        this.lastVotingOutcome = 'none';
 
         this.nightTimer =
             setTimeout(
@@ -1852,6 +1887,13 @@ class MafiaGame {
                 },
                 phaseDurationMs
             );
+
+        this.nightReminderTimer = setTimeout(() => {
+            if (!this.gameStarted || !this.nightActive || this.narrationPhaseToken !== phaseToken) return;
+            const secondsRemaining = Math.ceil((phaseDurationMs * 0.35) / 1000);
+            void this.sendNightActionReminders(channelId, phaseToken, secondsRemaining);
+        }, Math.floor(phaseDurationMs * 0.65));
+        if (this.nightReminderTimer.unref) this.nightReminderTimer.unref();
     }
 
     // ============================================================
@@ -2233,6 +2275,10 @@ class MafiaGame {
 
         this.nightActive =
             false;
+        if (this.nightReminderTimer) {
+            clearTimeout(this.nightReminderTimer);
+            this.nightReminderTimer = null;
+        }
 
         const killTarget =
             this.nightActions.kill;
@@ -2394,6 +2440,7 @@ class MafiaGame {
             channelId,
             morningMessage
         );
+        this.lastNightOutcome = killedPlayer ? 'player_eliminated' : 'no_player_eliminated';
 
         if (
             await this.checkWinCondition(
@@ -2425,6 +2472,7 @@ class MafiaGame {
 
         this.votingActive =
             true;
+        this.narrationPhaseToken += 1;
 
         this.nightActive =
             false;
@@ -2435,6 +2483,7 @@ class MafiaGame {
         this.lastVotingQuipAt = 0;
         const phaseDurationMs = this.getPhaseDurationMs();
         const phaseMinutes = Math.ceil(phaseDurationMs / 60000);
+        const livingPlayers = this.getAlivePlayers().length;
 
         await this.client.sendMessage(
             channelId,
@@ -2446,6 +2495,10 @@ class MafiaGame {
             'Ghosts cannot vote.\n' +
             `You have *${phaseMinutes} minute(s)* to discuss and vote, based on the living player count.`
         );
+        void this.publishPublicNarration('voting_open', {
+            livingPlayers,
+            nightOutcome: this.lastNightOutcome
+        });
 
         this.voteTimer =
             setTimeout(
@@ -2477,8 +2530,96 @@ class MafiaGame {
             );
     }
 
-    async maybeCommentDuringVoting(chatId, senderId, userName, text, generateComment) {
-        if (!this.gameStarted || !this.votingActive || chatId !== this.channelId) return;
+    sanitizePublicNarration(text) {
+        const clean = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 220);
+        if (!clean || clean.includes('@')) return null;
+        if (/\b(mafia|doctor|detective|villager|role|secret|killer|guilty|innocent|suspect|vote|eliminate|kill|save|investigate|target)\b/i.test(clean)) return null;
+        return clean;
+    }
+
+    async publishPublicNarration(event, context = {}) {
+        if (!this.aiNarrator) return;
+        const channelId = this.channelId;
+        const phaseToken = this.narrationPhaseToken;
+        try {
+            const generated = await this.aiNarrator({ audience: 'public', event, context });
+            if (!generated) return;
+
+            if (event === 'game_end') {
+                if (global.activeMafiaGame && global.activeMafiaGame !== this) return;
+            } else if (
+                !this.gameStarted ||
+                this.endingGame ||
+                this.channelId !== channelId ||
+                this.narrationPhaseToken !== phaseToken ||
+                global.activeMafiaGame !== this
+            ) {
+                return;
+            }
+
+            const comment = this.sanitizePublicNarration(generated);
+            if (!comment) return;
+            await this.client.sendMessage(channelId, '🎭 ' + comment);
+        } catch (error) {
+            console.warn('[MAFIA AI NARRATOR] Public narration failed:', error.message);
+        }
+    }
+
+    getPendingNightActions() {
+        const pending = [];
+        const mafia = this.getMafia();
+        const doctor = this.players.find(player => player.role === 'Doctor' && player.isAlive);
+        const detective = this.players.find(player => player.role === 'Detective' && player.isAlive);
+
+        if (mafia && !this.nightActions.kill) pending.push({ player: mafia, action: 'strike' });
+        if (doctor && !this.nightActions.save) pending.push({ player: doctor, action: 'protection' });
+        if (detective && !this.nightActions.investigate) pending.push({ player: detective, action: 'investigation' });
+        return pending;
+    }
+
+    async sendPrivateNightReminder(entry, channelId, phaseToken, secondsRemaining) {
+        if (!this.aiNarrator) return;
+        const player = entry.player;
+        const role = player.role;
+        try {
+            const generated = await this.aiNarrator({
+                audience: 'private',
+                event: 'pending_night_action',
+                context: { role, action: entry.action, secondsRemaining }
+            });
+            if (!generated || !this.gameStarted || !this.nightActive || this.channelId !== channelId || this.narrationPhaseToken !== phaseToken) return;
+            if (!player.isAlive || player.role !== role) return;
+            if (!this.getPendingNightActions().some(item => item.player === player && item.action === entry.action)) return;
+
+            const comment = String(generated).replace(/\s+/g, ' ').trim().slice(0, 200);
+            if (!comment || comment.includes('@')) return;
+            const otherRoles = ['Mafia', 'Doctor', 'Detective'].filter(name => name !== role);
+            if (otherRoles.some(name => new RegExp('\\b' + name + '\\b', 'i').test(comment))) return;
+            if (this.players.some(other => {
+                const otherName = String(other.username || '').trim();
+                return other !== player && otherName.length >= 4 && comment.toLowerCase().includes(otherName.toLowerCase());
+            })) return;
+
+            await this.sendRoleDM(player, '🌙 *PRIVATE NIGHT NUDGE*\n\n' + comment);
+        } catch (error) {
+            console.warn('[MAFIA AI NARRATOR] Private role nudge failed:', error.message);
+        }
+    }
+
+    async sendNightActionReminders(channelId, phaseToken, secondsRemaining) {
+        if (!this.aiNarrator || !this.gameStarted || !this.nightActive || this.narrationPhaseToken !== phaseToken) return;
+        const pending = this.getPendingNightActions();
+        if (!pending.length) return;
+
+        void this.publishPublicNarration('night_deadline', {
+            livingPlayers: this.getAlivePlayers().length,
+            secondsRemaining
+        });
+        await Promise.all(pending.map(entry => this.sendPrivateNightReminder(entry, channelId, phaseToken, secondsRemaining)));
+    }
+
+    async maybeCommentDuringVoting(chatId, senderId, userName, text) {
+        if (!this.aiNarrator || !this.gameStarted || !this.votingActive || chatId !== this.channelId) return;
         const speaker = this.getPlayerById(senderId);
         if (!speaker || !speaker.isAlive || !String(text || '').trim()) return;
         this.votingMessages.push({
@@ -2491,24 +2632,28 @@ class MafiaGame {
         if (now - this.lastVotingQuipAt < 45000 || Math.random() > 0.35) return;
         const eligible = this.getAlivePlayers();
         if (!eligible.length) return;
+        const phaseToken = this.narrationPhaseToken;
         const target = eligible[Math.floor(Math.random() * eligible.length)];
-        const transcript = this.votingMessages.map(line => line.name + ': ' + line.text).join('\n').slice(-1800);
+        const transcript = this.votingMessages.map(line => line.text).join('\n').slice(-1800);
         this.lastVotingQuipAt = now;
         this.votingQuipsSent += 1;
         try {
-            const comment = await generateComment(transcript);
-            if (!this.gameStarted || !this.votingActive || chatId !== this.channelId || !comment) return;
-            const safeComment = String(comment).trim().slice(0, 240);
-            if (!safeComment || /\b(mafia|doctor|detective|villager|role|secret|killer|guilty|innocent|suspect|vote|eliminate|kill|save|investigate)\b/i.test(safeComment)) return;
+            const comment = await this.aiNarrator({
+                audience: 'public',
+                event: 'voting_banter',
+                context: { conversation: transcript, livingPlayers: eligible.length }
+            });
+            if (!this.gameStarted || !this.votingActive || chatId !== this.channelId || this.narrationPhaseToken !== phaseToken || !comment) return;
+            const safeComment = this.sanitizePublicNarration(comment);
             const mention = String(target.id || '').split('@')[0];
-            if (!mention) return;
+            if (!safeComment || !mention) return;
             await this.client.sendMessage(
                 chatId,
                 '@' + mention + ' ' + safeComment,
                 { mentions: [target.id] }
             );
         } catch (error) {
-            console.warn('[MAFIA AI COMMENT] Could not generate voting banter:', error.message);
+            console.warn('[MAFIA AI NARRATOR] Voting banter failed:', error.message);
         }
     }
 
@@ -2757,6 +2902,7 @@ class MafiaGame {
                 'The Mafia remains hidden.\n\n' +
                 'Night is falling again...'
             );
+            this.lastVotingOutcome = 'no_votes';
 
             await this.startNightPhase(
                 channelId
@@ -2805,6 +2951,7 @@ class MafiaGame {
                 'so no one is executed today.\n' +
                 'The city enters another night.'
             );
+            this.lastVotingOutcome = 'tie';
 
             await this.startNightPhase(
                 channelId
@@ -2853,6 +3000,7 @@ class MafiaGame {
             'The Mafia slips deeper into the shadows.\n\n' +
             'Night falls once again...'
         );
+        this.lastVotingOutcome = 'innocent_exile';
 
         if (
             await this.checkWinCondition(
@@ -2883,7 +3031,8 @@ module.exports = {
             client,
             MessageMedia,
             hostId,
-            hostName
+            hostName,
+            aiNarrator
         ) => {
 
             if (
@@ -2911,7 +3060,8 @@ module.exports = {
             global.activeMafiaGame =
                 new MafiaGame(
                     client,
-                    MessageMedia
+                    MessageMedia,
+                    aiNarrator
                 );
 
             return global.activeMafiaGame.startLobby(
@@ -3040,10 +3190,10 @@ module.exports = {
             return null;
         },
 
-    maybeCommentDuringVoting: async (chatId, senderId, userName, text, generateComment) => {
+    handleMafiaPublicMessage: async (chatId, senderId, userName, text) => {
         const game = global.activeMafiaGame;
-        if (!game || typeof generateComment !== 'function') return;
-        return game.maybeCommentDuringVoting(chatId, senderId, userName, text, generateComment);
+        if (!game) return;
+        return game.maybeCommentDuringVoting(chatId, senderId, userName, text);
     },
 
     endMafiaGame:
