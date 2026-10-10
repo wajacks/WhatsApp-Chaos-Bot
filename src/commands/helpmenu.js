@@ -72,22 +72,22 @@
 
 ┌── ░◈ _*GAME CENTER*_ ◈░ ─────────┐
 │
-│🟩 `!wordle`
+│🟩 \`!wordle\`
 │     ☞『_*Open a Wordle lobby*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🌍 `!rebus`
+│🌍 \`!rebus\`
 │     ☞『_*Open a Country Rebus lobby*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🔀 `!scramble`
+│🔀 \`!scramble\`
 │     ☞『_*Open a Scramble lobby*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🔗 `!wordchain`
+│🔗 \`!wordchain\`
 │     ☞『_*Open a Word Chain lobby*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│⚒️ `!wordforge`
+│⚒️ \`!wordforge\`
 │     ☞『_*Open a Word Forge lobby*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🕵️ `!mafia`
+│🕵️ \`!mafia\`
 │     ☞『_*Open a Mafia lobby*_』
 │
 └──────────────────────────────┘
