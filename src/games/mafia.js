@@ -24,6 +24,7 @@ class MafiaGame {
         this.narrationPhaseToken = 0;
         this.nightNumber = 0;
         this.lastNightOutcome = 'unknown';
+        this.lastVotingOutcome = 'none';
 
         this.inLobby = false;
         this.gameStarted = false;
@@ -616,6 +617,7 @@ class MafiaGame {
         this.lastVotingQuipAt = 0;
         this.nightNumber = 0;
         this.lastNightOutcome = 'unknown';
+        this.lastVotingOutcome = 'none';
         this.narrationPhaseToken += 1;
 
         this.players = [];
@@ -1574,6 +1576,7 @@ class MafiaGame {
         this.gameStarted = true;
         this.nightNumber = 0;
         this.lastNightOutcome = 'unknown';
+        this.lastVotingOutcome = 'none';
         this.narrationPhaseToken += 1;
 
         this.channelId =
@@ -1851,8 +1854,10 @@ class MafiaGame {
         );
         void this.publishPublicNarration('night_fall', {
             nightNumber: this.nightNumber,
-            livingPlayers
+            livingPlayers,
+            previousVote: this.lastVotingOutcome
         });
+        this.lastVotingOutcome = 'none';
 
         this.nightTimer =
             setTimeout(
@@ -2542,8 +2547,7 @@ class MafiaGame {
 
             if (event === 'game_end') {
                 if (global.activeMafiaGame && global.activeMafiaGame !== this) return;
-            } else if (event === 'voting_result') {
-                if (!this.gameStarted || this.channelId !== channelId || global.activeMafiaGame !== this) return;
+            } else if (
             } else if (
                 !this.gameStarted ||
                 this.endingGame ||
@@ -2594,7 +2598,7 @@ class MafiaGame {
             if (otherRoles.some(name => new RegExp('\\b' + name + '\\b', 'i').test(comment))) return;
             if (this.players.some(other => other !== player && other.username && comment.toLowerCase().includes(other.username.toLowerCase()))) return;
 
-            await this.sendRoleDM(player, '🌙 *PRIVATE NIGHT NUDGE*\\n\\n' + comment);
+            await this.sendRoleDM(player, '🌙 *PRIVATE NIGHT NUDGE*\n\n' + comment);
         } catch (error) {
             console.warn('[MAFIA AI NARRATOR] Private role nudge failed:', error.message);
         }
@@ -2896,10 +2900,7 @@ class MafiaGame {
                 'The Mafia remains hidden.\n\n' +
                 'Night is falling again...'
             );
-            void this.publishPublicNarration('voting_result', {
-                result: 'no_votes',
-                livingPlayers: this.getAlivePlayers().length
-            });
+            this.lastVotingOutcome = 'no_votes';
 
             await this.startNightPhase(
                 channelId
@@ -2948,10 +2949,7 @@ class MafiaGame {
                 'so no one is executed today.\n' +
                 'The city enters another night.'
             );
-            void this.publishPublicNarration('voting_result', {
-                result: 'tie',
-                livingPlayers: this.getAlivePlayers().length
-            });
+            this.lastVotingOutcome = 'tie';
 
             await this.startNightPhase(
                 channelId
@@ -3000,10 +2998,7 @@ class MafiaGame {
             'The Mafia slips deeper into the shadows.\n\n' +
             'Night falls once again...'
         );
-        void this.publishPublicNarration('voting_result', {
-            result: 'innocent_exile',
-            livingPlayers: this.getAlivePlayers().length
-        });
+        this.lastVotingOutcome = 'innocent_exile';
 
         if (
             await this.checkWinCondition(
