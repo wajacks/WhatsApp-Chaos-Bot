@@ -87,13 +87,13 @@ function getUserProfile(userId, fallbackName = 'Player') {
 // Add this inside src/database/db.js
 function resetEconomy() {
     // Overwrites or resets the database object
-    // This example clears user balances/coins/XP back to default, or you can wipe the whole DB file
+    // This example clears user balances/dollars/XP back to default, or you can wipe the whole DB file
     const db = {}; 
     writeDB(db);
     return { success: true, message: "⚠️ All player balances, wallets, and stats have been completely wiped!" };
 }
 
-// Coin economy helpers
+// Dollar economy helpers
 function getBalance(userId) {
     const user = getUser(userId);
     return user.coins || 0;
@@ -128,7 +128,7 @@ function deductBalance(userId, amount) {
     const user = getUser(userId);
     
     if ((user.coins || 0) < amount) {
-        return false; // Not enough coins
+        return false; // Not enough dollars
     }
 
     user.coins -= amount;
@@ -143,7 +143,7 @@ function transferCoins(senderId, recipientId, amount) {
     const sender = getUser(senderId);
     
     if (amount <= 0) return { success: false, message: "❌ Amount must be greater than zero!" };
-    if ((sender.coins || 0) < amount) return { success: false, message: "❌ You don't have enough coins for this transfer!" };
+    if ((sender.coins || 0) < amount) return { success: false, message: "❌ You don't have enough dollars for this transfer!" };
 
     // Deduct from sender, add to recipient
     sender.coins -= amount;

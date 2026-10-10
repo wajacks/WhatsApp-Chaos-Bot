@@ -1,4 +1,5 @@
 const fs = require('fs');
+const { claimGame, releaseGame } = require('./gameRegistry');
 
 const {
     getUser,
@@ -23,6 +24,11 @@ class MafiaGame {
         this.inLobby = false;
         this.gameStarted = false;
         this.channelId = null;
+        this.hostId = null;
+        this.hostName = null;
+        this.votingMessages = [];
+        this.votingQuipsSent = 0;
+        this.lastVotingQuipAt = 0;
 
         this.players = [];
         this.ghosts = [];
@@ -71,6 +77,11 @@ class MafiaGame {
         for (const [alias, canonicalId] of getKnownPlayerLinks()) {
             this.identityAliases.set(alias, canonicalId);
         }
+    }
+
+    getPhaseDurationMs() {
+        const aliveCount = this.getAlivePlayers().length;
+        return Math.min(300000, Math.max(60000, 30000 + aliveCount * 15000));
     }
 
     sleep(ms) {
@@ -588,6 +599,10 @@ class MafiaGame {
         this.nightActive = false;
 
         this.channelId = null;
+        this.hostId = null;
+        this.hostName = null;
+        this.votingMessages = [];
+        this.votingQuipsSent = 0;
 
         this.players = [];
         this.ghosts = [];
@@ -613,7 +628,7 @@ class MafiaGame {
     // FORCE END
     // ============================================================
 
-    async forceEndGame(channelId) {
+    async forceEndGame(channelId, senderId) {
 
         if (
             !this.gameStarted &&
@@ -623,6 +638,10 @@ class MafiaGame {
                 '❌ There is no active Mafia game ' +
                 'or lobby running right now.'
             );
+        }
+
+        if (this.canonicalizeIdentity(senderId) !== this.hostId) {
+            return '❌ Only the host can stop this Mafia game.';
         }
 
         this.clearTimers();
@@ -649,6 +668,7 @@ class MafiaGame {
             );
         }
 
+        releaseGame(channelId, 'mafia');
         this.resetGameState();
 
         if (
@@ -903,6 +923,7 @@ class MafiaGame {
             );
         }
 
+        releaseGame(channelId, 'mafia');
         this.resetGameState();
 
         if (
@@ -916,7 +937,7 @@ class MafiaGame {
     // START LOBBY
     // ============================================================
 
-    async startLobby(channelId) {
+    async startLobby(channelId, hostId, hostName) {
 
         if (
             this.inLobby ||
@@ -934,6 +955,8 @@ class MafiaGame {
         this.gameStarted = false;
 
         this.channelId = channelId;
+        this.hostId = this.canonicalizeIdentity(hostId) || hostId;
+        this.hostName = hostName || 'Chaos Member';
 
         this.players = [];
         this.ghosts = [];
@@ -946,20 +969,12 @@ class MafiaGame {
 
         await this.client.sendMessage(
             channelId,
-            '*PROJECT MAFIA CASE*\n\n' +
-            'Welcome to the investigation. ' +
-            'Take your time, talk, and prepare.\n\n' +
-            '⚠️ *REQUIRED BEFORE JOINING:* ⚠️\n' +
-            '*NB* :\`LONG PRESS THIS MESSAGE, THEN CHOOSE REPLY PRIVATELY\`\n' +
-            'SEND THIS COMMAND \`!ping\`'+
-            'Return to group then \`!joinmafia\` to enter the case!\n\n' +
-            'Registration is open for *3 minutes*.\n\n' +
-            'Minimum players: *4*\n' +
-            'Mafia: *1*\n' +
-            'Doctor: *1*\n' +
-            'Detective: *1*\n' +
-            'Everyone else: *Villagers*\n\n' +
-            'Once registration closes, secret roles will be assigned privately.'
+            '*MAFIA LOBBY OPEN*\n\n' +
+            `Host: *${this.hostName}* (host must also join with !joinmafia)\n` +
+            'Players: use !joinmafia. Minimum: 4.\n' +
+            'Only the host can use !startmafia or !stopmafia.\n' +
+            'The lobby stays open until the host starts or stops it.\n\n' +
+            'Secret roles are sent by private message after the host starts the game.'
         );
 
         try {
@@ -1052,31 +1067,7 @@ class MafiaGame {
             );
         }
 
-        this.lobbyTimer =
-            setTimeout(
-                async () => {
 
-                    if (!this.inLobby) {
-                        return;
-                    }
-
-                    try {
-
-                        await this.startGame(
-                            channelId
-                        );
-
-                    } catch (error) {
-
-                        console.error(
-                            'Mafia lobby timer error:',
-                            error
-                        );
-                    }
-
-                },
-                180000
-            );
     }
 
     // ============================================================
@@ -1518,9 +1509,18 @@ class MafiaGame {
     // START GAME
     // ============================================================
 
-    async startGame(channelId) {
+    async startGame(channelId, senderId) {
 
         if (!this.inLobby) {
+            return;
+        }
+
+        if (this.canonicalizeIdentity(senderId) !== this.hostId) {
+            await this.client.sendMessage(channelId, 'Only the lobby host can start this Mafia game.');
+            return;
+        }
+        if (!this.getPlayerById(this.hostId)) {
+            await this.client.sendMessage(channelId, 'The host must join with !joinmafia before starting.');
             return;
         }
 
@@ -1538,6 +1538,7 @@ class MafiaGame {
                 '❌ The Mafia Case has been canceled.'
             );
 
+            releaseGame(channelId, 'mafia');
             this.resetGameState();
 
             if (
@@ -1809,6 +1810,8 @@ class MafiaGame {
         };
 
         this.votes.clear();
+        const phaseDurationMs = this.getPhaseDurationMs();
+        const phaseMinutes = Math.ceil(phaseDurationMs / 60000);
 
         await this.client.sendMessage(
             channelId,
@@ -1818,7 +1821,7 @@ class MafiaGame {
             'Mafia: execute your strike (`!kill [Letter]`).\n' +
             'Doctor: protect someone (`!save [Letter]`).\n' +
             'Detective: gather evidence (`!investigate [Letter]`).\n\n' +
-            'You have *5 minutes* of deep night to scheme in secret.'
+            `Night lasts *${phaseMinutes} minute(s)*, based on the living player count.`
         );
 
         this.nightTimer =
@@ -1847,7 +1850,7 @@ class MafiaGame {
                     }
 
                 },
-                300000
+                phaseDurationMs
             );
     }
 
@@ -2427,6 +2430,11 @@ class MafiaGame {
             false;
 
         this.votes.clear();
+        this.votingMessages = [];
+        this.votingQuipsSent = 0;
+        this.lastVotingQuipAt = 0;
+        const phaseDurationMs = this.getPhaseDurationMs();
+        const phaseMinutes = Math.ceil(phaseDurationMs / 60000);
 
         await this.client.sendMessage(
             channelId,
@@ -2436,7 +2444,7 @@ class MafiaGame {
             'Vote using:\n' +
             '`!vote @username`\n\n' +
             'Ghosts cannot vote.\n' +
-            'You have *5 minutes* of open floor discussion and deliberation.'
+            `You have *${phaseMinutes} minute(s)* to discuss and vote, based on the living player count.`
         );
 
         this.voteTimer =
@@ -2465,8 +2473,43 @@ class MafiaGame {
                     }
 
                 },
-                300000
+                phaseDurationMs
             );
+    }
+
+    async maybeCommentDuringVoting(chatId, senderId, userName, text, generateComment) {
+        if (!this.gameStarted || !this.votingActive || chatId !== this.channelId) return;
+        const speaker = this.getPlayerById(senderId);
+        if (!speaker || !speaker.isAlive || !String(text || '').trim()) return;
+        this.votingMessages.push({
+            name: speaker.username || userName || 'Player',
+            text: String(text).trim().slice(0, 240)
+        });
+        if (this.votingMessages.length > 12) this.votingMessages.shift();
+        if (this.votingMessages.length < 3 || this.votingQuipsSent >= 2) return;
+        const now = Date.now();
+        if (now - this.lastVotingQuipAt < 45000 || Math.random() > 0.35) return;
+        const eligible = this.getAlivePlayers();
+        if (!eligible.length) return;
+        const target = eligible[Math.floor(Math.random() * eligible.length)];
+        const transcript = this.votingMessages.map(line => line.name + ': ' + line.text).join('\n').slice(-1800);
+        this.lastVotingQuipAt = now;
+        this.votingQuipsSent += 1;
+        try {
+            const comment = await generateComment(transcript);
+            if (!this.gameStarted || !this.votingActive || chatId !== this.channelId || !comment) return;
+            const safeComment = String(comment).trim().slice(0, 240);
+            if (!safeComment || /\b(mafia|doctor|detective|villager|role|secret|killer|guilty|innocent|suspect|vote|eliminate|kill|save|investigate)\b/i.test(safeComment)) return;
+            const mention = String(target.id || '').split('@')[0];
+            if (!mention) return;
+            await this.client.sendMessage(
+                chatId,
+                '@' + mention + ' ' + safeComment,
+                { mentions: [target.id] }
+            );
+        } catch (error) {
+            console.warn('[MAFIA AI COMMENT] Could not generate voting banter:', error.message);
+        }
     }
 
     // ============================================================
@@ -2838,7 +2881,9 @@ module.exports = {
         async (
             chatId,
             client,
-            MessageMedia
+            MessageMedia,
+            hostId,
+            hostName
         ) => {
 
             if (
@@ -2857,6 +2902,12 @@ module.exports = {
                 return;
             }
 
+            const claim = claimGame(chatId, 'mafia');
+            if (!claim.ok) {
+                await client.sendMessage(chatId, `A ${claim.activeGame} game is already active in this group.`);
+                return;
+            }
+
             global.activeMafiaGame =
                 new MafiaGame(
                     client,
@@ -2864,7 +2915,9 @@ module.exports = {
                 );
 
             return global.activeMafiaGame.startLobby(
-                chatId
+                chatId,
+                hostId,
+                hostName
             );
         },
 
@@ -2976,9 +3029,27 @@ module.exports = {
     // END
     // ============================================================
 
+    startMafiaGame:
+        async (chatId, senderId) => {
+            const game = global.activeMafiaGame;
+            if (!game || !game.inLobby || game.channelId !== chatId) return '❌ No Mafia lobby is waiting to start.';
+            if (game.canonicalizeIdentity(senderId) !== game.hostId) return '❌ Only the host can start this Mafia game.';
+            if (!game.getPlayerById(game.hostId)) return '❌ The host must join with !joinmafia before starting.';
+            if (game.players.length < 4) return `❌ At least 4 registered players are required (currently ${game.players.length}).`;
+            await game.startGame(chatId, senderId);
+            return null;
+        },
+
+    maybeCommentDuringVoting: async (chatId, senderId, userName, text, generateComment) => {
+        const game = global.activeMafiaGame;
+        if (!game || typeof generateComment !== 'function') return;
+        return game.maybeCommentDuringVoting(chatId, senderId, userName, text, generateComment);
+    },
+
     endMafiaGame:
         async (
-            chatId
+            chatId,
+            senderId
         ) => {
 
             if (
@@ -2992,7 +3063,8 @@ module.exports = {
             }
 
             return global.activeMafiaGame.forceEndGame(
-                chatId
+                chatId,
+                senderId
             );
         }
 };

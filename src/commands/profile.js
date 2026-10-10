@@ -176,7 +176,7 @@ async function handleProfileCommand(message, client) {
 👤 *Name:* ${user.name}
 📊 *Level:* ${user.level || 1}
 ⭐ *XP:* ${user.xp || 0} / ${xpNeeded}
-💰 *Coins:* ${user.coins || 0}
+💵 *Dollars:* $${(user.coins || 0).toLocaleString()}
 ⚔️ *Wins/Losses:* ${user.wins || 0}W - ${user.losses || 0}L
 🔤 *Wordle Solves:* ${wordleSolved}
 🚘 *Vehicle:* ${assets.car}
@@ -242,7 +242,7 @@ async function handleProfileCommand(message, client) {
         writeDB(db);
 
         await message.reply(
-            `🎁 *DAILY REWARD CLAIMED!*\nYou received *${rewardCoins} coins* 💰\nTotal balance: *${user.coins} coins*.`
+            `🎁 *DAILY REWARD CLAIMED!*\nYou received *$${rewardCoins}* 💵\nTotal balance: *$${user.coins.toLocaleString()}*.`
         );
 
         return;

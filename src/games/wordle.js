@@ -148,8 +148,8 @@ const GENERAL_WORD_BANK = [
 ];
 
 const activeGames = new Map();
+const { claimGame, releaseGame } = require('./gameRegistry');
 
-const LOBBY_TIME_MS = 160 * 1000;                  // 80 Seconds to join lobby
 const ROUND_TIME_MS = 5 * 60 * 1000;              // 4 Minutes per word round
 const WARNING_TIME_MS = 2 * 60 * 1000;            // Send warning at 2 mins remaining
 const MAX_ROUNDS = 15;                            // Total rounds per match
@@ -201,7 +201,7 @@ function generateInitialRevealedMask(targetWord) {
     };
 }
 
-function startWordleLobby(chatId, client) {
+function startWordleLobby(chatId, client, hostId, hostName) {
     if (activeGames.has(chatId)) {
         const game = activeGames.get(chatId);
         if (game.status === 'LOBBY') {
@@ -210,10 +210,15 @@ function startWordleLobby(chatId, client) {
         return '⚠️ A Wordle match is currently active in this chat!';
     }
 
+    const claim = claimGame(chatId, 'wordle');
+    if (!claim.ok) return `⚠️ A ${claim.activeGame} game is already active in this group.`;
+
     const shuffledPool = shuffleArray(GENERAL_WORD_BANK);
 
     const gameState = {
         status: 'LOBBY',
+        hostId,
+        hostName,
         players: new Map(), // senderId -> { name, points, wordsSolved, attemptsLeft }
         wordPool: shuffledPool,
         usedWords: new Set(),
@@ -230,27 +235,22 @@ function startWordleLobby(chatId, client) {
 
     activeGames.set(chatId, gameState);
 
-    setTimeout(() => {
-        if (activeGames.has(chatId)) {
-            const game = activeGames.get(chatId);
-            if (game.players.size === 0) {
-                client.sendMessage(chatId, '❌ Game canceled — nobody joined the lobby!');
-                activeGames.delete(chatId);
-                return;
-            }
-            startNextRound(chatId, client);
-        }
-    }, LOBBY_TIME_MS);
+    return `🔤 *WORDLE LOBBY OPEN*
+Guess the shared 5-letter word; type guesses in the group (up to 15 rounds).
+Host: *${hostName}* (host must also join with !join)
+Players: use !join. Minimum: 2.
+Only the host can use !startwordle or !stopwordle.
+The lobby stays open until the host starts or stops it.`;
+}
 
-    return `🔤 *WORDLE MATCH LOBBY OPEN!* 🔤\n` +
-`━━━━━━━━━━━━━━━━━━━━━\n` +
-`🎮 *HOW TO JOIN:* Type *!join* to enter the match!\n\n` +
-`📖 *MATCH RULES:* \n` +
-`• Total Match Duration: *Rounds based* (Up to 15 Rounds, 5 Mins per Round)\n` +
-`• Each Player gets *15 Max Attempts* per word.\n` +
-`• Bot reveals *1 correct letter* at the start of each word.\n` +
-`• Simply type your 5-letter guess directly in chat!\n\n` +
-`⏱️ Lobby closing soon... Register now with *!join*!`;
+function startWordleGame(chatId, senderId, client) {
+    const game = activeGames.get(chatId);
+    if (!game || game.status !== 'LOBBY') return '❌ No Wordle lobby is waiting to start.';
+    if (senderId !== game.hostId) return '❌ Only the host can start this Wordle game.';
+    if (!game.players.has(game.hostId)) return '❌ The host must join with !join before starting.';
+    if (game.players.size < 2) return '❌ At least 2 registered players are required.';
+    startNextRound(chatId, client);
+    return '🟩 Wordle has started.';
 }
 
 function joinLobby(chatId, senderId, userName) {
@@ -440,7 +440,7 @@ function formatRoundWinBoard(game, oldWord, solverName, coins, xp) {
     });
 
     return `🎉 *ROUND ${game.currentRound} SOLVED!* Secret Word: *${oldWord}*\n` +
-`👤 Winner: *${solverName}* (+${coins} coins | +${xp} XP)\n` +
+`👤 Winner: *${solverName}* (+$${coins.toLocaleString()} | +${xp} XP)\n` +
 `━━━━━━━━━━━━━━━━━━━━━\n` +
 `${top3Text}` +
 `━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -470,24 +470,28 @@ function endGameSession(chatId, client, reason) {
     summary += `\n━━━━━━━━━━━━━━━━━━━━━\n🔥 Total Words Solved: *${game.streak}*`;
 
     activeGames.delete(chatId);
+    releaseGame(chatId, 'wordle');
     client.sendMessage(chatId, summary);
 }
 
-function stopGame(chatId) {
+function stopGame(chatId, senderId) {
     if (!activeGames.has(chatId)) {
         return '❌ There is no active Wordle match to end in this chat.';
     }
     
     const game = activeGames.get(chatId);
+    if (senderId !== game.hostId) return '❌ Only the host can stop this Wordle game.';
     if (game.roundTimer) clearTimeout(game.roundTimer);
     if (game.warningTimer) clearTimeout(game.warningTimer);
     
     activeGames.delete(chatId);
-    return '🛑 *The Wordle match has been manually ended by a player.*';
+    releaseGame(chatId, 'wordle');
+    return '🛑 The host stopped the Wordle match.';
 }
 
 module.exports = {
     startWordleLobby,
+    startWordleGame,
     joinLobby,
     processGuess,
     endGameSession,

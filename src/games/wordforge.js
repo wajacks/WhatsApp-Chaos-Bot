@@ -12,7 +12,6 @@ const wordForgeDB = require('../database/wordforgedb');
 
 const ROUND_DURATION_MS = 90 * 1000;
 const BREAK_DURATION_MS = 10 * 1000;
-const LOBBY_DURATION_MS = 3 * 60 * 1000;
 const MAX_ROUNDS = 8;
 const MAX_PLAYERS = 10;
 const MIN_PLAYERS = 2;
@@ -36,6 +35,7 @@ const dictionary = new Set(
 );
 const wordList = Array.from(dictionary);
 const activeGames = new Map();
+const { claimGame, releaseGame } = require('./gameRegistry');
 const timers = new Map();
 const identityAliases = new Map(getKnownPlayerLinks());
 let gamesRestored = false;
@@ -190,14 +190,13 @@ function makePlayer(game, bundle, name) {
     };
 }
 
-function createMatch(groupId, playerId, userName, bundle) {
+function createMatch(groupId, playerId) {
     const game = {
         id: crypto.randomBytes(8).toString('hex').toUpperCase(),
         groupId,
         hostId: playerId,
         phase: 'LOBBY',
         createdAt: Date.now(),
-        lobbyExpiresAt: Date.now() + LOBBY_DURATION_MS,
         currentRound: 0,
         roundStartedAt: null,
         roundEndsAt: null,
@@ -210,9 +209,6 @@ function createMatch(groupId, playerId, userName, bundle) {
         timers: null
     };
 
-    const player = makePlayer(game, bundle, userName);
-    game.players[player.id] = player;
-    game.playerOrder.push(player.id);
     return game;
 }
 
@@ -321,32 +317,21 @@ function startWordForgeLobby(groupId, playerId, userName, client, aliases) {
         return '⚠️ You are already registered in another active Word Forge match.';
     }
 
-    const game = createMatch(groupId, bundle.canonical, userName, bundle);
+    const claim = claimGame(groupId, 'wordforge');
+    if (!claim.ok) return `⚠️ A ${claim.activeGame} game is already active in this group.`;
+
+    const game = createMatch(groupId, bundle.canonical);
     activeGames.set(groupId, game);
     if (!saveGame(game, client)) {
         activeGames.delete(groupId);
+        releaseGame(groupId, 'wordforge');
         return '❌ Word Forge could not open because its database is unavailable.';
     }
 
-    safeSend(client, bundle.canonical,
-        'Your private Word Forge leaderboard ID is *' + game.players[bundle.canonical].anonymousId +
-        '*; only you will know this ID until the final reveal.');
-
-    const timerSet = getTimerSet(groupId);
-    timerSet.lobby = scheduleGuardedTimeout(groupId, LOBBY_DURATION_MS, () => {
-        const current = activeGames.get(groupId);
-        if (current !== game || current.phase !== 'LOBBY') return;
-        cancelMatch(groupId, client, '⌛ The Word Forge lobby expired before the host started the match.');
-    }, client);
-    if (timerSet.lobby.unref) timerSet.lobby.unref();
-
     return '⚒️ WORD FORGE LOBBY OPEN!\n\n' +
-        '*' + safeName(userName) + '* is registered.\n' +
+        '*' + safeName(userName) + '* is the host and must also join with !joinforge.\n' +
         'Players: use !joinforge to register (2–10 players).\n' +
-        'Host: use !startforge when ready.\n\n' +
-        'The match has 8 rounds. Each round lasts up to 90 seconds, followed by a 10-second anonymous break leaderboard. ' +
-        'Every player receives a different rack and rule privately in DM. A word must be in the English dictionary, use rack letters no more times than shown, and obey your rule. ' +
-        'Wrong guesses score zero but may be retried; the first valid word locks your round. Score is 10 per letter plus up to 20 speed points.';
+        'Only the host can use !startforge or !stopforge. The lobby has no time limit.';
 }
 
 function joinWordForgeLobby(groupId, playerId, userName, client, aliases) {
@@ -380,7 +365,8 @@ function startWordForgeGame(groupId, senderId, client, aliases) {
     if (!game) return '❌ No Word Forge lobby is open in this group.';
     if (game.phase !== 'LOBBY') return '⚠️ The Word Forge match has already started.';
     const bundle = identityBundle(senderId, aliases);
-    if (!matchesIdentity(game.players[game.hostId], bundle)) return '❌ Only the host can start this Word Forge match.';
+    if (bundle.canonical !== game.hostId && !(bundle.aliases || []).includes(game.hostId)) return '❌ Only the host can start this Word Forge match.';
+    if (!game.players[game.hostId]) return '❌ The host must join with !joinforge before starting.';
     if (game.playerOrder.length < MIN_PLAYERS) return '❌ At least 2 players are required to start Word Forge.';
 
     clearTimer(getTimerSet(groupId), 'lobby');
@@ -806,6 +792,7 @@ function finishMatch(game, client, winner) {
     }
 
     activeGames.delete(game.groupId);
+    releaseGame(game.groupId, 'wordforge');
     for (const playerId of game.playerOrder) {
         const player = game.players[playerId];
         for (const alias of player.identityAliases || []) identityAliases.delete(alias);
@@ -841,6 +828,7 @@ function cancelMatch(groupId, client, reason) {
     }
 
     activeGames.delete(groupId);
+    releaseGame(groupId, 'wordforge');
     safeSend(client, groupId, reason || '🛑 Word Forge has been stopped.');
     return true;
 }
@@ -849,7 +837,7 @@ function stopWordForgeGame(groupId, senderId, client, aliases) {
     const game = activeGames.get(groupId);
     if (!game) return '❌ There is no active Word Forge match in this group.';
     const bundle = identityBundle(senderId, aliases);
-    if (!matchesIdentity(game.players[game.hostId], bundle)) return '❌ Only the host can stop this Word Forge match.';
+    if (bundle.canonical !== game.hostId && !(bundle.aliases || []).includes(game.hostId)) return '❌ Only the host can stop this Word Forge match.';
     const stopped = cancelMatch(groupId, client, '🛑 The host stopped this Word Forge match.');
     return stopped ? '🛑 Word Forge stopped.' : '⚠️ Word Forge could not be stopped safely; its state is paused.';
 }
@@ -990,7 +978,7 @@ function handleWordForgeStealCommand(groupId, senderId, mentionedJid, client, se
 
     const balance = getBalance(eligible.id);
     const amount = Math.floor(balance * STEAL_FRACTION);
-    if (amount <= 0) return '💸 That player has too few coins for a 25% steal. Your steal chance is still available.';
+    if (amount <= 0) return '💸 That player has too few dollars for a 25% steal. Your steal chance is still available.';
 
     const winnerBalanceBefore = getBalance(winnerId);
     try {
@@ -1027,7 +1015,7 @@ function handleWordForgeStealCommand(groupId, senderId, mentionedJid, client, se
             '❌ The wallet transfer could not be confirmed. Your steal chance remains available.';
     }
 
-    return '🥷 *WORD FORGE STEAL COMPLETE!*\n\nYou stole *' + amount + ' coins* (25%) from @' +
+    return '🥷 *WORD FORGE STEAL COMPLETE!*\n\nYou stole *$' + amount + '* (25%) from @' +
         String(eligible.id).split('@')[0] + '.';
 }
 
@@ -1041,21 +1029,13 @@ function restoreWordForgeGames(client) {
     for (const game of wordForgeDB.loadActiveMatches()) {
         if (!game || !game.groupId || !game.players || !game.playerOrder) continue;
         game.timers = null;
+        const claim = claimGame(game.groupId, 'wordforge');
+        if (!claim.ok) {
+            console.warn('[WORD FORGE] Skipping restored match because another game is active in group:', game.groupId);
+            continue;
+        }
         activeGames.set(game.groupId, game);
-        if (game.phase === 'LOBBY') {
-            const delay = game.lobbyExpiresAt - Date.now();
-            if (delay <= 0) {
-                cancelMatch(game.groupId, client, '⌛ The Word Forge lobby expired while the bot was offline.');
-            } else {
-                const timerSet = getTimerSet(game.groupId);
-                timerSet.lobby = scheduleGuardedTimeout(game.groupId, delay, () => {
-                    if (activeGames.get(game.groupId) === game && game.phase === 'LOBBY') {
-                        cancelMatch(game.groupId, client, '⌛ The Word Forge lobby expired before the host started the match.');
-                    }
-                }, client);
-                if (timerSet.lobby.unref) timerSet.lobby.unref();
-            }
-        } else if (game.phase === 'ACTIVE') {
+        if (game.phase === 'ACTIVE') {
             if ((game.tiebreakCandidates || game.playerOrder).every(id => game.players[id].roundSolved)) {
                 endRound(game, client, '✅ Everyone eligible had already locked a valid word before restart.');
             } else {
