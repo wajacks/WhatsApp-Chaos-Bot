@@ -18,7 +18,7 @@ async function sendHymnPianoAudio(chatId, hymnNumber, hymnTitle, client, hymnalN
             fs.mkdirSync(tempDir, { recursive: true });
         }
 
-        const searchQuery = `ytsearch1:Nyimbo za Kristo ${hymnNumber} ${hymnTitle} piano instrumental`;
+        const searchQuery = `ytsearch1:${hymnalName} ${hymnNumber} ${hymnTitle} piano instrumental`;
         console.log(`🎵 [HYMN AUDIO] Searching: ${searchQuery}`);
 
         const ytDlpArgs = [
