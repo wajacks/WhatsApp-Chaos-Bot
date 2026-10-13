@@ -60,6 +60,7 @@ function registerMessageHandler(client, dependencies) {
         getWeather,
         fetchBibleVerse,
         getHymn,
+        getEnglishHymn,
         sendHymnPianoAudio,
         logMessage,
         getChatHistory,
@@ -217,6 +218,7 @@ function registerMessageHandler(client, dependencies) {
             lowerText,
             text,
             getHymn,
+            getEnglishHymn,
             sendHymnPianoAudio,
             client
         });
