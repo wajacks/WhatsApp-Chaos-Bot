@@ -5,7 +5,7 @@ const { execFile } = require('child_process');
 const execFileAsync = promisify(execFile);
 const { MessageMedia } = require('whatsapp-web.js');
 
-async function sendHymnPianoAudio(chatId, hymnNumber, hymnTitle, client) {
+async function sendHymnPianoAudio(chatId, hymnNumber, hymnTitle, client, hymnalName = 'Nyimbo za Kristo') {
     const projectRoot = path.join(__dirname, '../..');
     const cookiesPath = path.join(projectRoot, 'cookies.txt');
     const tempDir = path.join(projectRoot, 'temp');
