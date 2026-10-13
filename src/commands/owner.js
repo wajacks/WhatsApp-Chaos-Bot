@@ -65,4 +65,4 @@ function getOwnerMenu() {
     );
 }
 
-module.exports = { isOwner, canUseImageFeatures, getOwnerMenu, IMAGE_ACCESS_DENIED_MESSAGE };
+module.exports = { OWNER_NUMBER, isOwner, canUseImageFeatures, getOwnerMenu, IMAGE_ACCESS_DENIED_MESSAGE };
