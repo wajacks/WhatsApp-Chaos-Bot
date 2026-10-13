@@ -3,6 +3,16 @@ async function handleHymnalCommand({ message, chatId, lowerText, text, getHymn, 
         const query = text.replace(/^!hymn\b/i, '').trim();
         const result = await getEnglishHymn(query);
         await message.reply(result.text);
+        if (result.success && result.song) {
+            await client.sendMessage(chatId, '🎹 *Looking for the English SDA hymn instrumental...*');
+            await sendHymnPianoAudio(
+                chatId,
+                result.song.Number ?? result.song.ID,
+                result.song.Title,
+                client,
+                'Seventh-day Adventist Hymnal'
+            );
+        }
         return true;
     }
 
