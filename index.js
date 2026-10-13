@@ -94,6 +94,7 @@ const { handleBalanceCommand } = require('./src/commands/balance');
 const { getWeather } = require('./src/tools/weather');
 const { fetchBibleVerse } = require('./src/tools/bible');
 const { getHymn } = require('./src/tools/hymnal');
+const { getEnglishHymn } = require('./src/tools/englishHymnal');
 const { sendHymnPianoAudio } = require('./src/tools/hymnalAudio');
 const { logMessage, getChatHistory } = require('./src/database/chatlog');
 
@@ -315,6 +316,7 @@ function initializeChaosBot(options) {
         getWeather,
         fetchBibleVerse,
         getHymn,
+        getEnglishHymn,
         sendHymnPianoAudio,
         logMessage,
         getChatHistory,

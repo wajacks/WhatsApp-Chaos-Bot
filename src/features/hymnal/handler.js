@@ -1,4 +1,11 @@
-async function handleHymnalCommand({ message, chatId, lowerText, text, getHymn, sendHymnPianoAudio, client }) {
+async function handleHymnalCommand({ message, chatId, lowerText, text, getHymn, getEnglishHymn, sendHymnPianoAudio, client }) {
+    if (/^!hymn(?:\s|$)/i.test(text)) {
+        const query = text.replace(/^!hymn\b/i, '').trim();
+        const result = await getEnglishHymn(query);
+        await message.reply(result.text);
+        return true;
+    }
+
     if (!lowerText.startsWith('!nyimbo')) return false;
 
     const query = text.replace(/^!nyimbo/i, '').trim();
