@@ -1,4 +1,4 @@
-async function sendVerseVoiceNote({ text, message, chatId, senderId, voiceSelections, EDGE_TTS_VOICES, DEFAULT_EDGE_VOICE, voiceCooldowns, VOICE_COOLDOWN_MS, EdgeTTS, execFileAsync, baseDir, fs, path, MessageMedia, client }) {
+async function sendVerseVoiceNote({ text, message, chatId, senderId, voiceSelections, EDGE_TTS_VOICES, DEFAULT_EDGE_VOICE, voiceCooldowns, VOICE_COOLDOWN_MS, EdgeTTS, googleTTS, fallbackLanguage, execFileAsync, baseDir, fs, path, MessageMedia, client }) {
     if (text.length > 4000) {
         await message.reply('⚠️ That passage is too long for one voice note. Request a shorter verse range.');
         return;
@@ -29,11 +29,42 @@ async function sendVerseVoiceNote({ text, message, chatId, senderId, voiceSelect
         fs.mkdirSync(tempDir, { recursive: true });
         await message.reply('🎙️ Narrating with your selected !voice setting...');
 
-        const tts = new EdgeTTS({
-            voice: selectedVoice.voice,
-            lang: selectedVoice.voice.split('-').slice(0, 2).join('-')
-        });
-        await tts.ttsPromise(text, inputFile);
+        try {
+            const tts = new EdgeTTS({
+                voice: selectedVoice.voice,
+                lang: selectedVoice.voice.split('-').slice(0, 2).join('-')
+            });
+            await tts.ttsPromise(text, inputFile);
+
+            if (!fs.existsSync(inputFile) || fs.statSync(inputFile).size === 0) {
+                throw new Error('Edge TTS did not produce an audio file.');
+            }
+        } catch (edgeError) {
+            console.warn(
+                '⚠️ Edge TTS failed for Bible narration; trying Google TTS fallback:',
+                edgeError.message || edgeError
+            );
+            await message.reply(
+                '⚠️ Microsoft Edge TTS is unavailable, so I am trying a backup voice for this verse. The backup may differ from your selected !voice.'
+            );
+
+            const audioParts = await googleTTS.getAllAudioBase64(text, {
+                lang: fallbackLanguage,
+                slow: false,
+                host: 'https://translate.google.com'
+            });
+            if (!Array.isArray(audioParts) || audioParts.length === 0) {
+                throw new Error('Google TTS did not return audio.');
+            }
+
+            const audioBuffer = Buffer.concat(
+                audioParts.map(part => Buffer.from(part.base64, 'base64'))
+            );
+            if (audioBuffer.length === 0) {
+                throw new Error('Google TTS returned empty audio.');
+            }
+            fs.writeFileSync(inputFile, audioBuffer);
+        }
 
         await execFileAsync('ffmpeg', [
             '-y', '-i', inputFile, '-ac', '1', '-ar', '48000',
@@ -102,6 +133,8 @@ async function handleBibleMessages({ message, chatId, senderId, text, lowerText,
                             voiceCooldowns,
                             VOICE_COOLDOWN_MS,
                             EdgeTTS,
+                            googleTTS,
+                            fallbackLanguage: language === 'swahili' ? 'sw' : 'en',
                             execFileAsync,
                             baseDir,
                             fs,

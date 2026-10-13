@@ -210,6 +210,7 @@ function registerMessageHandler(client, dependencies) {
             lowerText,
             pendingBibleRequests,
             fetchBibleVerse,
+            googleTTS,
             voiceSelections,
             EDGE_TTS_VOICES,
             DEFAULT_EDGE_VOICE,
