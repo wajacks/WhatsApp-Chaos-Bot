@@ -27,7 +27,6 @@ async function sendVerseVoiceNote({ text, message, chatId, senderId, voiceSelect
 
     try {
         fs.mkdirSync(tempDir, { recursive: true });
-        await message.reply('🎙️ Narrating with your selected !voice setting...');
 
         try {
             const tts = new EdgeTTS({
@@ -43,9 +42,6 @@ async function sendVerseVoiceNote({ text, message, chatId, senderId, voiceSelect
             console.warn(
                 '⚠️ Edge TTS failed for Bible narration; trying Google TTS fallback:',
                 edgeError.message || edgeError
-            );
-            await message.reply(
-                '⚠️ Microsoft Edge TTS is unavailable, so I am trying a backup voice for this verse. The backup may differ from your selected !voice.'
             );
 
             const audioParts = await googleTTS.getAllAudioBase64(text, {
@@ -105,7 +101,6 @@ async function handleBibleMessages({ message, chatId, senderId, text, lowerText,
                 pendingBibleRequests.delete(bibleKey);
                 const language = lowerText === '1' ? 'english' : 'swahili';
                 try {
-                    await message.reply('📖 Fetching your verse...');
                     const result = await fetchBibleVerse(pending.reference, language);
                     if (!result.success) {
                         await message.reply(`❌ ${result.error}`);
