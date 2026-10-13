@@ -122,7 +122,7 @@ const handleAiCommand = async (context) => {
                 '- Economy: !profile, !bal, !daily, !store, !buy, !beg, and !pay. Balances are displayed in dollars.',
                 '- AI/media: !ai, !draw, !analyze, !speak, and !voice.',
                 '- Hymns: !nyimbo searches the existing Nyimbo za Kristo hymnal; !hymn <number, title, or lyric phrase> searches the English SDA Hymnal from hymnal.rindra.org, returns its lyrics, and looks for a piano instrumental voice note.',
-                '- Bible verses: !verse <reference> requests English or Kiswahili text; add audio to receive a voice note in the requester's current !voice selection. Other utilities include weather, catch-up summaries, video handling, and the private class portal. Availability depends on configuration and the exact command listed in !menu.',
+                '- Bible verses: !verse <reference> requests English or Kiswahili text; add audio to receive a voice note in the currently selected !voice. Other utilities include weather, catch-up summaries, video handling, and the private class portal. Availability depends on configuration and the exact command listed in !menu.',
                 '- Owner-only administration is shown by !owner. Do not disclose secrets or assume the speaker is the owner.',
                 '',
                 'For questions about a feature, explain its user-facing purpose and the relevant command. If a detail is not established here or in the conversation, say so briefly.'
