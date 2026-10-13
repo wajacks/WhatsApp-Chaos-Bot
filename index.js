@@ -644,18 +644,17 @@ const commandReactions = {
     contactowner: '📞', ownercontact: '📞', owner: '🔐'
 };
 
-    // 🎨 EMOJI MESSAGE REPLY (Auto-React Replacement)
+    // 🎨 COMMAND EMOJI REACTION
     if (message.body && message.body.startsWith('!')) {
         try {
             const cleanCommand = message.body.slice(1).trim().split(/\s+/)[0].toLowerCase();
             const emoji = commandReactions[cleanCommand];
 
             if (emoji) {
-                // Sends the matching emoji as a clean quoted message reply
-                await message.reply(emoji);
+                await message.react(emoji);
             }
         } catch (err) {
-            console.warn('[EMOJI REPLY ERROR]:', err.message);
+            console.warn('[COMMAND REACTION ERROR]:', err.message);
         }
     }
 
