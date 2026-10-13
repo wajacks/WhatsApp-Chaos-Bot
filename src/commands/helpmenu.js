@@ -62,6 +62,9 @@
 │🎵 \`!nyimbo\`
 │     ☞『_*Request Song Hymnals*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🎼 \`!hymn <query>\`
+│     ☞『_*Search English hymns*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🎵 \`!randomsong\`
 │     ☞『_*Random music*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
