@@ -1,3 +1,4 @@
+const { execFile } = require('child_process');
 const { handleVoiceCommands } = require('../features/voice/handler');
 const { handleAiCommand } = require('../features/ai/handler');
 const { handlePendingDrawSelection, handleImageCommands } = require('../features/images/handler');
