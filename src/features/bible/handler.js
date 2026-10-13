@@ -123,8 +123,8 @@ async function handleBibleMessages({ message, chatId, senderId, text, lowerText,
 
         if (lowerText === '!verse' || lowerText.startsWith('!verse ')) {
             const request = text.replace(/^!verse/i, '').trim();
-            const includeAudio = /\\s+audio$/i.test(request);
-            const reference = request.replace(/\\s+audio$/i, '').trim();
+            const includeAudio = /\s+audio$/i.test(request);
+            const reference = request.replace(/\s+audio$/i, '').trim();
             if (!reference) {
                 await message.reply(
                     '📖 *BIBLE VERSE*\n\n' +
