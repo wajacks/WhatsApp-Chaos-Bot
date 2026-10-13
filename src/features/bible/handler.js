@@ -95,7 +95,7 @@ async function sendVerseVoiceNote({ text, message, chatId, senderId, voiceSelect
     }
 }
 
-async function handleBibleMessages({ message, chatId, senderId, text, lowerText, pendingBibleRequests, fetchBibleVerse, voiceSelections, EDGE_TTS_VOICES, DEFAULT_EDGE_VOICE, voiceCooldowns, VOICE_COOLDOWN_MS, EdgeTTS, execFileAsync, baseDir, fs, path, MessageMedia, client }) {
+async function handleBibleMessages({ message, chatId, senderId, text, lowerText, pendingBibleRequests, fetchBibleVerse, googleTTS, voiceSelections, EDGE_TTS_VOICES, DEFAULT_EDGE_VOICE, voiceCooldowns, VOICE_COOLDOWN_MS, EdgeTTS, execFileAsync, baseDir, fs, path, MessageMedia, client }) {
         const bibleKey = `${chatId}:${senderId}`;
 
         if (pendingBibleRequests.has(bibleKey)) {
