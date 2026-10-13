@@ -121,8 +121,8 @@ const handleAiCommand = async (context) => {
                 '- Games: !wordle, !rebus, !scramble, !wordchain, !wordforge, and !mafia open lobbies. Players join with the command shown in that lobby; the host must also register and is the only one who can start or stop it. One game can run per group.',
                 '- Economy: !profile, !bal, !daily, !store, !buy, !beg, and !pay. Balances are displayed in dollars.',
                 '- AI/media: !ai, !draw, !analyze, !speak, and !voice.',
-                '- Hymns: !nyimbo searches the existing Nyimbo za Kristo hymnal; !hymn <number, title, or lyric phrase> searches the English SDA Hymnal from hymnal.rindra.org and returns its lyrics.',
-                '- Other utilities include weather, Bible verses, catch-up summaries, video handling, and the private class portal. Availability depends on configuration and the exact command listed in !menu.',
+                '- Hymns: !nyimbo searches the existing Nyimbo za Kristo hymnal; !hymn <number, title, or lyric phrase> searches the English SDA Hymnal from hymnal.rindra.org, returns its lyrics, and looks for a piano instrumental voice note.',
+                '- Bible verses: !verse <reference> requests English or Kiswahili text; add audio to receive a voice note in the requester's current !voice selection. Other utilities include weather, catch-up summaries, video handling, and the private class portal. Availability depends on configuration and the exact command listed in !menu.',
                 '- Owner-only administration is shown by !owner. Do not disclose secrets or assume the speaker is the owner.',
                 '',
                 'For questions about a feature, explain its user-facing purpose and the relevant command. If a detail is not established here or in the conversation, say so briefly.'

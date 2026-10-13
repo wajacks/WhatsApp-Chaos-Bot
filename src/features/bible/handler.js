@@ -1,4 +1,70 @@
-async function handleBibleMessages({ message, chatId, senderId, text, lowerText, pendingBibleRequests, fetchBibleVerse }) {
+async function sendVerseVoiceNote({ text, message, chatId, senderId, voiceSelections, EDGE_TTS_VOICES, DEFAULT_EDGE_VOICE, voiceCooldowns, VOICE_COOLDOWN_MS, EdgeTTS, execFileAsync, baseDir, fs, path, MessageMedia, client }) {
+    if (text.length > 4000) {
+        await message.reply('⚠️ That passage is too long for one voice note. Request a shorter verse range.');
+        return;
+    }
+
+    const now = Date.now();
+    const lastUsed = voiceCooldowns.get(senderId) || 0;
+    if (now - lastUsed < VOICE_COOLDOWN_MS) {
+        const remaining = Math.ceil((VOICE_COOLDOWN_MS - (now - lastUsed)) / 1000);
+        await message.reply('⏳ Voice engine cooling down. Please wait ' + remaining + 's before requesting another narration.');
+        return;
+    }
+    voiceCooldowns.set(senderId, now);
+
+    const selectedVoiceKey = voiceSelections.get(senderId) || DEFAULT_EDGE_VOICE;
+    const selectedVoice = EDGE_TTS_VOICES[selectedVoiceKey] || EDGE_TTS_VOICES[DEFAULT_EDGE_VOICE];
+    if (!selectedVoice) {
+        await message.reply('⚠️ The selected voice is unavailable. Choose a voice with !voice and try again.');
+        return;
+    }
+
+    const tempDir = path.join(baseDir, 'temp');
+    const timestamp = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    const inputFile = path.join(tempDir, 'bible-verse-' + timestamp + '.mp3');
+    const outputFile = path.join(tempDir, 'bible-verse-' + timestamp + '.ogg');
+
+    try {
+        fs.mkdirSync(tempDir, { recursive: true });
+        await message.reply('🎙️ Narrating with your selected !voice setting...');
+
+        const tts = new EdgeTTS({
+            voice: selectedVoice.voice,
+            lang: selectedVoice.voice.split('-').slice(0, 2).join('-')
+        });
+        await tts.ttsPromise(text, inputFile);
+
+        await execFileAsync('ffmpeg', [
+            '-y', '-i', inputFile, '-ac', '1', '-ar', '48000',
+            '-c:a', 'libopus', '-b:a', '32k', '-vbr', 'on',
+            '-application', 'voip', outputFile
+        ], { windowsHide: true });
+
+        if (!fs.existsSync(outputFile) || fs.statSync(outputFile).size === 0) {
+            throw new Error('Voice conversion did not produce an audio file.');
+        }
+
+        const media = new MessageMedia(
+            'audio/ogg; codecs=opus',
+            fs.readFileSync(outputFile).toString('base64'),
+            'bible-verse.ogg'
+        );
+        await client.sendMessage(chatId, media, { sendAudioAsVoice: true });
+    } catch (error) {
+        console.error('❌ Bible narration error:', error);
+        await message.reply('⚠️ I sent the verse text, but could not create its voice note.');
+    } finally {
+        try {
+            if (fs.existsSync(inputFile)) fs.unlinkSync(inputFile);
+            if (fs.existsSync(outputFile)) fs.unlinkSync(outputFile);
+        } catch (cleanupError) {
+            console.warn('⚠️ Bible narration cleanup warning:', cleanupError.message);
+        }
+    }
+}
+
+async function handleBibleMessages({ message, chatId, senderId, text, lowerText, pendingBibleRequests, fetchBibleVerse, voiceSelections, EDGE_TTS_VOICES, DEFAULT_EDGE_VOICE, voiceCooldowns, VOICE_COOLDOWN_MS, EdgeTTS, execFileAsync, baseDir, fs, path, MessageMedia, client }) {
         const bibleKey = `${chatId}:${senderId}`;
 
         if (pendingBibleRequests.has(bibleKey)) {
@@ -24,6 +90,26 @@ async function handleBibleMessages({ message, chatId, senderId, text, lowerText,
                         `${result.text}\n\n` +
                         `— *${languageName}*`
                     );
+                    if (pending.includeAudio) {
+                        await sendVerseVoiceNote({
+                            text: `${verseReference}. ${result.text}`,
+                            message,
+                            chatId,
+                            senderId,
+                            voiceSelections,
+                            EDGE_TTS_VOICES,
+                            DEFAULT_EDGE_VOICE,
+                            voiceCooldowns,
+                            VOICE_COOLDOWN_MS,
+                            EdgeTTS,
+                            execFileAsync,
+                            baseDir,
+                            fs,
+                            path,
+                            MessageMedia,
+                            client
+                        });
+                    }
                 } catch (error) {
                     console.error('❌ Bible Error:', error);
                     await message.reply(
@@ -36,7 +122,9 @@ async function handleBibleMessages({ message, chatId, senderId, text, lowerText,
         }
 
         if (lowerText === '!verse' || lowerText.startsWith('!verse ')) {
-            const reference = text.replace(/^!verse/i, '').trim();
+            const request = text.replace(/^!verse/i, '').trim();
+            const includeAudio = /\s+audio$/i.test(request);
+            const reference = request.replace(/\s+audio$/i, '').trim();
             if (!reference) {
                 await message.reply(
                     '📖 *BIBLE VERSE*\n\n' +
@@ -51,6 +139,7 @@ async function handleBibleMessages({ message, chatId, senderId, text, lowerText,
 
             pendingBibleRequests.set(bibleKey, {
                 reference,
+                includeAudio,
                 timestamp: Date.now()
             });
             await message.reply(

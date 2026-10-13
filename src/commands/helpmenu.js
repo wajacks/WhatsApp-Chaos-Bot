@@ -56,11 +56,14 @@
 │🗣️ \`!voice <text>\`
 │     ☞『_*Choose a voice*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🎵 \`!verse\`
-│     ☞『_*Request BIBLE verse*_』
+│🎵 \`!verse <ref> [audio]\`
+│     ☞『_*Get verse + optional narration*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🎵 \`!nyimbo\`
 │     ☞『_*Request Song Hymnals*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🎼 \`!hymn <query>\`
+│     ☞『_*Search English hymns*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🎵 \`!randomsong\`
 │     ☞『_*Random music*_』

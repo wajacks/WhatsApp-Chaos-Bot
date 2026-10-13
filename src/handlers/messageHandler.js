@@ -209,7 +209,19 @@ function registerMessageHandler(client, dependencies) {
             text,
             lowerText,
             pendingBibleRequests,
-            fetchBibleVerse
+            fetchBibleVerse,
+            voiceSelections,
+            EDGE_TTS_VOICES,
+            DEFAULT_EDGE_VOICE,
+            voiceCooldowns,
+            VOICE_COOLDOWN_MS,
+            EdgeTTS,
+            execFileAsync,
+            baseDir,
+            fs,
+            path,
+            MessageMedia,
+            client
         });
         if (bibleHandled) return;
 
