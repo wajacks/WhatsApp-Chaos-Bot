@@ -4,11 +4,15 @@ const API_BASE_URL = 'https://hymnal.rindra.org/api';
 const SDA_HYMNAL_CATEGORY_ID = 3;
 const REQUEST_TIMEOUT_MS = 10000;
 const CATALOG_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const SEARCH_INDEX_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const MAX_CACHED_HYMNS = 100;
 
 let catalogCache = null;
 let catalogCacheExpiresAt = 0;
 let catalogRequest = null;
+let lyricSearchIndexCache = null;
+let lyricSearchIndexCacheExpiresAt = 0;
+let lyricSearchIndexRequest = null;
 const hymnCache = new Map();
 const hymnRequests = new Map();
 
@@ -44,6 +48,47 @@ async function loadSdaHymnalCatalog() {
     });
 
     return catalogRequest;
+}
+
+// The hymnal site uses this compact ID-to-lyrics index for its own phrase search.
+async function loadSdaHymnalSearchIndex() {
+    if (lyricSearchIndexCache && Date.now() < lyricSearchIndexCacheExpiresAt) {
+        return lyricSearchIndexCache;
+    }
+
+    if (lyricSearchIndexRequest) {
+        return lyricSearchIndexRequest;
+    }
+
+    lyricSearchIndexRequest = axios.get(
+        API_BASE_URL + '/search-index.json',
+        { timeout: REQUEST_TIMEOUT_MS }
+    ).then(response => {
+        const entries = Array.isArray(response.data) ? response.data : response.data?.index;
+        if (!Array.isArray(entries) || entries.length === 0) {
+            throw new Error('The hymnal API returned an invalid lyric search index.');
+        }
+
+        const searchIndex = new Map();
+        for (const entry of entries) {
+            const id = Number(entry?.i);
+            if (Number.isFinite(id) && typeof entry?.t === 'string') {
+                searchIndex.set(id, entry.t.toLowerCase());
+            }
+        }
+
+        if (searchIndex.size === 0) {
+            throw new Error('The hymnal API returned an empty lyric search index.');
+        }
+
+        lyricSearchIndexCache = searchIndex;
+        lyricSearchIndexCacheExpiresAt = Date.now() + SEARCH_INDEX_CACHE_TTL_MS;
+        return lyricSearchIndexCache;
+    }).finally(() => {
+        lyricSearchIndexRequest = null;
+    });
+
+    return lyricSearchIndexRequest;
 }
 
 async function loadSdaHymn(id) {
@@ -106,7 +151,7 @@ async function getEnglishHymn(query) {
     if (!cleanQuery) {
         return {
             success: false,
-            text: '📖 Send an English SDA hymn number or title.\n\nExamples: !hymn 1 or !hymn Praise to the Lord.'
+            text: '📖 Send an English SDA hymn number, title, or lyric phrase.\n\nExamples: !hymn 1, !hymn Praise to the Lord, or !hymn King of creation.'
         };
     }
 
@@ -126,12 +171,20 @@ async function getEnglishHymn(query) {
             ) || catalog.find(hymn =>
                 String(hymn.Title).toLocaleLowerCase().includes(normalizedQuery)
             );
+
+            if (!entry) {
+                const searchIndex = await loadSdaHymnalSearchIndex();
+                entry = catalog.find(hymn => {
+                    const lyrics = searchIndex.get(Number(hymn.ID));
+                    return lyrics && lyrics.includes(normalizedQuery);
+                });
+            }
         }
 
         if (!entry) {
             return {
                 success: false,
-                text: '❌ No English SDA hymn found for "' + cleanQuery + '". Search by hymn number or title.'
+                text: '❌ No English SDA hymn found for "' + cleanQuery + '". Search by hymn number, title, or a lyric phrase.'
             };
         }
 
