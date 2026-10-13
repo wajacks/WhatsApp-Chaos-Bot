@@ -164,6 +164,7 @@ const handlePendingDrawSelection = async (context) => {
 };
 
 const handleImageCommands = async (context) => {
+    const imageChoiceKey = context.chatId + ':' + context.senderId;
     const {
         message, chatId, senderId, text, imageState,
         DRAW_COOLDOWN_MS, DRAW_GLOBAL_COOLDOWN_MS, ANALYZE_COOLDOWN_MS,
