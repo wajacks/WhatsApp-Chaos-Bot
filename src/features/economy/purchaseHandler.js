@@ -9,8 +9,9 @@ async function handleCoinPurchaseCommand(context) {
     if (args.length !== 2 || !/^\d+$/.test(args[0])) {
         await message.reply(
             '💳 *Buy game dollars*\n\n' +
-            'Pay using the payment details confirmed by the bot owner, then send:\n' +
-            '`!buycoins <KSh amount> <M-Pesa transaction code>`\n\n' +
+            'Pay by M-Pesa Send Money to 0111659469 (+254111659469), then send:\n' +
+            '`!buycoins <KSh amount> <M-Pesa transaction code>`\n' +
+            'Example: `!buycoins 10 ST4T6TGHU7T`\n\n' +
             'Minimum: KSh ' + MIN_PURCHASE_KSH.toLocaleString() + ' = $' +
             (MIN_PURCHASE_KSH * COINS_PER_KSH).toLocaleString() +
             ' game dollars. The owner verifies each payment before crediting it.'
