@@ -31,7 +31,12 @@
 │🥷 \`!beg\`
 │     ☞『_*Ask the streets*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│💸 \`!pay <amount>\`
+│💸 `!pay <amount>`
+│     ☞『_*Transfer dollars*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│💳 `!buycoins <KSh> <M-Pesa code>`
+│     ☞『_*Request game dollars*_』
+│     Minimum KSh 10 = $20,000; owner approval required.
 │     ☞『_*Transfer dollars*_』
 │
 └──────────────────────────────┘
@@ -41,10 +46,12 @@
 │🧠 \`!ai <prompt>\`
 │     ☞『_*Talk to Chaos AI*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🎨 \`!draw <prompt>\`
+│🎨 `!draw <prompt>`
+│     ☞『_*Azure: $5,000 • Pollinations: free*_』
 │     ☞『_*Generate an AI image*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🔎 \`!analyze [question]\`
+│🔎 `!analyze [question]`
+│     ☞『_*Photo analysis: $2,000*_』
 │     ☞『_*Analyze a photo*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🛰️ \`!catchup\`
