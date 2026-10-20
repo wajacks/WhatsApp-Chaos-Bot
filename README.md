@@ -190,7 +190,7 @@ sudo apt-get install -y ffmpeg
 
 ### YouTube downloads
 
-`!video` is active. It offers video at up to 360p and audio-only downloads. The handler asks yt-dlp to use YouTube's Android/iOS player clients and does not pass a cookies file. No `cookies.txt` or bgutil token server is required. Higher video resolutions are not offered because only 360p has been reliable.
+`!video` is active. It offers video at up to 360p and audio-only downloads. The handler asks yt-dlp to use YouTube's Android player client and does not pass a cookies file. No `cookies.txt` or bgutil token server is required. Higher video resolutions are not offered because only 360p has been reliable.
 
 Install yt-dlp in a Python virtual environment and FFmpeg for audio extraction and video conversion:
 
@@ -235,7 +235,7 @@ Install the Ubuntu/Debian libraries above. Puppeteer’s [troubleshooting guide]
 Check that the bot runs as the same user and that `data/session` is writable and persistent. If you moved servers, link the device again if the saved session cannot be reused.
 
 **YouTube downloads fail**  
-Confirm `yt-dlp` and FFmpeg are installed and available in the bot process's `PATH`. The current handler uses YouTube's Android/iOS player clients, does not pass cookies, and offers video at up to 360p.
+Confirm `yt-dlp` and FFmpeg are installed and available in the bot process's `PATH`. The current handler uses YouTube's Android player client, does not pass cookies, and offers video at up to 360p.
 
 ## 🔄 Updating
 
