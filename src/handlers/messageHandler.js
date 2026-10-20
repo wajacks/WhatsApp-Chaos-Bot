@@ -6,6 +6,7 @@ const { handleBibleMessages } = require('../features/bible/handler');
 const { handleHymnalCommand } = require('../features/hymnal/handler');
 const { handleChatSummaryCommand } = require('../features/ai/chatSummary');
 const { handleWeatherCommand } = require('../features/weather/command');
+const { handleCoinPurchaseCommand } = require('../features/economy/purchaseHandler');
 
 const { createCommandRouter } = require('../commands/router');
 
@@ -21,6 +22,11 @@ function registerMessageHandler(client, dependencies) {
         MessageMedia,
         getUserBalance,
         deductBalance,
+        addCoins,
+        createCoinPurchaseRequest,
+        listPendingCoinPurchases,
+        approveCoinPurchase,
+        rejectCoinPurchase,
         transferCoins,
         getUser,
         readDB,
@@ -151,7 +157,23 @@ function registerMessageHandler(client, dependencies) {
         const text = message.body ? message.body.trim() : '';
         const lowerText = text.toLowerCase();
 
-        const imageSelectionHandled = await handlePendingDrawSelection({ message, chatId, senderId, text, client, MessageMedia, axios, imageState, DRAW_COOLDOWN_MS, DRAW_GLOBAL_COOLDOWN_MS, ANALYZE_COOLDOWN_MS, canUseImageFeatures, IMAGE_ACCESS_DENIED_MESSAGE, buildImageAnalysisContent, azureClient });
+        const purchaseHandled = await handleCoinPurchaseCommand({
+            message,
+            text,
+            senderId,
+            userName,
+            client,
+            ownerNumber: OWNER_NUMBER,
+            createCoinPurchaseRequest
+        });
+        if (purchaseHandled) return;
+
+        const imageSelectionHandled = await handlePendingDrawSelection({
+            message, chatId, senderId, text, client, MessageMedia, axios, imageState,
+            DRAW_COOLDOWN_MS, DRAW_GLOBAL_COOLDOWN_MS, ANALYZE_COOLDOWN_MS,
+            getUserBalance, deductBalance, addCoins, isOwner, userName,
+            canUseImageFeatures, IMAGE_ACCESS_DENIED_MESSAGE, buildImageAnalysisContent, azureClient
+        });
         if (imageSelectionHandled) return;
 
         const wasHandledAsVideoReply = await handleVideoQualityReply(message);
@@ -355,7 +377,13 @@ function registerMessageHandler(client, dependencies) {
         }
 
         // ====================================================
-        const imageCommandHandled = await handleImageCommands({ message, chatId, senderId, text, imageState, DRAW_COOLDOWN_MS, DRAW_GLOBAL_COOLDOWN_MS, ANALYZE_COOLDOWN_MS, canUseImageFeatures, IMAGE_ACCESS_DENIED_MESSAGE, buildImageAnalysisContent, azureClient, client, MessageMedia, axios });
+        const imageCommandHandled = await handleImageCommands({
+            message, chatId, senderId, text, imageState,
+            DRAW_COOLDOWN_MS, DRAW_GLOBAL_COOLDOWN_MS, ANALYZE_COOLDOWN_MS,
+            getUserBalance, deductBalance, addCoins, isOwner, userName,
+            canUseImageFeatures, IMAGE_ACCESS_DENIED_MESSAGE,
+            buildImageAnalysisContent, azureClient, client, MessageMedia, axios
+        });
         if (imageCommandHandled) return;
 
         const summaryHandled = await handleChatSummaryCommand({
@@ -548,85 +576,103 @@ function registerMessageHandler(client, dependencies) {
             }
 
             // --------------------------------------------
-            // !owner allow <WhatsApp number> <duration>
+            // Manual real-money purchase review
             // --------------------------------------------
 
-            if (ownerCommand === 'allow') {
-                const durationMs = parseDuration(ownerArgs[ownerArgs.length - 1]);
-                const recipientInput = ownerArgs.slice(2, -1).join(' ');
-                const recipientJid = normalizeWhatsAppNumber(recipientInput);
-                const ownerJid = normalizeWhatsAppNumber(OWNER_NUMBER || '');
-
-                if (!recipientJid || !durationMs) {
-                    await message.reply(
-                        'Usage: !owner allow <WhatsApp number> <duration>\n' +
-                        'Examples: !owner allow 254712345678 2h, !owner allow +254 712 345 678 7d\n' +
-                        'Duration units: m, h, or d; maximum 365 days.'
-                    );
+            if (ownerCommand === 'payments') {
+                if (message.from.endsWith('@g.us')) {
+                    await message.reply('🔒 Review payment requests in a private chat so transaction references stay private.');
                     return;
                 }
-
-                if (recipientJid === ownerJid) {
-                    await message.reply('👑 The owner already has permanent access to image generation and analysis.');
+                const pending = listPendingCoinPurchases();
+                if (!pending.length) {
+                    await message.reply('📋 There are no pending game dollar purchases.');
                     return;
                 }
-
-                try {
-                    const grant = grantImageAccess(recipientJid, durationMs, senderId);
-                    const grantedNumber = grant.number.slice(0, -'@c.us'.length);
-                    await message.reply(
-                        '✅ Temporary image access enabled for +' + grantedNumber + '.\n' +
-                        'Access covers !draw and !analyze until ' + new Date(grant.expiresAt).toLocaleString() + '.'
-                    );
-                } catch (error) {
-                    console.error('[IMAGE ACCESS] Could not grant access:', error.message);
-                    await message.reply('❌ I could not save that access grant. Check the bot data folder and logs.');
-                }
+                const lines = pending.map(request =>
+                    request.id + ' — KSh ' + request.amountKsh.toLocaleString() +
+                    ' → $' + request.coins.toLocaleString() +
+                    ' — ' + request.userName + ' (' + request.userId + ')' +
+                    ' — ref ' + request.transactionCode
+                );
+                await message.reply('💳 *Pending purchase requests*\n\n' + lines.join('\n') +
+                    '\n\nVerify each payment in your payment account before approving.');
                 return;
             }
 
-            // --------------------------------------------
-            // !owner revoke <WhatsApp number>
-            // --------------------------------------------
-
-            if (ownerCommand === 'revoke') {
-                const recipientJid = normalizeWhatsAppNumber(ownerArgs.slice(2).join(' '));
-                if (!recipientJid) {
-                    await message.reply('Usage: !owner revoke <WhatsApp number>');
+            if (ownerCommand === 'approvepayment') {
+                if (message.from.endsWith('@g.us')) {
+                    await message.reply('🔒 Approve payment requests in a private chat.');
                     return;
                 }
-
-                try {
-                    const revoked = revokeImageAccess(recipientJid);
-                    await message.reply(revoked
-                        ? '✅ Temporary image access revoked for +' + recipientJid.slice(0, -'@c.us'.length) + '.'
-                        : 'ℹ️ That number has no saved image access grant.');
-                } catch (error) {
-                    console.error('[IMAGE ACCESS] Could not revoke access:', error.message);
-                    await message.reply('❌ I could not update image access. Check the bot data folder and logs.');
+                const requestId = ownerArgs[2];
+                if (!requestId) {
+                    await message.reply('Usage: !owner approvepayment <request ID>');
+                    return;
                 }
-                return;
-            }
-
-            // --------------------------------------------
-            // !owner allowed
-            // --------------------------------------------
-
-            if (ownerCommand === 'allowed') {
                 try {
-                    const grants = listImageAccess();
-                    if (grants.length === 0) {
-                        await message.reply('📋 There are no active temporary image access grants.');
+                    const result = approveCoinPurchase(requestId, senderId);
+                    if (!result.success) {
+                        await message.reply(result.reason === 'already_resolved'
+                            ? 'ℹ️ That purchase request has already been reviewed.'
+                            : '❌ I could not find that pending purchase request.');
                         return;
                     }
-                    const lines = grants.map((grant, index) =>
-                        (index + 1) + '. +' + grant.number.slice(0, -'@c.us'.length) +
-                        ' — expires ' + new Date(grant.expiresAt).toLocaleString()
+                    const request = result.request;
+                    await message.reply(
+                        '✅ Approved ' + request.id + ': KSh ' + request.amountKsh.toLocaleString() +
+                        ' credited as $' + request.coins.toLocaleString() + ' game dollars.'
                     );
-                    await message.reply('📋 *Active image access grants*\n\n' + lines.join('\n'));
+                    try {
+                        await client.sendMessage(
+                            request.userId,
+                            '✅ Your payment for request ' + request.id + ' was verified. $' +
+                            request.coins.toLocaleString() + ' game dollars have been added.\n' +
+                            'New balance: $' + Number(request.balanceAfter || 0).toLocaleString() + '.'
+                        );
+                    } catch (notifyError) {
+                        console.warn('[COIN PURCHASE] Could not notify the player:', notifyError.message);
+                    }
                 } catch (error) {
-                    console.error('[IMAGE ACCESS] Could not list grants:', error.message);
-                    await message.reply('❌ I could not read image access grants. Check the bot data folder and logs.');
+                    console.error('[COIN PURCHASE] Approval failed:', error);
+                    await message.reply('❌ Approval failed. Check the bot logs and balance database.');
+                }
+                return;
+            }
+
+            if (ownerCommand === 'rejectpayment') {
+                if (message.from.endsWith('@g.us')) {
+                    await message.reply('🔒 Reject payment requests in a private chat.');
+                    return;
+                }
+                const requestId = ownerArgs[2];
+                if (!requestId) {
+                    await message.reply('Usage: !owner rejectpayment <request ID> [reason]');
+                    return;
+                }
+                try {
+                    const reason = ownerArgs.slice(3).join(' ').trim();
+                    const result = rejectCoinPurchase(requestId, senderId, reason);
+                    if (!result.success) {
+                        await message.reply(result.reason === 'already_resolved'
+                            ? 'ℹ️ That purchase request has already been reviewed.'
+                            : '❌ I could not find that pending purchase request.');
+                        return;
+                    }
+                    const request = result.request;
+                    await message.reply('❌ Rejected purchase request ' + request.id + '.');
+                    try {
+                        await client.sendMessage(
+                            request.userId,
+                            '❌ Your game dollar purchase request ' + request.id +
+                            ' was not approved. Please contact the owner if you need help.'
+                        );
+                    } catch (notifyError) {
+                        console.warn('[COIN PURCHASE] Could not notify the player:', notifyError.message);
+                    }
+                } catch (error) {
+                    console.error('[COIN PURCHASE] Rejection failed:', error);
+                    await message.reply('❌ I could not update that purchase request.');
                 }
                 return;
             }

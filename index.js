@@ -29,6 +29,7 @@ const {
     addXP,
     getUserBalance,
     deductBalance,
+    addCoins,
     transferCoins,
     getUser,
     readDB,
@@ -36,6 +37,12 @@ const {
     resetEconomy
 } = require('./src/database/db');
 
+const {
+    createCoinPurchaseRequest,
+    listPendingCoinPurchases,
+    approveCoinPurchase,
+    rejectCoinPurchase
+} = require('./src/database/coinPurchases');
 
 // ============================================================
 // COMMANDS
@@ -276,6 +283,11 @@ function initializeChaosBot(options) {
         MessageMedia,
         getUserBalance,
         deductBalance,
+        addCoins,
+        createCoinPurchaseRequest,
+        listPendingCoinPurchases,
+        approveCoinPurchase,
+        rejectCoinPurchase,
         transferCoins,
         getUser,
         readDB,

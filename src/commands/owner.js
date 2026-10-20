@@ -1,5 +1,3 @@
-const { hasImageAccess } = require('../database/imageAccess');
-
 const OWNER_NUMBER = process.env.OWNER_NUMBER;
 
 function isOwner(senderId) {
@@ -10,16 +8,10 @@ function isOwner(senderId) {
     return senderId === `${cleanOwnerNumber}@c.us`;
 }
 
-const IMAGE_ACCESS_DENIED_MESSAGE = '🔒 Image generation and analysis are owner-only. Ask the bot owner for temporary access.';
+const IMAGE_ACCESS_DENIED_MESSAGE = 'Image Studio is open. Azure features use game dollar balances.';
 
-function canUseImageFeatures(senderId) {
-    if (isOwner(senderId)) return true;
-    try {
-        return hasImageAccess(senderId);
-    } catch (error) {
-        console.error('[IMAGE ACCESS] Grant data could not be read; access denied:', error.message);
-        return false;
-    }
+function canUseImageFeatures() {
+    return true;
 }
 
 function getOwnerMenu() {
@@ -48,14 +40,14 @@ function getOwnerMenu() {
         '📡 *!owner broadcast <message>*\n' +
         'Broadcast an announcement to all groups.\n\n' +
 
-        '🖼️ *!owner allow <WhatsApp number> <duration>*\n' +
-        'Temporarily allow image generation and analysis; duration: 1m–365d.\n\n' +
+        '💳 *!owner payments*\n' +
+        'List pending game dollar purchases (private chat only).\n\n' +
 
-        '🚫 *!owner revoke <WhatsApp number>*\n' +
-        'Remove someone’s image access immediately.\n\n' +
+        '✅ *!owner approvepayment <request ID>*\n' +
+        'Credit a purchase after verifying it in your payment account.\n\n' +
 
-        '📋 *!owner allowed*\n' +
-        'List active temporary image access grants.\n\n' +
+        '❌ *!owner rejectpayment <request ID> [reason]*\n' +
+        'Reject a pending purchase request.\n\n' +
 
         'ℹ️ *!owner help*\n' +
         'Show this owner panel.\n\n' +

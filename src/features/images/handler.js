@@ -3,7 +3,7 @@ const handlePendingDrawSelection = async (context) => {
         message, chatId, senderId, text, client, MessageMedia, axios,
         imageState, DRAW_COOLDOWN_MS, DRAW_GLOBAL_COOLDOWN_MS,
         ANALYZE_COOLDOWN_MS, canUseImageFeatures, IMAGE_ACCESS_DENIED_MESSAGE,
-        buildImageAnalysisContent, azureClient
+        buildImageAnalysisContent, azureClient, getUserBalance, deductBalance, addCoins, isOwner
     } = context;
         const generateSelectedImage = async (prompt, choice) => {
             if (!canUseImageFeatures(senderId)) {
@@ -36,6 +36,21 @@ const handlePendingDrawSelection = async (context) => {
                 await message.reply('⏳ Image Studio is pacing requests. Please wait ' + Math.ceil(globalRemaining / 1000) + 's.');
                 return;
             }
+
+            const generationCost = choice.kind === 'azure' && !isOwner(senderId) ? 5000 : 0;
+            if (generationCost > 0) {
+                const balance = getUserBalance(senderId);
+                if (balance < generationCost) {
+                    await message.reply('💸 Azure image generation costs $5,000 game dollars. Your balance is $' +
+                        Number(balance).toLocaleString() + '. Use !buycoins to add funds.');
+                    return;
+                }
+                if (!deductBalance(senderId, generationCost)) {
+                    await message.reply('⚠️ Your balance changed before I could start. Check !bal and try again.');
+                    return;
+                }
+            }
+            let chargedAmount = generationCost;
 
             imageState.drawCooldowns.set(senderId, now);
             imageState.lastDrawAt = now;
@@ -85,8 +100,13 @@ const handlePendingDrawSelection = async (context) => {
                 }
 
                 const captionPrompt = prompt.length > 800 ? prompt.slice(0, 797) + '...' : prompt;
-                const caption = '🎨 *' + choice.label + '*\n*Prompt:* "' + captionPrompt + '"\n`wantam`👆😅';
+                const costLine = generationCost > 0
+                    ? '\n*Cost:* $5,000 game dollars'
+                    : '\n*Cost:* Free';
+                const caption = '🎨 *' + choice.label + '*\n*Prompt:* "' + captionPrompt + '"' +
+                    costLine + '\n`wantam`👆😅';
                 await client.sendMessage(chatId, imageMedia, { caption });
+                chargedAmount = 0;
             } catch (imgErr) {
                 const providerMessage = imgErr.response?.data?.error?.message || imgErr.message || 'Unknown image generation error';
                 console.error('❌ Image Generation Error:', {
@@ -96,7 +116,18 @@ const handlePendingDrawSelection = async (context) => {
                     elapsedSeconds: ((Date.now() - providerStartedAt) / 1000).toFixed(1),
                     message: providerMessage
                 });
-                await message.reply('❌ ' + choice.label + ' image generation failed. Check provider settings, Azure quota, and bot logs.');
+                let wasRefunded = false;
+                if (chargedAmount > 0) {
+                    try {
+                        addCoins(senderId, chargedAmount);
+                        chargedAmount = 0;
+                        wasRefunded = true;
+                    } catch (refundError) {
+                        console.error('[IMAGE BILLING] Could not refund failed generation:', refundError);
+                    }
+                }
+                await message.reply('❌ ' + choice.label + ' image generation failed. Check provider settings, Azure quota, and bot logs.' +
+                    (wasRefunded ? ' Your $5,000 was refunded.' : ''));
             } finally {
                 imageState.drawGenerationInProgress = false;
             }
@@ -169,7 +200,8 @@ const handleImageCommands = async (context) => {
         message, chatId, senderId, text, imageState,
         DRAW_COOLDOWN_MS, DRAW_GLOBAL_COOLDOWN_MS, ANALYZE_COOLDOWN_MS,
         canUseImageFeatures, IMAGE_ACCESS_DENIED_MESSAGE,
-        buildImageAnalysisContent, azureClient, client, MessageMedia, axios
+        buildImageAnalysisContent, azureClient, client, MessageMedia, axios,
+        getUserBalance, deductBalance, addCoins, isOwner, userName
     } = context;
         // IMAGE GENERATOR (!draw)
         // ====================================================
@@ -208,9 +240,9 @@ const handleImageCommands = async (context) => {
             imageState.pendingDrawChoices.set(imageChoiceKey, pendingChoice);
 
             const menu = imageState.IMAGE_MODEL_CHOICES.map((choice) =>
-                choice.number + '. ' + choice.label + ' — ' + choice.description + (choice.kind === 'azure' ? ' (Azure credits)' : ' (free)')
+                choice.number + '. ' + choice.label + ' — ' + choice.description + (choice.kind === 'azure' ? ' ($5,000 game dollars)' : ' (free)')
             ).join('\n');
-            await message.reply('🎨 *Image Studio — best-first model choices*\n\n' + menu + '\n\nReply with 1, 2, or 3 within 60 seconds. Reply `cancel` to stop.');
+            await message.reply('🎨 *Image Studio — best-first model choices*\n\n' + menu + '\n\nAzure images cost $5,000; Pollinations is free. Reply with 1, 2, or 3 within 60 seconds. Reply `cancel` to stop.');
             return true;
         }
 
@@ -264,6 +296,21 @@ const handleImageCommands = async (context) => {
                 await message.reply(IMAGE_ACCESS_DENIED_MESSAGE);
                 return true;
             }
+            const analysisCost = isOwner(senderId) ? 0 : 2000;
+            let chargedAmount = 0;
+            if (analysisCost > 0) {
+                const balance = getUserBalance(senderId, userName);
+                if (balance < analysisCost) {
+                    await message.reply('💸 Image analysis costs $2,000 game dollars. Your balance is $' +
+                        Number(balance).toLocaleString() + '. Use !buycoins to add funds.');
+                    return true;
+                }
+                if (!deductBalance(senderId, analysisCost)) {
+                    await message.reply('⚠️ Your balance changed before I could start. Check !bal and try again.');
+                    return true;
+                }
+                chargedAmount = analysisCost;
+            }
             imageState.analyzeCooldowns.set(senderId, Date.now());
             try {
                 await message.reply('🔎 Analyzing your image with the Azure vision model...');
@@ -290,11 +337,20 @@ const handleImageCommands = async (context) => {
 
                 const analysis = response.choices[0]?.message?.content?.trim();
                 if (!analysis) {
-                    await message.reply('⚠️ The vision model returned an empty analysis. Please try again.');
+                    if (chargedAmount > 0) {
+                        addCoins(senderId, chargedAmount);
+                        chargedAmount = 0;
+                    }
+                    imageState.analyzeCooldowns.delete(senderId);
+                    await message.reply('⚠️ The vision model returned an empty analysis. You were not charged; please try again.');
                     return true;
                 }
 
-                await message.reply('🖼️ *Image analysis*\n\n' + analysis);
+                const chargeLine = analysisCost > 0
+                    ? '\n\n💵 Cost: $2,000 game dollars'
+                    : '\n\n👑 Owner use: free';
+                await message.reply('🖼️ *Image analysis*\n\n' + analysis + chargeLine);
+                chargedAmount = 0;
             } catch (analyzeErr) {
                 console.error('❌ Image Analysis Error:', {
                     status: analyzeErr.response?.status,
@@ -308,9 +364,20 @@ const handleImageCommands = async (context) => {
                     IMAGE_ANALYSIS_TOO_LARGE: 'That image is too large. Please send an image smaller than 10 MB.',
                     IMAGE_ANALYSIS_INVALID_DATA: 'I could not read that image. Please resend the photo and try again.'
                 };
+                let wasRefunded = false;
+                if (chargedAmount > 0) {
+                    try {
+                        addCoins(senderId, chargedAmount);
+                        chargedAmount = 0;
+                        wasRefunded = true;
+                    } catch (refundError) {
+                        console.error('[IMAGE BILLING] Could not refund failed analysis:', refundError);
+                    }
+                }
+                imageState.analyzeCooldowns.delete(senderId);
                 const failureMessage = knownFailureMessages[analyzeErr.code] ||
-                    '❌ Image analysis failed. Check the Azure vision deployment, quota, and bot logs.';
-                await message.reply(failureMessage);
+                    '❌ Image analysis failed. You were not charged. Check the Azure vision deployment, quota, and bot logs.';
+                await message.reply(failureMessage + (wasRefunded ? '\n\n$2,000 was refunded.' : ''));
             }
 
             return true;

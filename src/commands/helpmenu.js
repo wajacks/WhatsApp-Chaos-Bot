@@ -33,6 +33,10 @@
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │💸 \`!pay <amount>\`
 │     ☞『_*Transfer dollars*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│💳 \`!buycoins <KSh> <M-Pesa code>\`
+│     ☞『_*Request game dollars*_』
+│     Pay 0111659469; minimum KSh 10 = $20,000; owner approval required.
 │
 └──────────────────────────────┘
 
@@ -42,10 +46,10 @@
 │     ☞『_*Talk to Chaos AI*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🎨 \`!draw <prompt>\`
-│     ☞『_*Generate an AI image*_』
+│     ☞『_*Azure: $5,000 • Pollinations: free*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🔎 \`!analyze [question]\`
-│     ☞『_*Analyze a photo*_』
+│     ☞『_*Photo analysis: $2,000*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🛰️ \`!catchup\`
 │     ☞『_*Recover missed context*_』
