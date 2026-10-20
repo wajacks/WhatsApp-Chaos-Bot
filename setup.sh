@@ -51,6 +51,7 @@ fi
 info "Node.js $(node --version); npm $(npm --version)"
 info "Creating the bot's runtime folders..."
 mkdir -p data/session downloads
+chmod 700 data data/session downloads
 
 if [[ ! -f .env ]]; then
     if [[ ! -f .env.example ]]; then
