@@ -197,7 +197,7 @@ Install yt-dlp in a Python virtual environment and FFmpeg for audio extraction a
 ```bash
 sudo apt-get install -y ffmpeg python3-venv
 python3 -m venv "$HOME/.venvs/chaos-media"
-"$HOME/.venvs/chaos-media/bin/python" -m pip install --upgrade pip yt-dlp
+"$HOME/.venvs/chaos-media/bin/python" -m pip install --upgrade pip 'yt-dlp[default]'
 export PATH="$HOME/.venvs/chaos-media/bin:$PATH"
 yt-dlp --version
 ```
