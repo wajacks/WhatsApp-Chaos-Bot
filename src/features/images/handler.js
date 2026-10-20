@@ -116,15 +116,18 @@ const handlePendingDrawSelection = async (context) => {
                     elapsedSeconds: ((Date.now() - providerStartedAt) / 1000).toFixed(1),
                     message: providerMessage
                 });
+                let wasRefunded = false;
                 if (chargedAmount > 0) {
                     try {
                         addCoins(senderId, chargedAmount);
                         chargedAmount = 0;
+                        wasRefunded = true;
                     } catch (refundError) {
                         console.error('[IMAGE BILLING] Could not refund failed generation:', refundError);
                     }
                 }
-                await message.reply('❌ ' + choice.label + ' image generation failed. Check provider settings, Azure quota, and bot logs.');
+                await message.reply('❌ ' + choice.label + ' image generation failed. Check provider settings, Azure quota, and bot logs.' +
+                    (wasRefunded ? ' Your $5,000 was refunded.' : ''));
             } finally {
                 imageState.drawGenerationInProgress = false;
             }
@@ -361,10 +364,12 @@ const handleImageCommands = async (context) => {
                     IMAGE_ANALYSIS_TOO_LARGE: 'That image is too large. Please send an image smaller than 10 MB.',
                     IMAGE_ANALYSIS_INVALID_DATA: 'I could not read that image. Please resend the photo and try again.'
                 };
+                let wasRefunded = false;
                 if (chargedAmount > 0) {
                     try {
                         addCoins(senderId, chargedAmount);
                         chargedAmount = 0;
+                        wasRefunded = true;
                     } catch (refundError) {
                         console.error('[IMAGE BILLING] Could not refund failed analysis:', refundError);
                     }
@@ -372,7 +377,7 @@ const handleImageCommands = async (context) => {
                 imageState.analyzeCooldowns.delete(senderId);
                 const failureMessage = knownFailureMessages[analyzeErr.code] ||
                     '❌ Image analysis failed. You were not charged. Check the Azure vision deployment, quota, and bot logs.';
-                await message.reply(failureMessage);
+                await message.reply(failureMessage + (wasRefunded ? '\n\n$2,000 was refunded.' : ''));
             }
 
             return true;
