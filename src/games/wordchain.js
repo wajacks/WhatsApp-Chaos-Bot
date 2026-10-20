@@ -28,14 +28,16 @@ const { claimGame, releaseGame } = require('./gameRegistry');
 // ============================================================
 
 const LOBBY_STATE = 'LOBBY';
+const RULES_READ_STATE = 'READING_RULES';
 const PLAYING_STATE = 'PLAYING';
 
-const GAME_DURATION = 5 * 60 * 1000;
-const TURN_DURATION = 15 * 1000;
+const RULES_READ_DURATION = 20 * 1000;
+const TURN_DURATION = 30 * 1000;
+const TURNS_PER_PLAYER = 10;
 
-const POINTS_3_4 = 1;
-const POINTS_5_6 = 2;
-const POINTS_7_PLUS = 3;
+const POINTS_ANY_ORDER = 1;
+const POINTS_IN_ORDER = 2;
+const POINTS_CONSECUTIVE = 3;
 
 const COINS_PER_POINT = 1000;
 
@@ -66,6 +68,39 @@ function getPlayerName(player) {
     return player.name || 'Player';
 }
 
+function getWordChainPoints(word, requiredLetters) {
+    const requiredCounts = new Map();
+
+    for (const letter of requiredLetters) {
+        requiredCounts.set(
+            letter,
+            (requiredCounts.get(letter) || 0) + 1
+        );
+    }
+
+    for (const [letter, count] of requiredCounts) {
+        const wordCount = word.split(letter).length - 1;
+        if (wordCount < count) {
+            return 0;
+        }
+    }
+
+    if (word.includes(requiredLetters)) {
+        return POINTS_CONSECUTIVE;
+    }
+
+    let searchFrom = 0;
+    for (const letter of requiredLetters) {
+        const index = word.indexOf(letter, searchFrom);
+        if (index === -1) {
+            return POINTS_ANY_ORDER;
+        }
+        searchFrom = index + 1;
+    }
+
+    return POINTS_IN_ORDER;
+}
+
 // ============================================================
 // OPEN WORD CHAIN LOBBY
 // ============================================================
@@ -87,7 +122,7 @@ async function startWordChainLobby(message) {
             return;
         }
 
-        if (existingGame.state === PLAYING_STATE) {
+        if (existingGame.state === PLAYING_STATE || existingGame.state === RULES_READ_STATE) {
             await message.reply(
                 '⚠️ A Word Chain game is already running in this chat.'
             );
@@ -118,15 +153,19 @@ async function startWordChainLobby(message) {
 
         scores: new Map(),
 
+        turnsTaken: new Map(),
+
         usedWords: new Set(),
 
         currentTurnIndex: 0,
 
         currentWord: null,
 
-        lastLetter: null,
+        requiredLetters: null,
 
         matchTimer: null,
+
+        rulesTimer: null,
 
         turnTimer: null,
 
@@ -139,8 +178,8 @@ async function startWordChainLobby(message) {
         'Players can join using:\n' +
         '`!wjoin`\n\n' +
         'Host must also join with !wjoin. Minimum players: *2*\n' +
-        'Game duration: *5 minutes*\n' +
-        'Turn duration: *10 seconds*\n\n' +
+        'Each player gets *10 turns* of up to *30 seconds*.\n' +
+        'Maximum game time: *5 minutes × number of players*.\n\n' +
         'When everyone is ready, the host can use:\n' +
         '`!startwordchain`'
     );
@@ -259,7 +298,7 @@ async function startWordChainGame(message, client) {
         return;
     }
 
-    game.state = PLAYING_STATE;
+    game.state = RULES_READ_STATE;
     game.clientRef = client;
 
     game.players =
@@ -267,10 +306,13 @@ async function startWordChainGame(message, client) {
 
     game.scores = new Map();
 
+    game.turnsTaken = new Map();
+
     game.usedWords = new Set();
 
     game.players.forEach(player => {
         game.scores.set(player.id, 0);
+        game.turnsTaken.set(player.id, 0);
     });
 
     game.currentTurnIndex = 0;
@@ -301,42 +343,30 @@ async function startWordChainGame(message, client) {
         ];
 
     game.currentWord = startingWord;
-
-    game.lastLetter =
-        startingWord[
-            startingWord.length - 1
-        ];
-
+    game.requiredLetters = startingWord.slice(-3);
     game.usedWords.add(startingWord);
-
-    // ============================================================
-    // FIVE MINUTE MATCH TIMER
-    // ============================================================
-
-    game.matchTimer = setTimeout(
-        async () => {
-            await stopWordChain(
-                chatId,
-                client,
-                '⏰ *5 MINUTES ARE UP!*'
-            );
-        },
-        GAME_DURATION
-    );
 
     await message.reply(
         '🔗 *WORD CHAIN HAS STARTED!*\n\n' +
         `Starting word: *${startingWord.toUpperCase()}*\n` +
-        `Next word must start with: *${game.lastLetter.toUpperCase()}*\n\n` +
-        'Each player has *10 seconds* per turn.\n' +
-        'Valid words score points.\n\n' +
-        'Good luck! 🔥'
+        `Required letters: *${game.requiredLetters.toUpperCase()}*\n\n` +
+        'Use one unused English word containing all 3 letters, in any order.\n' +
+        'Example (T-H-E): ENTHUSIASTIC = 1, THUNDER = 2, THEATER = 3.\n' +
+        'Scoring: 1 any order; 2 in order (gaps OK); 3 consecutive in order.\n' +
+        'Each player gets 10 turns; each turn is 30 seconds.\n\n' +
+        '⏳ First turn starts in 20 seconds so everyone can read.'
     );
 
-    promptCurrentPlayer(
-        chatId,
-        client
-    );
+    game.rulesTimer = setTimeout(() => {
+        const currentGame = activeWordChainGames.get(chatId);
+        if (!currentGame || currentGame.state !== RULES_READ_STATE) {
+            return;
+        }
+
+        currentGame.rulesTimer = null;
+        currentGame.state = PLAYING_STATE;
+        promptCurrentPlayer(chatId, client);
+    }, RULES_READ_DURATION);
 }
 
 // ============================================================
@@ -368,15 +398,15 @@ function promptCurrentPlayer(chatId, client) {
         return;
     }
 
-    const nextLetter =
-        game.lastLetter.toUpperCase();
+    const turnsTaken = game.turnsTaken.get(player.id) || 0;
+    const turnNumber = turnsTaken + 1;
 
     client.sendMessage(
         chatId,
         `🎯 *YOUR TURN!*\n\n` +
         `@${player.id.split('@')[0]}\n\n` +
-        `Your word must start with: *${nextLetter}*\n` +
-        `You have *10 seconds!*`,
+        `Include all 3 letters in one unused word, any order.\n` +
+        `Turn ${turnNumber}/${TURNS_PER_PLAYER} — you have 30 seconds.`,
         {
             mentions: [player.id]
         }
@@ -411,7 +441,7 @@ function promptCurrentPlayer(chatId, client) {
             await client.sendMessage(
                 chatId,
                 `⏰ @${currentPlayer.id.split('@')[0]} ran out of time!\n\n` +
-                `No word was submitted.\n` +
+                `This counts as turn ${(currentGame.turnsTaken.get(currentPlayer.id) || 0) + 1}/${TURNS_PER_PLAYER}.\n` +
                 `The turn goes to the next player.`,
                 {
                     mentions: [
@@ -479,6 +509,11 @@ async function processWordChain(message, client) {
         return false;
     }
 
+    // Ignore chat messages and phrases without validating them as guesses.
+    if (!text || /\s/.test(text)) {
+        return true;
+    }
+
     // ============================================================
     // WORD FORMAT
     // ============================================================
@@ -495,25 +530,7 @@ async function processWordChain(message, client) {
         return true;
     }
 
-    // ============================================================
-    // CHECK FIRST LETTER
-    // ============================================================
 
-    if (
-        word[0] !==
-        game.lastLetter.toLowerCase()
-    ) {
-        await message.reply(
-            `❌ Wrong starting letter!\n\n` +
-            `Your word must start with *${game.lastLetter.toUpperCase()}*.\n` +
-            `You still have the rest of your turn.`
-        );
-
-        return true;
-    }
-
-    // ============================================================
-    // CHECK DICTIONARY
     // ============================================================
 
     if (!wordSet.has(word)) {
@@ -538,6 +555,19 @@ async function processWordChain(message, client) {
     }
 
     // ============================================================
+    // REQUIRED LETTERS AND SCORE
+    // ============================================================
+
+    const points = getWordChainPoints(word, game.requiredLetters);
+    if (points === 0) {
+        await message.reply(
+            `❌ Include all three required letters: *${game.requiredLetters.toUpperCase()}*.\n` +
+            'You still have the rest of your turn.'
+        );
+        return true;
+    }
+
+    // ============================================================
     // VALID WORD
     // ============================================================
 
@@ -549,19 +579,7 @@ async function processWordChain(message, client) {
     game.usedWords.add(word);
 
     game.currentWord = word;
-
-    game.lastLetter =
-        word[word.length - 1];
-
-    let points = 0;
-
-    if (word.length <= 4) {
-        points = POINTS_3_4;
-    } else if (word.length <= 6) {
-        points = POINTS_5_6;
-    } else {
-        points = POINTS_7_PLUS;
-    }
+    game.requiredLetters = word.slice(-3);
 
     const oldScore =
         game.scores.get(
@@ -582,8 +600,8 @@ async function processWordChain(message, client) {
         chatId,
         `✅ *${word.toUpperCase()}* accepted!\n\n` +
         `@${currentPlayer.id.split('@')[0]} earns *${points} point${points === 1 ? '' : 's'}*.\n` +
-        `Score: *${newScore}*\n\n` +
-        `Next letter: *${game.lastLetter.toUpperCase()}*`,
+        `Score: *${newScore}*\n` +
+        `Next required letters: *${game.requiredLetters.toUpperCase()}*`,
         {
             mentions: [
                 currentPlayer.id
@@ -619,15 +637,27 @@ function advanceTurn(chatId, client) {
         game.turnTimer = null;
     }
 
-    game.currentTurnIndex =
-        (
-            game.currentTurnIndex + 1
-        ) % game.players.length;
+    const completedPlayer = game.players[game.currentTurnIndex];
+    if (completedPlayer) {
+        const turns = (game.turnsTaken.get(completedPlayer.id) || 0) + 1;
+        game.turnsTaken.set(completedPlayer.id, turns);
+    }
 
-    promptCurrentPlayer(
-        chatId,
-        client
+    const everyoneFinished = game.players.every(
+        player => (game.turnsTaken.get(player.id) || 0) >= TURNS_PER_PLAYER
     );
+
+    if (everyoneFinished) {
+        stopWordChain(chatId, client, '🎉 *EVERYONE COMPLETED 10 TURNS!*').catch(err => {
+            console.error('[WORD CHAIN] Could not finish game:', err);
+        });
+        return;
+    }
+
+    game.currentTurnIndex =
+        (game.currentTurnIndex + 1) % game.players.length;
+
+    promptCurrentPlayer(chatId, client);
 }
 
 // ============================================================
@@ -647,11 +677,13 @@ async function stopWordChain(
     }
 
     if (game.matchTimer) {
-        clearTimeout(
-            game.matchTimer
-        );
-
+        clearTimeout(game.matchTimer);
         game.matchTimer = null;
+    }
+
+    if (game.rulesTimer) {
+        clearTimeout(game.rulesTimer);
+        game.rulesTimer = null;
     }
 
     if (game.turnTimer) {
