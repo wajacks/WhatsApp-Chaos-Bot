@@ -31,13 +31,12 @@
 │🥷 \`!beg\`
 │     ☞『_*Ask the streets*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│💸 `!pay <amount>`
+│💸 \`!pay <amount>\`
 │     ☞『_*Transfer dollars*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│💳 `!buycoins <KSh> <M-Pesa code>`
+│💳 \`!buycoins <KSh> <M-Pesa code>\`
 │     ☞『_*Request game dollars*_』
 │     Minimum KSh 10 = $20,000; owner approval required.
-│     ☞『_*Transfer dollars*_』
 │
 └──────────────────────────────┘
 
@@ -46,13 +45,11 @@
 │🧠 \`!ai <prompt>\`
 │     ☞『_*Talk to Chaos AI*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🎨 `!draw <prompt>`
+│🎨 \`!draw <prompt>\`
 │     ☞『_*Azure: $5,000 • Pollinations: free*_』
-│     ☞『_*Generate an AI image*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🔎 `!analyze [question]`
+│🔎 \`!analyze [question]\`
 │     ☞『_*Photo analysis: $2,000*_』
-│     ☞『_*Analyze a photo*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🛰️ \`!catchup\`
 │     ☞『_*Recover missed context*_』
@@ -78,6 +75,69 @@
 │🎬 \`!video <query>\`
 │     ☞『_*Video & audio tools*_』
 │
+└──────────────────────────────┘
+
+┌── ░◈ _*GAME CENTER*_ ◈░ ─────────┐
+│
+│🟩 \`!wordle\`
+│     ☞『_*Open a Wordle lobby*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🌍 \`!rebus\`
+│     ☞『_*Open a Country Rebus lobby*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🔀 \`!scramble\`
+│     ☞『_*Open a Scramble lobby*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🔗 \`!wordchain\`
+│     ☞『_*Open a Word Chain lobby*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│⚒️ \`!wordforge\`
+│     ☞『_*Open a Word Forge lobby*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🕵️ \`!mafia\`
+│     ☞『_*Open a Mafia lobby*_』
+│
+└──────────────────────────────┘
+
+┌──── ░◈ _*SYSTEM*_ ◈░ ──────────────┐
+
+│📋 \`!class\`
+│     ☞『_*Strict for education*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🎮 \`!games\`
+│     ☞『_*All game modes*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│📡 \`!ping\`
+│     _*Check latency*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│📋 \`!menu\`
+│     ☞『_*Open this menu*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🌤️ \`!weather <city>\`
+│     ☞『_*Live weather*_』
+│
+└──────────────────────────────┘
+
+╭──────────────────────────────╮
+│                              
+│       👑░◈ _*OWNER ACCESS*_ ◈░        
+│                              
+│  📞 \`!contactowner\`『✔︎』             
+│         ☞『_*Contact Master Owner*_』     
+│                              
+│  🔐 \`!owner\`『✔︎』                   
+│         ☞『_*Restricted controls*_』      
+│                              
+│        \t⚘ \`C H R I S S\` ⚘       
+│             CREATOR『✔︎』             
+│                              
+╰──────────────────────────────╯
+       \t\t⚡ _*TUM*_ × _*CHAOS*_ ⚡      
+       \t「 CONTROL THE CHAOS 」`;
+}
+module.exports = {
+  getBotMenu
+};
 └──────────────────────────────┘
 
 ┌── ░◈ _*GAME CENTER*_ ◈░ ─────────┐
