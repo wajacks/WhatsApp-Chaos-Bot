@@ -22,7 +22,7 @@ async function handleVideoCommand(message) {
         if (IS_VIDEO_UNDER_MAINTENANCE) {
             await message.reply(
                 '⚠️ *SYSTEM MAINTENANCE NOTICE*\n\n' +
-                'Video and media download services are temporarily offline for updates and cookie re-calibration.\n\n' +
+                'Video and media download services are temporarily offline for updates.\n\n' +
                 '🛠️ *Status:* Under Active Maintenance\n' +
                 '📢 *Notice:* Check back later once the system is patched!'
             );
@@ -55,13 +55,10 @@ async function handleVideoCommand(message) {
             `🎬 *Select Media Type / Quality*\n\n` +
             `Reply with the number of your choice within 2 minutes:\n\n` +
             `\`I prefer 360p so you don't request large files taking forever to download\`\n\n` +
-            `1️⃣ *360p* (Fast / Small file size)\n` +
-            `2️⃣ *480p* (Balanced quality)\n` +
-            `3️⃣ *720p* (High Quality)\n` +
-            `4️⃣ *1080p* (Full HD - Capped/Optimized)\n` +
+            `1️⃣ *360p max* (Fast / Small file size)\n` +
             `5️⃣ *Audio Only* (MP3 / Voice Note Options)\n\n` +
             `\t\t‧₊˚🖇️✩ ₊˚🎧⊹♡\n` +
-            `_Reply with \`1\`, \`2\`, \`3\`, \`4\`, or \`5\`_\n\n` +
+            `_Reply with \`1\` or \`5\`_\n\n` +
             `\`wantam\`\t\t\t\t` + `👆😅`;
 
         await message.reply(promptText);
@@ -80,10 +77,10 @@ async function handleVideoQualityReply(message) {
     const selection = message.body.trim().toLowerCase();
 
     // ----------------------------------------------------
-    // 1. Initial Main Menu Selection (1, 2, 3, 4, 5)
+    // 1. Initial Main Menu Selection (1 = 360p, 5 = audio)
     // ----------------------------------------------------
     if (pendingVideoRequests.has(chatId)) {
-        const validChoices = ['1', '2', '3', '4', '5'];
+        const validChoices = ['1', '5'];
         if (!validChoices.includes(selection)) return false;
 
         const requestData = pendingVideoRequests.get(chatId);
@@ -113,12 +110,9 @@ async function handleVideoQualityReply(message) {
             return true;
         }
 
-        // Handles standard video options (1 = 360p, 2 = 480p, 3 = 720p, 4 = 1080p)
+        // Handles the remaining video option (1 = up to 360p).
         const qualityMap = {
-            '1': { height: 360,  label: '360p',  audioOnly: false },
-            '2': { height: 480,  label: '480p',  audioOnly: false },
-            '3': { height: 720,  label: '720p',  audioOnly: false },
-            '4': { height: 1080, label: '1080p', audioOnly: false }
+            '1': { height: 360, label: '360p', audioOnly: false }
         };
 
         const chosenOption = qualityMap[selection];
@@ -126,7 +120,6 @@ async function handleVideoQualityReply(message) {
         await message.reply(`⏳ *Processing...* Fetching ${chosenOption.label} video in the background.`);
 
         const projectRoot = path.join(__dirname, '..', '..');
-        const cookiesPath = path.join(projectRoot, 'cookies.txt');
         const requestDir = path.join(projectRoot, 'downloads', `req_${Date.now()}_${Math.floor(Math.random() * 1000)}`);
         
         if (!fs.existsSync(requestDir)) {
@@ -134,7 +127,7 @@ async function handleVideoQualityReply(message) {
         }
 
         setImmediate(() => {
-            processMediaInBackground(message, requestData.targetQuery, chosenOption, cookiesPath, requestDir);
+            processMediaInBackground(message, requestData.targetQuery, chosenOption, requestDir);
         });
 
         return true;
@@ -197,7 +190,6 @@ async function handleVideoQualityReply(message) {
         await message.reply(`⏳ *Processing...* Fetching ${chosenBitrate} ${mediaTypeLabel} in the background.`);
 
         const projectRoot = path.join(__dirname, '..', '..');
-        const cookiesPath = path.join(projectRoot, 'cookies.txt');
         const requestDir = path.join(projectRoot, 'downloads', `req_${Date.now()}_${Math.floor(Math.random() * 1000)}`);
         
         if (!fs.existsSync(requestDir)) {
@@ -211,7 +203,7 @@ async function handleVideoQualityReply(message) {
         };
 
         setImmediate(() => {
-            processMediaInBackground(message, audioData.targetQuery, chosenOption, cookiesPath, requestDir);
+            processMediaInBackground(message, audioData.targetQuery, chosenOption, requestDir);
         });
 
         return true;
@@ -223,7 +215,7 @@ async function handleVideoQualityReply(message) {
 /**
  * Executes yt-dlp download and handles file delivery with a strict 50MB size guardrail
  */
-function processMediaInBackground(message, targetQuery, chosenOption, cookiesPath, requestDir) {
+function processMediaInBackground(message, targetQuery, chosenOption, requestDir) {
     const outputTemplate = path.join(requestDir, '%(title)s.%(ext)s');
     const safeQuery = targetQuery.replace(/'/g, "'\\''");
 
@@ -231,15 +223,15 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
 
     if (chosenOption.audioOnly) {
         if (chosenOption.isVoiceNote) {
-            ytDlpCmd = `yt-dlp --restrict-filenames -x --audio-format m4a --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+            ytDlpCmd = `yt-dlp --extractor-args "youtube:player_client=android" --restrict-filenames -x --audio-format m4a --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
         } else {
-            ytDlpCmd = `yt-dlp --restrict-filenames -x --audio-format mp3 --audio-quality ${chosenOption.bitrate} --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+            ytDlpCmd = `yt-dlp --extractor-args "youtube:player_client=android" --restrict-filenames -x --audio-format mp3 --audio-quality ${chosenOption.bitrate} --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
         }
     } else {
         const height = chosenOption.height;
-        const formatRule = `bv*[height<=${height}][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=${height}]+ba/b[height<=${height}]/b`;
-        // Removed cookies and restored the android,ios mobile client bypass
-        ytDlpCmd = `yt-dlp --extractor-args "youtube:player_client=android,ios" --restrict-filenames -f "${formatRule}" --merge-output-format mp4 --postprocessor-args "ffmpeg:-c:v libx264 -c:a aac -b:a 128k" --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+        const formatRule = `bv*[height<=${height}][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=${height}]+ba/b[height<=${height}]`;
+        // Use Android player client; no cookies file is passed.
+        ytDlpCmd = `yt-dlp --extractor-args "youtube:player_client=android" --restrict-filenames -f "${formatRule}" --merge-output-format mp4 --postprocessor-args "ffmpeg:-c:v libx264 -c:a aac -b:a 128k" --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
     }
 
     exec(ytDlpCmd, { maxBuffer: 50 * 1024 * 1024 }, async (error) => {
@@ -270,7 +262,7 @@ function processMediaInBackground(message, targetQuery, chosenOption, cookiesPat
                 await message.reply(
                     `❌ *File Too Large (${fileSizeInMB.toFixed(1)} MB)*\n\n` +
                     `Files over 50MB overwhelm WhatsApp Web and cause Puppeteer to freeze.\n` +
-                    `Please choose *1️⃣ (360p)* or *2️⃣ (480p)* to download a smaller, safe version!`
+                    `Try a shorter video or choose *5️⃣ Audio Only* to stay within WhatsApp's video size limit.`
                 );
                 return;
             }

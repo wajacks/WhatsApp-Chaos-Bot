@@ -83,13 +83,13 @@ Run this once on the server:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y \\
-  ca-certificates fonts-liberation libasound2 libatk-bridge2.0-0 \\
-  libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 \\
-  libfontconfig1 libgbm1 libgcc1 libglib2.0-0 libgtk-3-0 \\
-  libnspr4 libnss3 libpango-1.0-0 libpangocairo-1.0-0 \\
-  libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 \\
-  libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 \\
+sudo apt-get install -y \
+  ca-certificates fonts-liberation libasound2 libatk-bridge2.0-0 \
+  libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 \
+  libfontconfig1 libgbm1 libgcc1 libglib2.0-0 libgtk-3-0 \
+  libnspr4 libnss3 libpango-1.0-0 libpangocairo-1.0-0 \
+  libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 \
+  libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 \
   libxrandr2 libxrender1 libxss1 libxtst6 lsb-release wget xdg-utils
 ```
 
@@ -165,7 +165,7 @@ PM2 prints a system command. Run that command, then save the process list:
 pm2 save
 ```
 
-See the [PM2 startup guide](https://pm2.keymetrics.io/docs/usage/startup/) for details. The setup script intentionally leaves process-manager installation and boot configuration to you.
+See the [PM2 startup guide](https://pm2.keymetrics.io/docs/usage/startup/) for details. The setup script intentionally leaves process-manager installation and boot configuration to you. The in-chat `!owner restart` and `!owner update` commands require the bot to run in PM2 under the name `chaos-bot`.
 
 Useful commands:
 
@@ -178,11 +178,11 @@ pm2 stop chaos-bot
 
 ## 🎵 Optional media and assets
 
-These tools are separate from the core setup. Add them only when you need the related features.
+The bundled OGG tracks support `!song` without extra system tools. Install the optional packages below for voice generation, hymn audio, and YouTube downloads.
 
 ### Voice and audio conversion
 
-Install FFmpeg on Ubuntu/Debian:
+Voice note generation and hymn piano audio use FFmpeg. Install it on Ubuntu/Debian:
 
 ```bash
 sudo apt-get install -y ffmpeg
@@ -190,41 +190,24 @@ sudo apt-get install -y ffmpeg
 
 ### YouTube downloads
 
-The media downloader needs `yt-dlp`; audio extraction and media conversion also use FFmpeg. The current `!video` handler is marked as under maintenance, so installing these tools does not enable it.
+`!video` is active. It offers video at up to 360p and audio-only downloads. The handler asks yt-dlp to use YouTube's Android player client and does not pass a cookies file. No `cookies.txt` or bgutil token server is required. Higher video resolutions are not offered because only 360p has been reliable.
 
-<details>
-<summary><strong>Optional yt-dlp and bgutil setup</strong></summary>
-
-Use a Python virtual environment so the media packages do not modify the server’s system Python:
+Install yt-dlp in a Python virtual environment and FFmpeg for audio extraction and video conversion:
 
 ```bash
-sudo apt-get install -y python3-venv
+sudo apt-get install -y ffmpeg python3-venv
 python3 -m venv "$HOME/.venvs/chaos-media"
-"$HOME/.venvs/chaos-media/bin/python" -m pip install --upgrade pip yt-dlp bgutil-ytdlp-pot-provider
+"$HOME/.venvs/chaos-media/bin/python" -m pip install --upgrade pip 'yt-dlp[default]'
 export PATH="$HOME/.venvs/chaos-media/bin:$PATH"
 yt-dlp --version
 ```
 
-The bgutil package installed above is the yt-dlp plugin. Its HTTP token server is a separate Node application. Follow the [upstream setup guide](https://github.com/Brainicism/bgutil-ytdlp-pot-provider#installation) and choose matching plugin/server versions. The native server setup is:
-
-```bash
-git clone --single-branch --branch 2.0.2 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git "$HOME/bgutil-ytdlp-pot-provider"
-cd "$HOME/bgutil-ytdlp-pot-provider/server"
-npm ci
-npx tsc
-node build/main.js
-```
-
-The example uses provider release `2.0.2`; check the upstream guide for the current matching release before installing. The server listens locally on port `4416` by default. Keep it on localhost and never expose that port publicly. To manage it with PM2, install PM2 as described below and start the built `server/build/main.js` process from the server directory.
-
-The bot’s current video code passes a project-root `cookies.txt` file to yt-dlp. If you re-enable that handler, provide a valid cookies file or remove the cookie argument in code. Keep cookies private and out of Git.
-
-</details>
+If the bot runs under PM2, make sure its environment still includes the virtual environment's `bin` directory after reboot so the process can find `yt-dlp`.
 
 ### Optional game assets
 
 - **Mafia:** `rules.pdf` and either `briefing.mp3` or `briefing.ogg` may be placed in the project root. Missing files are skipped by the game.
-- **Random songs:** OGG files belong under `src/assets`. The current random-song handler is marked as under maintenance.
+- **Random songs:** `!song` uses the OGG files bundled under `src/assets`.
 
 ### Memory and swap
 
@@ -237,7 +220,8 @@ The WhatsApp login is saved under `data/session`. User economy data and game sta
 - Keep the bot running as the same operating-system user so it can read its session and data.
 - Back up `data/` securely before replacing a server or reinstalling.
 - Stop the old instance before moving the WhatsApp session to another server. Do not run two bot instances with the same WhatsApp session at once.
-- Treat backups of `data/` as private: they can contain authentication state and player identifiers.
+- The setup script restricts `data/`, `data/session/`, and `downloads/` to the bot account. Treat backups of `data/` as private: they contain authentication state and player identifiers.
+- The Class Portal also writes a scheduled backup to `data/classdb_backup.json`; continue backing up the full `data/` directory.
 
 ## 🧰 Troubleshooting
 
@@ -251,7 +235,7 @@ Install the Ubuntu/Debian libraries above. Puppeteer’s [troubleshooting guide]
 Check that the bot runs as the same user and that `data/session` is writable and persistent. If you moved servers, link the device again if the saved session cannot be reused.
 
 **YouTube downloads fail**  
-Confirm `yt-dlp` and FFmpeg are installed, then check whether your network or YouTube requires cookies or the optional bgutil provider. The provider does not guarantee that YouTube will allow a download.
+Confirm `yt-dlp` and FFmpeg are installed and available in the bot process's `PATH`. The current handler uses YouTube's Android player client, does not pass cookies, and offers video at up to 360p.
 
 ## 🔄 Updating
 
@@ -272,7 +256,6 @@ Do not commit or publicly share:
 
 - `.env` — API keys and configuration
 - `data/` — WhatsApp session, player profiles, and game state
-- `cookies.txt` — YouTube cookies, if used
 - `downloads/` — requested media files
 
 These paths are ignored by Git where applicable. Check `git status` before pushing deployment changes.

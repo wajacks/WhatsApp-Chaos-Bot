@@ -5,6 +5,7 @@ function registerClientEvents(client, {
     startDailyReminders,
     startTimetableMonitor,
     startClassWeekendBroadcast,
+    startSystemMaintenance,
     restoreWordForgeGames
 }) {
     client.on('code', (code) => {
@@ -27,6 +28,7 @@ function registerClientEvents(client, {
         startDailyReminders(client);
         startTimetableMonitor(client);
         startClassWeekendBroadcast(client);
+        startSystemMaintenance(client);
         restoreWordForgeGames(client);
     });
 

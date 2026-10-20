@@ -497,7 +497,11 @@ async function sendDynamicReminders(client, timeOfDay) {
     }
 }
 
+let systemMaintenanceStarted = false;
+
 function startSystemMaintenance(client) {
+    if (systemMaintenanceStarted) return;
+    systemMaintenanceStarted = true;
     // 1. MIDNIGHT SWEEP: Closes orphaned roll calls at 11:59 PM daily
     cron.schedule('59 23 * * *', () => {
         const db = readClassDB();
@@ -516,8 +520,8 @@ function startSystemMaintenance(client) {
     cron.schedule('0 3 */3 * *', async () => {
         const fs = require('fs');
         const path = require('path');
-        const dbPath = path.join(__dirname, '..', 'database', 'classdb.json');
-        const backupPath = path.join(__dirname, '..', 'database', 'classdb_backup.json');
+        const dbPath = path.join(__dirname, '..', '..', 'data', 'classdb.json');
+        const backupPath = path.join(__dirname, '..', '..', 'data', 'classdb_backup.json');
 
         try {
             // Overwrites the old backup with the new one
@@ -555,4 +559,5 @@ module.exports = {
     startPollMonitor,
     startDailyReminders,
     startClassWeekendBroadcast,
+    startSystemMaintenance,
 };

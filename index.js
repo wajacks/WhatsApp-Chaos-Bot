@@ -110,7 +110,7 @@ const { resetClassDB, readClassDB, writeClassDB } = require('./src/database/clas
 const { isUserInClassSession, endSession } = require('./src/tools/classSession');
 const classHandler = require('./src/commands/classHandler');
 const { handleAttendance } = require('./src/commands/classHandler');
-const { startDeadlineMonitor, startPollMonitor, startDailyReminders, startTimetableMonitor, startClassWeekendBroadcast } = require('./src/tools/classSession');
+const { startDeadlineMonitor, startPollMonitor, startDailyReminders, startTimetableMonitor, startClassWeekendBroadcast, startSystemMaintenance } = require('./src/tools/classSession');
 
 
 const {
@@ -264,6 +264,7 @@ function initializeChaosBot(options) {
         startDailyReminders,
         startTimetableMonitor,
         startClassWeekendBroadcast,
+        startSystemMaintenance,
         restoreWordForgeGames
     });
 
