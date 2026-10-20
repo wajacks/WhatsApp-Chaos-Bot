@@ -30,6 +30,7 @@ const { claimGame, releaseGame } = require('./gameRegistry');
 const LOBBY_STATE = 'LOBBY';
 const RULES_READ_STATE = 'READING_RULES';
 const PLAYING_STATE = 'PLAYING';
+const STOPPING_STATE = 'STOPPING';
 
 const RULES_READ_DURATION = 20 * 1000;
 const TURN_DURATION = 30 * 1000;
@@ -122,7 +123,11 @@ async function startWordChainLobby(message) {
             return;
         }
 
-        if (existingGame.state === PLAYING_STATE || existingGame.state === RULES_READ_STATE) {
+        if (
+            existingGame.state === PLAYING_STATE ||
+            existingGame.state === RULES_READ_STATE ||
+            existingGame.state === STOPPING_STATE
+        ) {
             await message.reply(
                 '⚠️ A Word Chain game is already running in this chat.'
             );
@@ -162,8 +167,6 @@ async function startWordChainLobby(message) {
         currentWord: null,
 
         requiredLetters: null,
-
-        matchTimer: null,
 
         rulesTimer: null,
 
@@ -532,6 +535,8 @@ async function processWordChain(message, client) {
 
 
     // ============================================================
+    // CHECK DICTIONARY
+    // ============================================================
 
     if (!wordSet.has(word)) {
         await message.reply(
@@ -672,14 +677,12 @@ async function stopWordChain(
     const game =
         activeWordChainGames.get(chatId);
 
-    if (!game) {
+    if (!game || game.state === STOPPING_STATE) {
         return;
     }
 
-    if (game.matchTimer) {
-        clearTimeout(game.matchTimer);
-        game.matchTimer = null;
-    }
+    const wasLobby = game.state === LOBBY_STATE;
+    game.state = STOPPING_STATE;
 
     if (game.rulesTimer) {
         clearTimeout(game.rulesTimer);
@@ -698,7 +701,7 @@ async function stopWordChain(
     // LOBBY CANCELLATION
     // ============================================================
 
-    if (game.state === LOBBY_STATE) {
+    if (wasLobby) {
         activeWordChainGames.delete(
             chatId
         );
