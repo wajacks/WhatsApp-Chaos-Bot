@@ -138,7 +138,7 @@ const handlePendingDrawSelection = async (context) => {
         if (pendingDrawChoice && pendingDrawChoice.expiresAt <= Date.now()) {
             clearTimeout(pendingDrawChoice.timer);
             imageState.pendingDrawChoices.delete(imageChoiceKey);
-            if (/^[1-3]$/.test(text)) {
+            if (/^[12]$/.test(text)) {
                 await message.reply('⌛ That image selection expired. Send !draw <prompt> to start again.');
                 return true;
             }
@@ -161,7 +161,7 @@ const handlePendingDrawSelection = async (context) => {
             }
             const choice = imageState.IMAGE_MODEL_CHOICES.find((item) => item.number === text);
             if (!choice) {
-                await message.reply('Choose 1, 2, or 3, or reply `cancel`.');
+                await message.reply('Choose 1 or 2, or reply `cancel`.');
                 return true;
             }
             if (imageState.drawGenerationInProgress) {
@@ -180,7 +180,7 @@ const handlePendingDrawSelection = async (context) => {
                 return true;
             }
             if (choice.kind === 'azure' && (!process.env.AZURE_OPENAI_KEY || !process.env.AZURE_OPENAI_ENDPOINT)) {
-                await message.reply('⚙️ Azure image generation is not configured. You can choose 3 for Pollinations instead.');
+                await message.reply('⚙️ Azure image generation is not configured. You can choose 2 for Pollinations instead.');
                 return true;
             }
 
@@ -242,7 +242,7 @@ const handleImageCommands = async (context) => {
             const menu = imageState.IMAGE_MODEL_CHOICES.map((choice) =>
                 choice.number + '. ' + choice.label + ' — ' + choice.description + (choice.kind === 'azure' ? ' ($5,000 game dollars)' : ' (free)')
             ).join('\n');
-            await message.reply('🎨 *Image Studio — best-first model choices*\n\n' + menu + '\n\nAzure images cost $5,000; Pollinations is free. Reply with 1, 2, or 3 within 60 seconds. Reply `cancel` to stop.');
+            await message.reply('🎨 *Image Studio — best-first model choices*\n\n' + menu + '\n\nAzure images cost $5,000; Pollinations is free. Reply with 1 or 2 within 60 seconds. Reply `cancel` to stop.');
             return true;
         }
 
