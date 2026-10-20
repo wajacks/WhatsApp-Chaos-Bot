@@ -34,24 +34,21 @@ The lobby host must also join as a player. Only the host can start or stop a gam
 
 ## 🎨 Image Studio
 
-Use one command: `!draw <prompt>`. The bot shows the available image models from the strongest Azure option to the free fallback:
+Use one command: `!draw <prompt>`. The bot offers:
 
-1. **GPT-image-2.5-Sunburst** — highest-capability Azure option (uses Azure credits)
-2. **GPT-image-2** — strong general-purpose Azure option (uses Azure credits)
-3. **Pollinations** — free fallback
+1. **GPT-image-2** — Azure image generation, costs $5,000 game dollars.
+2. **Pollinations** — free.
 
-Reply with `1`, `2`, or `3` within 60 seconds to generate with that model. Reply `cancel` to stop. Each request generates one image with the model you choose; Azure choices use Azure credits.
-
-Configure the Azure deployment names with `AZURE_OPENAI_IMAGE_DEPLOYMENT` and `AZURE_OPENAI_IMAGE_DEPLOYMENT_SUNBURST` in `.env`; both default names match the deployments shown in Azure. Azure image requests wait up to five minutes by default; set `AZURE_OPENAI_IMAGE_TIMEOUT_MS` to change that limit.
+Reply with `1` or `2` within 60 seconds to generate. Reply `cancel` to stop. Azure uses `AZURE_OPENAI_IMAGE_DEPLOYMENT` (defaults to `gpt-image-2`). Image requests wait up to five minutes by default; set `AZURE_OPENAI_IMAGE_TIMEOUT_MS` to change that limit.
 
 
 ## 🔍 Image Analysis
 
-Attach a photo with a caption such as `!analyze What is happening here?`, or reply to a photo with `!analyze <question>`. The bot sends the image and question to the Azure vision-capable chat deployment and replies with a text analysis.
+Attach a photo with a caption such as `!analyze What is happening here?`, or reply to a photo with `!analyze <question>`. The bot sends the image and question to the Azure vision-capable chat deployment and replies with a text analysis. Analysis costs $2,000 game dollars; the owner is exempt.
 
 Supported formats are JPEG, PNG, WebP, and GIF. Images must be smaller than 10 MB. The command uses `AZURE_OPENAI_CHAT_DEPLOYMENT` and consumes Azure usage. If WhatsApp cannot download the image, resend it as a regular photo rather than a view-once image.
 
-Image generation and analysis are available to the configured owner by default. The owner can grant temporary access with `!owner allow <WhatsApp number> <duration>`; for example, `!owner allow 254712345678 2h`. Durations use `m`, `h`, or `d` and can be up to 365 days. Use `!owner revoke <WhatsApp number>` to end a grant early and `!owner allowed` to see active grants. Grants are saved in the ignored `data/` directory and survive bot restarts.
+Azure image generation costs $5,000 game dollars; Pollinations is free. Image analysis costs $2,000 game dollars. The owner is exempt. To purchase game dollars, send M-Pesa to 0111659469, then submit `!buycoins <KSh amount> <M-Pesa transaction code>`. The owner verifies the payment before crediting the balance.
 
 ## 🚀 First-time setup
 
@@ -125,8 +122,7 @@ nano .env
 | `AZURE_OPENAI_KEY` | **Yes for startup** | Azure OpenAI credential. The current app constructs this client during startup. |
 | `AZURE_OPENAI_ENDPOINT` | **Yes for startup** | Azure resource endpoint, for example `https://your-resource.openai.azure.com/`. |
 | `AZURE_OPENAI_CHAT_DEPLOYMENT` | Recommended | The deployment name configured in your Azure resource. The code falls back to `gpt-4o-mini`. |
-| `AZURE_OPENAI_IMAGE_DEPLOYMENT` | Optional | Deployment used by `!draw --gpt-image-2`; defaults to `gpt-image-2`. |
-| `AZURE_OPENAI_IMAGE_DEPLOYMENT_SUNBURST` | Optional | Deployment used by `!draw --sunburst`; defaults to `gpt-image-2.5-sunburst`. |
+| `AZURE_OPENAI_IMAGE_DEPLOYMENT` | Optional | Azure deployment offered as choice 1 in `!draw`; defaults to `gpt-image-2`. |
 | `AZURE_OPENAI_IMAGE_TIMEOUT_MS` | Optional | Azure image request timeout in milliseconds; defaults to 300000 (5 minutes). |
 | `OWNER_NUMBER` | Recommended | Owner controls. Use the full international number with digits only, such as `254712345678`. |
 | `GEMINI_API_KEY` | Optional | Enables Gemini-powered features. |
