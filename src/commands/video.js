@@ -223,15 +223,15 @@ function processMediaInBackground(message, targetQuery, chosenOption, requestDir
 
     if (chosenOption.audioOnly) {
         if (chosenOption.isVoiceNote) {
-            ytDlpCmd = `yt-dlp --extractor-args "youtube:player_client=android,ios" --restrict-filenames -x --audio-format m4a --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+            ytDlpCmd = `yt-dlp --extractor-args "youtube:player_client=android" --restrict-filenames -x --audio-format m4a --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
         } else {
-            ytDlpCmd = `yt-dlp --extractor-args "youtube:player_client=android,ios" --restrict-filenames -x --audio-format mp3 --audio-quality ${chosenOption.bitrate} --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+            ytDlpCmd = `yt-dlp --extractor-args "youtube:player_client=android" --restrict-filenames -x --audio-format mp3 --audio-quality ${chosenOption.bitrate} --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
         }
     } else {
         const height = chosenOption.height;
         const formatRule = `bv*[height<=${height}][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=${height}]+ba/b[height<=${height}]`;
-        // Use Android/iOS player clients; no cookies file is passed.
-        ytDlpCmd = `yt-dlp --extractor-args "youtube:player_client=android,ios" --restrict-filenames -f "${formatRule}" --merge-output-format mp4 --postprocessor-args "ffmpeg:-c:v libx264 -c:a aac -b:a 128k" --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+        // Use Android player client; no cookies file is passed.
+        ytDlpCmd = `yt-dlp --extractor-args "youtube:player_client=android" --restrict-filenames -f "${formatRule}" --merge-output-format mp4 --postprocessor-args "ffmpeg:-c:v libx264 -c:a aac -b:a 128k" --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
     }
 
     exec(ytDlpCmd, { maxBuffer: 50 * 1024 * 1024 }, async (error) => {
