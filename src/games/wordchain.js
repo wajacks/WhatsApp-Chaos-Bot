@@ -449,21 +449,20 @@ function promptCurrentPlayer(chatId, client) {
 
             currentGame.turnResolved = true;
 
-            await client.sendMessage(
-                chatId,
-                `⏰ @${currentPlayer.id.split('@')[0]} ran out of time!\n\n` +
-                `This counts as turn ${(currentGame.turnsTaken.get(currentPlayer.id) || 0) + 1}/${TURNS_PER_PLAYER}.`,
-                {
-                    mentions: [
-                        currentPlayer.id
-                    ]
-                }
-            );
+            try {
+                await client.sendMessage(
+                    chatId,
+                    `⏰ @${currentPlayer.id.split('@')[0]} ran out of time!\n\n` +
+                    `This counts as turn ${(currentGame.turnsTaken.get(currentPlayer.id) || 0) + 1}/${TURNS_PER_PLAYER}.`,
+                    {
+                        mentions: [currentPlayer.id]
+                    }
+                );
+            } catch (err) {
+                console.error('[WORD CHAIN] Timeout notice error:', err);
+            }
 
-            advanceTurn(
-                chatId,
-                client
-            );
+            advanceTurn(chatId, client);
         },
         TURN_DURATION
     );
@@ -498,16 +497,16 @@ async function processWordChain(message, client) {
         return false;
     }
 
-    if (game.turnResolved) {
-        return true;
-    }
-
     // ============================================================
     // ONLY CURRENT PLAYER CAN PLAY
     // ============================================================
 
     if (senderId !== currentPlayer.id) {
         return false;
+    }
+
+    if (game.turnResolved) {
+        return true;
     }
 
     const text =
@@ -612,20 +611,26 @@ async function processWordChain(message, client) {
         newScore
     );
 
-    await message.react('✅');
+    try {
+        await message.react('✅');
+    } catch (err) {
+        console.error('[WORD CHAIN] Reaction error:', err);
+    }
 
-    await client.sendMessage(
-        chatId,
-        `✅ *${word.toUpperCase()}* accepted!\n\n` +
-        `@${currentPlayer.id.split('@')[0]} earns *${points} point${points === 1 ? '' : 's'}*.\n` +
-        `Score: *${newScore}*\n` +
-        `Next required letters: *${game.requiredLetters.toUpperCase()}*`,
-        {
-            mentions: [
-                currentPlayer.id
-            ]
-        }
-    );
+    try {
+        await client.sendMessage(
+            chatId,
+            `✅ *${word.toUpperCase()}* accepted!\n\n` +
+            `@${currentPlayer.id.split('@')[0]} earns *${points} point${points === 1 ? '' : 's'}*.\n` +
+            `Score: *${newScore}*\n` +
+            `Next required letters: *${game.requiredLetters.toUpperCase()}*`,
+            {
+                mentions: [currentPlayer.id]
+            }
+        );
+    } catch (err) {
+        console.error('[WORD CHAIN] Accepted-word notice error:', err);
+    }
 
     advanceTurn(
         chatId,
