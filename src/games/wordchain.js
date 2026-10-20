@@ -182,7 +182,7 @@ async function startWordChainLobby(message) {
         '`!wjoin`\n\n' +
         'Host must also join with !wjoin. Minimum players: *2*\n' +
         'Each player gets *10 turns* of up to *30 seconds*.\n' +
-        'Maximum game time: *5 minutes × number of players*.\n\n' +
+        'Ends after all turns (max *5 minutes × players* + 20s briefing).\n\n' +
         'When everyone is ready, the host can use:\n' +
         '`!startwordchain`'
     );
@@ -356,7 +356,8 @@ async function startWordChainGame(message, client) {
         'Use one unused English word containing all 3 letters, in any order.\n' +
         'Example (T-H-E): ENTHUSIASTIC = 1, THUNDER = 2, THEATER = 3.\n' +
         'Scoring: 1 any order; 2 in order (gaps OK); 3 consecutive in order.\n' +
-        'Each player gets 10 turns; each turn is 30 seconds.\n\n' +
+        'Each player gets 10 turns; the game ends after all 10 are used.\n' +
+        'Each turn lasts 30 seconds.\n\n' +
         '⏳ First turn starts in 20 seconds so everyone can read.'
     );
 
@@ -444,8 +445,7 @@ function promptCurrentPlayer(chatId, client) {
             await client.sendMessage(
                 chatId,
                 `⏰ @${currentPlayer.id.split('@')[0]} ran out of time!\n\n` +
-                `This counts as turn ${(currentGame.turnsTaken.get(currentPlayer.id) || 0) + 1}/${TURNS_PER_PLAYER}.\n` +
-                `The turn goes to the next player.`,
+                `This counts as turn ${(currentGame.turnsTaken.get(currentPlayer.id) || 0) + 1}/${TURNS_PER_PLAYER}.`,
                 {
                     mentions: [
                         currentPlayer.id
