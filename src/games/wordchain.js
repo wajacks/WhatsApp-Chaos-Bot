@@ -172,6 +172,8 @@ async function startWordChainLobby(message) {
 
         turnTimer: null,
 
+        turnResolved: false,
+
         clientRef: null
     });
 
@@ -393,6 +395,8 @@ function promptCurrentPlayer(chatId, client) {
         game.turnTimer = null;
     }
 
+    game.turnResolved = false;
+
     const player =
         game.players[
             game.currentTurnIndex
@@ -428,7 +432,8 @@ function promptCurrentPlayer(chatId, client) {
 
             if (
                 !currentGame ||
-                currentGame.state !== PLAYING_STATE
+                currentGame.state !== PLAYING_STATE ||
+                currentGame.turnResolved
             ) {
                 return;
             }
@@ -441,6 +446,8 @@ function promptCurrentPlayer(chatId, client) {
             if (!currentPlayer) {
                 return;
             }
+
+            currentGame.turnResolved = true;
 
             await client.sendMessage(
                 chatId,
@@ -489,6 +496,10 @@ async function processWordChain(message, client) {
 
     if (!currentPlayer) {
         return false;
+    }
+
+    if (game.turnResolved) {
+        return true;
     }
 
     // ============================================================
@@ -575,6 +586,8 @@ async function processWordChain(message, client) {
     // ============================================================
     // VALID WORD
     // ============================================================
+
+    game.turnResolved = true;
 
     if (game.turnTimer) {
         clearTimeout(game.turnTimer);
