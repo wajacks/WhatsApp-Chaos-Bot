@@ -110,7 +110,7 @@ async function handleVideoQualityReply(message) {
             return true;
         }
 
-        // Handles standard video options (1 = 360p, 2 = 480p, 3 = 720p, 4 = 1080p)
+        // Handles the remaining video option (1 = up to 360p).
         const qualityMap = {
             '1': { height: 360, label: '360p', audioOnly: false }
         };
