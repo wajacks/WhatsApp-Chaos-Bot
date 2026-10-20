@@ -262,7 +262,7 @@ function processMediaInBackground(message, targetQuery, chosenOption, requestDir
                 await message.reply(
                     `❌ *File Too Large (${fileSizeInMB.toFixed(1)} MB)*\n\n` +
                     `Files over 50MB overwhelm WhatsApp Web and cause Puppeteer to freeze.\n` +
-                    `Please choose *1️⃣ (360p)* or *2️⃣ (480p)* to download a smaller, safe version!`
+                    `Try a shorter video or choose *5️⃣ Audio Only* to stay within WhatsApp's video size limit.`
                 );
                 return;
             }
