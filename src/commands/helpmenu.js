@@ -36,7 +36,7 @@
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │💳 \`!buycoins <KSh> <M-Pesa code>\`
 │     ☞『_*Request game dollars*_』
-│     Minimum KSh 10 = $20,000; owner approval required.
+│     Pay 0111659469; minimum KSh 10 = $20,000; owner approval required.
 │
 └──────────────────────────────┘
 
