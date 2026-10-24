@@ -7,7 +7,13 @@ const { MessageMedia } = require('whatsapp-web.js');
 
 async function sendHymnPianoAudio(chatId, hymnNumber, hymnTitle, client, hymnalName = 'Nyimbo za Kristo') {
     const projectRoot = path.join(__dirname, '../..');
-    const cookiesPath = path.join(projectRoot, 'cookies.txt');
+    const homeDir = process.env.HOME || require('os').homedir();
+    const venvYtDlp = path.join(homeDir, '.venvs', 'chaos-media', 'bin', 'yt-dlp');
+    const ytDlpExecutable = process.env.YT_DLP_PATH || (fs.existsSync(venvYtDlp) ? venvYtDlp : 'yt-dlp');
+    const configuredCookiesPath = process.env.YOUTUBE_COOKIES_PATH || path.join(projectRoot, 'cookies.txt');
+    const cookiesPath = path.isAbsolute(configuredCookiesPath)
+        ? configuredCookiesPath
+        : path.resolve(projectRoot, configuredCookiesPath);
     const tempDir = path.join(projectRoot, 'temp');
     const timestamp = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
     const outputMp3 = path.join(tempDir, `hymn-${timestamp}.mp3`);
@@ -21,19 +27,24 @@ async function sendHymnPianoAudio(chatId, hymnNumber, hymnTitle, client, hymnalN
         const searchQuery = `ytsearch1:${hymnalName} ${hymnNumber} ${hymnTitle} piano instrumental`;
         console.log(`🎵 [HYMN AUDIO] Searching: ${searchQuery}`);
 
-        const ytDlpArgs = [
+        const ytDlpArgs = ['--js-runtimes', 'node'];
+
+        // Use the same managed yt-dlp and cookie configuration as video downloads.
+        if (fs.existsSync(cookiesPath)) {
+            ytDlpArgs.push('--cookies', cookiesPath);
+        } else {
+            console.warn('[HYMN AUDIO] YouTube cookies not found; attempting download without them.');
+        }
+
+        ytDlpArgs.push(
+            '--no-playlist',
             searchQuery,
             '-x',
             '--audio-format', 'mp3',
             '-o', outputMp3
-        ];
+        );
 
-        // Attach cookies if available to prevent YouTube sign-in blocks
-        if (fs.existsSync(cookiesPath)) {
-            ytDlpArgs.unshift('--cookies', cookiesPath);
-        }
-
-        await execFileAsync('yt-dlp', ytDlpArgs, { windowsHide: true });
+        await execFileAsync(ytDlpExecutable, ytDlpArgs, { windowsHide: true });
 
         if (!fs.existsSync(outputMp3)) return;
 
