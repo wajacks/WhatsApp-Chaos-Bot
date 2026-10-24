@@ -226,8 +226,8 @@ function isSafeYouTubeThumbnail(url) {
 }
 
 function buildVideoPreviewCaption(info, qualityMenu) {
-    const title = String(info.title || 'YouTube video').replace(/\\s+/g, ' ').trim().slice(0, 180);
-    const channel = String(info.channel || '').replace(/\\s+/g, ' ').trim().slice(0, 80);
+    const title = String(info.title || 'YouTube video').replace(/\s+/g, ' ').trim().slice(0, 180);
+    const channel = String(info.channel || '').replace(/\s+/g, ' ').trim().slice(0, 80);
     const topic = safeVideoTopic(info);
     const details = [];
 
@@ -236,8 +236,8 @@ function buildVideoPreviewCaption(info, qualityMenu) {
     if (topic) details.push('🏷️ ' + topic.slice(0, 100));
 
     return '▶️ *' + title + '*'
-        + (details.length ? '\\n' + details.join(' · ') : '')
-        + '\\n\\n' + qualityMenu;
+        + (details.length ? '\n' + details.join(' · ') : '')
+        + '\n\n' + qualityMenu;
 }
 
 function recordVideoTransfer(bytes, elapsedMs) {
