@@ -190,19 +190,25 @@ sudo apt-get install -y ffmpeg
 
 ### YouTube downloads
 
-`!video` is active. It offers video at up to 360p and audio-only downloads. The handler asks yt-dlp to use YouTube's Android player client and does not pass a cookies file. No `cookies.txt` or bgutil token server is required. Higher video resolutions are not offered because only 360p has been reliable.
+`!video` is active. It offers 360p, 480p, and 720p video plus audio-only downloads. Downloads use Node.js as yt-dlp's JavaScript runtime and pass `cookies.txt` from the project root when present. The bot also accepts `YOUTUBE_COOKIES_PATH` in `.env` if you keep the file elsewhere. The cookie file is ignored by Git; transfer it to the server securely and run `chmod 600 cookies.txt`. Never commit or paste the cookie file. If no cookie file is present, yt-dlp attempts an unauthenticated download. Video over 50 MB is rejected to protect WhatsApp Web and the bot's memory. The bot uses the `$HOME/.venvs/chaos-media/bin/yt-dlp` executable when it exists, with `YT_DLP_PATH` available to override it.
 
-Install yt-dlp in a Python virtual environment and FFmpeg for audio extraction and video conversion:
+Install yt-dlp in a Python virtual environment and FFmpeg for audio extraction:
 
 ```bash
 sudo apt-get install -y ffmpeg python3-venv
 python3 -m venv "$HOME/.venvs/chaos-media"
 "$HOME/.venvs/chaos-media/bin/python" -m pip install --upgrade pip 'yt-dlp[default]'
-export PATH="$HOME/.venvs/chaos-media/bin:$PATH"
-yt-dlp --version
+"$HOME/.venvs/chaos-media/bin/yt-dlp" --version
+node --version
 ```
 
-If the bot runs under PM2, make sure its environment still includes the virtual environment's `bin` directory after reboot so the process can find `yt-dlp`.
+The bot automatically uses this virtual environment's yt-dlp executable. Node.js must be available to the bot process for YouTube's JavaScript challenges. To enable cookie-backed downloads, securely copy your Netscape-format YouTube cookie export to `cookies.txt` in the project root, then run:
+
+```bash
+chmod 600 cookies.txt
+```
+
+Keep the cookie file out of Git and refresh it when YouTube expires it. You can set `YOUTUBE_COOKIES_PATH` in `.env` if the file is stored elsewhere.
 
 ### Optional game assets
 
@@ -235,7 +241,7 @@ Install the Ubuntu/Debian libraries above. Puppeteer’s [troubleshooting guide]
 Check that the bot runs as the same user and that `data/session` is writable and persistent. If you moved servers, link the device again if the saved session cannot be reused.
 
 **YouTube downloads fail**  
-Confirm `yt-dlp` and FFmpeg are installed and available in the bot process's `PATH`. The current handler uses YouTube's Android player client, does not pass cookies, and offers video at up to 360p.
+Confirm the bot can access Node.js, FFmpeg, and `$HOME/.venvs/chaos-media/bin/yt-dlp`. Check that the cookie file is present at the project root (or that `YOUTUBE_COOKIES_PATH` is set) and has mode `600`. Cookie exports expire, so refresh them if yt-dlp reports a sign-in or bot-check error. Video requests above 50 MB are rejected.
 
 ## 🔄 Updating
 
