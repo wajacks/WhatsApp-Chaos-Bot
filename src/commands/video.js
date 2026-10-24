@@ -134,7 +134,11 @@ async function getVideoQualityEstimates(targetQuery) {
     const jsonStart = result.stdout.indexOf('{');
     if (jsonStart < 0) throw new Error('yt-dlp returned no JSON metadata');
 
-    const info = JSON.parse(result.stdout.slice(jsonStart));
+    const parsedInfo = JSON.parse(result.stdout.slice(jsonStart));
+    const info = Array.isArray(parsedInfo.entries)
+        ? parsedInfo.entries.find(entry => entry && Array.isArray(entry.formats))
+        : parsedInfo;
+    if (!info) throw new Error('yt-dlp returned no video format metadata');
     return {
         360: estimateQualitySize(info, 360),
         480: estimateQualitySize(info, 480),
@@ -144,7 +148,7 @@ async function getVideoQualityEstimates(targetQuery) {
 
 function formatSize(bytes) {
     const megabytes = bytes / (1024 * 1024);
-    return megabytes < 10 ? megabytes.toFixed(1) + ' MB' : Math.round(megabytes) + ' MB';
+    return megabytes.toFixed(1) + ' MB';
 }
 
 function formatWaitPart(seconds) {
@@ -409,7 +413,7 @@ function processMediaInBackground(message, targetQuery, chosenOption, requestDir
         console.warn('[MEDIA] cookies.txt not found; attempting download without YouTube cookies.');
     }
 
-        args.push('--restrict-filenames');
+    args.push('--restrict-filenames');
 
     if (chosenOption.audioOnly) {
         args.push('-x', '--audio-format', chosenOption.isVoiceNote ? 'm4a' : 'mp3');
