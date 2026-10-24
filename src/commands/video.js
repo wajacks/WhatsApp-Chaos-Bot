@@ -140,9 +140,19 @@ async function getVideoQualityEstimates(targetQuery) {
         : parsedInfo;
     if (!info) throw new Error('yt-dlp returned no video format metadata');
     return {
-        360: estimateQualitySize(info, 360),
-        480: estimateQualitySize(info, 480),
-        720: estimateQualitySize(info, 720)
+        estimates: {
+            360: estimateQualitySize(info, 360),
+            480: estimateQualitySize(info, 480),
+            720: estimateQualitySize(info, 720)
+        },
+        videoInfo: {
+            title: info.title || info.fulltitle || '',
+            channel: info.uploader || info.channel || '',
+            duration: info.duration_string || formatVideoDuration(info.duration),
+            categories: Array.isArray(info.categories) ? info.categories : [],
+            tags: Array.isArray(info.tags) ? info.tags : [],
+            thumbnail: info.thumbnail || ''
+        }
     };
 }
 
@@ -174,6 +184,60 @@ function formatQualityLine(number, label, height, estimates) {
     const warning = estimate.bytes > VIDEO_UPLOAD_LIMIT_BYTES ? ' ⚠️ likely over 50 MB' : '';
     return number + '️⃣ *' + label + '* — ~' + formatSize(estimate.bytes)
         + ' · ' + estimateWaitRange(estimate.bytes) + warning;
+}
+
+function formatVideoDuration(value) {
+    const seconds = Number(value);
+    if (!Number.isFinite(seconds) || seconds < 0) return '';
+    const totalSeconds = Math.round(seconds);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const remainingSeconds = totalSeconds % 60;
+    const pad = number => String(number).padStart(2, '0');
+    return hours
+        ? hours + ':' + pad(minutes) + ':' + pad(remainingSeconds)
+        : minutes + ':' + pad(remainingSeconds);
+}
+
+function safeVideoTopic(info) {
+    const categories = Array.isArray(info.categories) ? info.categories : [];
+    const category = categories.find(value => typeof value === 'string' && value.trim());
+    if (category) return category.trim();
+
+    const tags = Array.isArray(info.tags) ? info.tags : [];
+    return tags.filter(value => typeof value === 'string' && value.trim())
+        .slice(0, 2)
+        .map(value => value.trim())
+        .join(', ');
+}
+
+function isSafeYouTubeThumbnail(url) {
+    try {
+        const hostname = new URL(url).hostname.toLowerCase();
+        return hostname === 'youtube.com'
+            || hostname.endsWith('.youtube.com')
+            || hostname === 'ytimg.com'
+            || hostname.endsWith('.ytimg.com')
+            || hostname === 'googleusercontent.com'
+            || hostname.endsWith('.googleusercontent.com');
+    } catch {
+        return false;
+    }
+}
+
+function buildVideoPreviewCaption(info, qualityMenu) {
+    const title = String(info.title || 'YouTube video').replace(/\\s+/g, ' ').trim().slice(0, 180);
+    const channel = String(info.channel || '').replace(/\\s+/g, ' ').trim().slice(0, 80);
+    const topic = safeVideoTopic(info);
+    const details = [];
+
+    if (channel) details.push('👤 ' + channel);
+    if (info.duration) details.push('⏱️ ' + info.duration);
+    if (topic) details.push('🏷️ ' + topic.slice(0, 100));
+
+    return '▶️ *' + title + '*'
+        + (details.length ? '\\n' + details.join(' · ') : '')
+        + '\\n\\n' + qualityMenu;
 }
 
 function recordVideoTransfer(bytes, elapsedMs) {
@@ -216,12 +280,13 @@ async function handleVideoCommand(message) {
         clearUserPendingStates(chatId);
         await message.reply('🔎 Checking available video sizes…');
 
-        let qualityEstimates = null;
+        let preflight = { estimates: null, videoInfo: null };
         try {
-            qualityEstimates = await getVideoQualityEstimates(targetQuery);
+            preflight = await getVideoQualityEstimates(targetQuery);
         } catch (estimateError) {
-            console.warn('[MEDIA] Could not preflight video sizes:', estimateError.message);
+            console.warn('[MEDIA] Could not preflight video metadata:', estimateError.message);
         }
+        const qualityEstimates = preflight.estimates;
 
         const timeoutId = setTimeout(() => {
             clearUserPendingStates(chatId);
@@ -240,6 +305,18 @@ async function handleVideoCommand(message) {
             '_Reply with 1, 2, 3, or 5_\n\n' +
             '_Size and total wait estimates are approximate; the final 50 MB check still applies._\n' +
             'wantam\t\t\t\t👆😅';
+
+        const thumbnailUrl = preflight.videoInfo && preflight.videoInfo.thumbnail;
+        if (thumbnailUrl && isSafeYouTubeThumbnail(thumbnailUrl)) {
+            try {
+                const previewMedia = await MessageMedia.fromUrl(thumbnailUrl);
+                const caption = buildVideoPreviewCaption(preflight.videoInfo, promptText);
+                await message.client.sendMessage(chatId, previewMedia, { caption });
+                return;
+            } catch (previewError) {
+                console.warn('[MEDIA] Could not send YouTube thumbnail preview:', previewError.message);
+            }
+        }
 
         await message.reply(promptText);
 
