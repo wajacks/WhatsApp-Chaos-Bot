@@ -1,5 +1,5 @@
 const { MessageMedia } = require('whatsapp-web.js');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -54,11 +54,12 @@ async function handleVideoCommand(message) {
         const promptText = 
             `🎬 *Select Media Type / Quality*\n\n` +
             `Reply with the number of your choice within 2 minutes:\n\n` +
-            `\`I prefer 360p so you don't request large files taking forever to download\`\n\n` +
-            `1️⃣ *360p max* (Fast / Small file size)\n` +
+            `1️⃣ *360p* (smallest file)\n` +
+            `2️⃣ *480p*\n` +
+            `3️⃣ *720p* (higher quality; files over 50 MB are blocked)\n` +
             `5️⃣ *Audio Only* (MP3 / Voice Note Options)\n\n` +
             `\t\t‧₊˚🖇️✩ ₊˚🎧⊹♡\n` +
-            `_Reply with \`1\` or \`5\`_\n\n` +
+            `_Reply with \`1\`, \`2\`, \`3\`, or \`5\`_\n\n` +
             `\`wantam\`\t\t\t\t` + `👆😅`;
 
         await message.reply(promptText);
@@ -77,10 +78,10 @@ async function handleVideoQualityReply(message) {
     const selection = message.body.trim().toLowerCase();
 
     // ----------------------------------------------------
-    // 1. Initial Main Menu Selection (1 = 360p, 5 = audio)
+    // 1. Initial Main Menu Selection (1 = 360p, 2 = 480p, 3 = 720p, 5 = audio)
     // ----------------------------------------------------
     if (pendingVideoRequests.has(chatId)) {
-        const validChoices = ['1', '5'];
+        const validChoices = ['1', '2', '3', '5'];
         if (!validChoices.includes(selection)) return false;
 
         const requestData = pendingVideoRequests.get(chatId);
@@ -110,9 +111,11 @@ async function handleVideoQualityReply(message) {
             return true;
         }
 
-        // Handles the remaining video option (1 = up to 360p).
+        // Video choices stay within the existing 50 MB WhatsApp send guard.
         const qualityMap = {
-            '1': { height: 360, label: '360p', audioOnly: false }
+            '1': { height: 360, label: '360p', audioOnly: false },
+            '2': { height: 480, label: '480p', audioOnly: false },
+            '3': { height: 720, label: '720p', audioOnly: false }
         };
 
         const chosenOption = qualityMap[selection];
@@ -217,24 +220,38 @@ async function handleVideoQualityReply(message) {
  */
 function processMediaInBackground(message, targetQuery, chosenOption, requestDir) {
     const outputTemplate = path.join(requestDir, '%(title)s.%(ext)s');
-    const safeQuery = targetQuery.replace(/'/g, "'\\''");
+    const projectRoot = path.join(__dirname, '..', '..');
+    const homeDir = process.env.HOME || require('os').homedir();
+    const venvYtDlp = path.join(homeDir, '.venvs', 'chaos-media', 'bin', 'yt-dlp');
+    const ytDlpExecutable = process.env.YT_DLP_PATH || (fs.existsSync(venvYtDlp) ? venvYtDlp : 'yt-dlp');
+    const configuredCookiesPath = process.env.YOUTUBE_COOKIES_PATH || path.join(projectRoot, 'cookies.txt');
+    const cookiesPath = path.isAbsolute(configuredCookiesPath)
+        ? configuredCookiesPath
+        : path.resolve(projectRoot, configuredCookiesPath);
 
-    let ytDlpCmd = '';
+    const args = ['--js-runtimes', 'node'];
+    if (fs.existsSync(cookiesPath)) {
+        args.push('--cookies', cookiesPath);
+    } else {
+        console.warn('[MEDIA] cookies.txt not found; attempting download without YouTube cookies.');
+    }
+
+    args.push('--restrict-filenames');
 
     if (chosenOption.audioOnly) {
-        if (chosenOption.isVoiceNote) {
-            ytDlpCmd = `yt-dlp --extractor-args "youtube:player_client=android" --restrict-filenames -x --audio-format m4a --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
-        } else {
-            ytDlpCmd = `yt-dlp --extractor-args "youtube:player_client=android" --restrict-filenames -x --audio-format mp3 --audio-quality ${chosenOption.bitrate} --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+        args.push('-x', '--audio-format', chosenOption.isVoiceNote ? 'm4a' : 'mp3');
+        if (!chosenOption.isVoiceNote) {
+            args.push('--audio-quality', chosenOption.bitrate);
         }
     } else {
         const height = chosenOption.height;
-        const formatRule = `bv*[height<=${height}][vcodec^=avc1]+ba[acodec^=mp4a]/bv*[height<=${height}]+ba/b[height<=${height}]`;
-        // Use Android player client; no cookies file is passed.
-        ytDlpCmd = `yt-dlp --extractor-args "youtube:player_client=android" --restrict-filenames -f "${formatRule}" --merge-output-format mp4 --postprocessor-args "ffmpeg:-c:v libx264 -c:a aac -b:a 128k" --no-playlist -o "${outputTemplate}" '${safeQuery}'`;
+        const formatRule = `bv*[height<=${height}][vcodec^=avc1][ext=mp4]+ba[acodec^=mp4a][ext=m4a]/b[height<=${height}][ext=mp4]/bv*[height<=${height}]+ba/b[height<=${height}]`;
+        args.push('-f', formatRule, '--merge-output-format', 'mp4');
     }
 
-    exec(ytDlpCmd, { maxBuffer: 50 * 1024 * 1024 }, async (error) => {
+    args.push('--no-playlist', '-o', outputTemplate, targetQuery);
+
+    execFile(ytDlpExecutable, args, { maxBuffer: 50 * 1024 * 1024 }, async (error) => {
         let downloadedFilePath = null;
 
         try {
@@ -276,8 +293,8 @@ function processMediaInBackground(message, targetQuery, chosenOption, requestDir
                     await message.client.sendMessage(message.from, media);
                 } else {
                     const mp3Media = new MessageMedia(
-                        'audio/mpeg', 
-                        fs.readFileSync(downloadedFilePath).toString('base64'), 
+                        'audio/mpeg',
+                        fs.readFileSync(downloadedFilePath).toString('base64'),
                         path.basename(downloadedFilePath)
                     );
                     await message.client.sendMessage(message.from, mp3Media);
