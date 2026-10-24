@@ -1,5 +1,7 @@
 const { MessageMedia } = require('whatsapp-web.js');
 const { execFile } = require('child_process');
+const { promisify } = require('util');
+const execFileAsync = promisify(execFile);
 const fs = require('fs');
 const path = require('path');
 
@@ -13,6 +15,170 @@ const pendingAudioFormatRequests = new Map();
 
 // Active audio quality selection steps: Map<userChatId, { targetQuery, isVoiceNote, timeoutId }>
 const pendingAudioQualityRequests = new Map();
+const VIDEO_UPLOAD_LIMIT_BYTES = 50 * 1024 * 1024;
+const recentVideoTransferRates = [];
+const DEFAULT_VIDEO_TRANSFER_MBPS = 0.35;
+
+function getYtDlpConfig() {
+    const projectRoot = path.resolve(__dirname, '..', '..');
+    const homeDir = process.env.HOME || require('os').homedir();
+    const venvYtDlp = path.join(homeDir, '.venvs', 'chaos-media', 'bin', 'yt-dlp');
+    const executable = process.env.YT_DLP_PATH || (fs.existsSync(venvYtDlp) ? venvYtDlp : 'yt-dlp');
+    const configuredCookiesPath = process.env.YOUTUBE_COOKIES_PATH || path.join(projectRoot, 'cookies.txt');
+    const cookiesPath = path.isAbsolute(configuredCookiesPath)
+        ? configuredCookiesPath
+        : path.resolve(projectRoot, configuredCookiesPath);
+    const baseArgs = ['--js-runtimes', 'node'];
+
+    if (fs.existsSync(cookiesPath)) {
+        baseArgs.push('--cookies', cookiesPath);
+    }
+
+    return { executable, baseArgs, cookiesPath };
+}
+
+function hasVideoStream(format) {
+    return Boolean(format.vcodec && format.vcodec !== 'none');
+}
+
+function hasAudioStream(format) {
+    return Boolean(format.acodec && format.acodec !== 'none');
+}
+
+function compareFormatQuality(a, b) {
+    return (Number(b.height) || 0) - (Number(a.height) || 0)
+        || (Number(b.fps) || 0) - (Number(a.fps) || 0)
+        || (Number(b.tbr) || 0) - (Number(a.tbr) || 0);
+}
+
+function bestFormat(formats) {
+    return [...formats].sort(compareFormatQuality)[0] || null;
+}
+
+function estimateFormatBytes(format, durationSeconds) {
+    const exactSize = Number(format.filesize);
+    if (Number.isFinite(exactSize) && exactSize > 0) return exactSize;
+
+    const approximateSize = Number(format.filesize_approx);
+    if (Number.isFinite(approximateSize) && approximateSize > 0) return approximateSize;
+
+    const totalBitrate = Number(format.tbr)
+        || ((Number(format.vbr) || 0) + (Number(format.abr) || 0));
+    if (totalBitrate > 0 && durationSeconds > 0) {
+        return totalBitrate * 1000 / 8 * durationSeconds;
+    }
+
+    return null;
+}
+
+function estimateQualitySize(info, maxHeight) {
+    const formats = Array.isArray(info.formats) ? info.formats : [];
+    const duration = Number(info.duration) || 0;
+    const hasHeight = format => Number(format.height) > 0 && Number(format.height) <= maxHeight;
+    const videoOnly = formats.filter(format => hasVideoStream(format) && !hasAudioStream(format) && hasHeight(format));
+    const audioOnly = formats.filter(format => hasAudioStream(format) && !hasVideoStream(format));
+    const preferredVideo = videoOnly.filter(format =>
+        format.ext === 'mp4' && String(format.vcodec).startsWith('avc1')
+    );
+    const preferredAudio = audioOnly.filter(format =>
+        format.ext === 'm4a' && String(format.acodec).startsWith('mp4a')
+    );
+
+    const estimatePair = (video, audio) => {
+        if (!video || !audio) return null;
+        const videoBytes = estimateFormatBytes(video, duration);
+        const audioBytes = estimateFormatBytes(audio, duration);
+        if (!videoBytes || !audioBytes) return null;
+        return { bytes: videoBytes + audioBytes, height: Number(video.height) || maxHeight };
+    };
+
+    const preferredPair = estimatePair(bestFormat(preferredVideo), bestFormat(preferredAudio));
+    if (preferredPair) return preferredPair;
+
+    const combinedMp4 = bestFormat(formats.filter(format =>
+        hasVideoStream(format) && hasAudioStream(format) && format.ext === 'mp4' && hasHeight(format)
+    ));
+    if (combinedMp4) {
+        const bytes = estimateFormatBytes(combinedMp4, duration);
+        if (bytes) return { bytes, height: Number(combinedMp4.height) || maxHeight };
+    }
+
+    const genericPair = estimatePair(bestFormat(videoOnly), bestFormat(audioOnly));
+    if (genericPair) return genericPair;
+
+    const combined = bestFormat(formats.filter(format =>
+        hasVideoStream(format) && hasAudioStream(format) && hasHeight(format)
+    ));
+    if (combined) {
+        const bytes = estimateFormatBytes(combined, duration);
+        if (bytes) return { bytes, height: Number(combined.height) || maxHeight };
+    }
+
+    return null;
+}
+
+async function getVideoQualityEstimates(targetQuery) {
+    const config = getYtDlpConfig();
+    const args = [
+        ...config.baseArgs,
+        '--no-warnings',
+        '--dump-single-json',
+        '--no-playlist',
+        targetQuery
+    ];
+    const result = await execFileAsync(config.executable, args, {
+        windowsHide: true,
+        maxBuffer: 25 * 1024 * 1024,
+        timeout: 90000
+    });
+    const jsonStart = result.stdout.indexOf('{');
+    if (jsonStart < 0) throw new Error('yt-dlp returned no JSON metadata');
+
+    const info = JSON.parse(result.stdout.slice(jsonStart));
+    return {
+        360: estimateQualitySize(info, 360),
+        480: estimateQualitySize(info, 480),
+        720: estimateQualitySize(info, 720)
+    };
+}
+
+function formatSize(bytes) {
+    const megabytes = bytes / (1024 * 1024);
+    return megabytes < 10 ? megabytes.toFixed(1) + ' MB' : Math.round(megabytes) + ' MB';
+}
+
+function formatWaitPart(seconds) {
+    if (seconds < 60) return Math.max(10, Math.round(seconds / 5) * 5) + ' sec';
+    return Math.max(1, Math.round(seconds / 60)) + ' min';
+}
+
+function estimateWaitRange(bytes) {
+    const rates = [...recentVideoTransferRates].sort((a, b) => a - b);
+    const rate = rates.length ? rates[Math.floor(rates.length / 2)] : DEFAULT_VIDEO_TRANSFER_MBPS;
+    const seconds = bytes / (1024 * 1024) / rate + 15;
+    const lower = formatWaitPart(seconds * 0.7);
+    const upper = formatWaitPart(seconds * 1.5);
+    return lower === upper ? '~' + lower : '~' + lower + '–' + upper;
+}
+
+function formatQualityLine(number, label, height, estimates) {
+    const estimate = estimates && estimates[height];
+    if (!estimate || !estimate.bytes) {
+        return number + '️⃣ *' + label + '* — size estimate unavailable';
+    }
+
+    const warning = estimate.bytes > VIDEO_UPLOAD_LIMIT_BYTES ? ' ⚠️ likely over 50 MB' : '';
+    return number + '️⃣ *' + label + '* — ~' + formatSize(estimate.bytes)
+        + ' · ' + estimateWaitRange(estimate.bytes) + warning;
+}
+
+function recordVideoTransfer(bytes, elapsedMs) {
+    if (!bytes || !elapsedMs || elapsedMs < 1000) return;
+    const rate = bytes / (1024 * 1024) / (elapsedMs / 1000);
+    if (!Number.isFinite(rate) || rate <= 0) return;
+    recentVideoTransferRates.push(rate);
+    if (recentVideoTransferRates.length > 5) recentVideoTransferRates.shift();
+}
 
 /**
  * Main entry point for !video command
@@ -44,23 +210,32 @@ async function handleVideoCommand(message) {
         const targetQuery = `${searchPrefix}${text}`;
 
         clearUserPendingStates(chatId);
+        await message.reply('🔎 Checking available video sizes…');
+
+        let qualityEstimates = null;
+        try {
+            qualityEstimates = await getVideoQualityEstimates(targetQuery);
+        } catch (estimateError) {
+            console.warn('[MEDIA] Could not preflight video sizes:', estimateError.message);
+        }
 
         const timeoutId = setTimeout(() => {
             clearUserPendingStates(chatId);
         }, 2 * 60 * 1000);
 
-        pendingVideoRequests.set(chatId, { targetQuery, timeoutId });
+        pendingVideoRequests.set(chatId, { targetQuery, timeoutId, qualityEstimates });
 
-        const promptText = 
-            `🎬 *Select Media Type / Quality*\n\n` +
-            `Reply with the number of your choice within 2 minutes:\n\n` +
-            `1️⃣ *360p* (smallest file)\n` +
-            `2️⃣ *480p*\n` +
-            `3️⃣ *720p* (higher quality; files over 50 MB are blocked)\n` +
-            `5️⃣ *Audio Only* (MP3 / Voice Note Options)\n\n` +
-            `\t\t‧₊˚🖇️✩ ₊˚🎧⊹♡\n` +
-            `_Reply with \`1\`, \`2\`, \`3\`, or \`5\`_\n\n` +
-            `\`wantam\`\t\t\t\t` + `👆😅`;
+        const promptText =
+            '🎬 *Select Media Type / Quality*\n\n' +
+            'Reply with the number of your choice within 2 minutes:\n\n' +
+            formatQualityLine('1', 'Up to 360p', 360, qualityEstimates) + '\n' +
+            formatQualityLine('2', 'Up to 480p', 480, qualityEstimates) + '\n' +
+            formatQualityLine('3', 'Up to 720p', 720, qualityEstimates) + '\n' +
+            '5️⃣ *Audio Only* (MP3 / Voice Note Options)\n\n' +
+            '\t\t‧₊˚🖇️✩ ₊˚🎧⊹♡\n' +
+            '_Reply with 1, 2, 3, or 5_\n\n' +
+            '_Size and total wait estimates are approximate; the final 50 MB check still applies._\n' +
+            'wantam\t\t\t\t👆😅';
 
         await message.reply(promptText);
 
@@ -120,7 +295,11 @@ async function handleVideoQualityReply(message) {
 
         const chosenOption = qualityMap[selection];
 
-        await message.reply(`⏳ *Processing...* Fetching ${chosenOption.label} video in the background.`);
+        const estimate = requestData.qualityEstimates && requestData.qualityEstimates[chosenOption.height];
+        const estimateNote = estimate && estimate.bytes
+            ? ' Estimated size ~' + formatSize(estimate.bytes) + ', rough total wait ' + estimateWaitRange(estimate.bytes) + '.'
+            : ' Size and wait estimate unavailable; the 50 MB cap will still be checked after download.';
+        await message.reply('⏳ *Processing...* Fetching ' + chosenOption.label + ' video.' + estimateNote);
 
         const projectRoot = path.join(__dirname, '..', '..');
         const requestDir = path.join(projectRoot, 'downloads', `req_${Date.now()}_${Math.floor(Math.random() * 1000)}`);
@@ -221,22 +400,16 @@ async function handleVideoQualityReply(message) {
 function processMediaInBackground(message, targetQuery, chosenOption, requestDir) {
     const outputTemplate = path.join(requestDir, '%(title)s.%(ext)s');
     const projectRoot = path.join(__dirname, '..', '..');
-    const homeDir = process.env.HOME || require('os').homedir();
-    const venvYtDlp = path.join(homeDir, '.venvs', 'chaos-media', 'bin', 'yt-dlp');
-    const ytDlpExecutable = process.env.YT_DLP_PATH || (fs.existsSync(venvYtDlp) ? venvYtDlp : 'yt-dlp');
-    const configuredCookiesPath = process.env.YOUTUBE_COOKIES_PATH || path.join(projectRoot, 'cookies.txt');
-    const cookiesPath = path.isAbsolute(configuredCookiesPath)
-        ? configuredCookiesPath
-        : path.resolve(projectRoot, configuredCookiesPath);
+    const processingStartedAt = Date.now();
+    const config = getYtDlpConfig();
+    const ytDlpExecutable = config.executable;
 
-    const args = ['--js-runtimes', 'node'];
-    if (fs.existsSync(cookiesPath)) {
-        args.push('--cookies', cookiesPath);
-    } else {
+    const args = [...config.baseArgs];
+    if (!fs.existsSync(config.cookiesPath)) {
         console.warn('[MEDIA] cookies.txt not found; attempting download without YouTube cookies.');
     }
 
-    args.push('--restrict-filenames');
+        args.push('--restrict-filenames');
 
     if (chosenOption.audioOnly) {
         args.push('-x', '--audio-format', chosenOption.isVoiceNote ? 'm4a' : 'mp3');
@@ -274,7 +447,7 @@ function processMediaInBackground(message, targetQuery, chosenOption, requestDir
             const fileSizeInMB = stats.size / (1024 * 1024);
 
             // HARD CAP GUARDRAIL: Block video files over 50MB from crashing Puppeteer
-            if (fileSizeInMB > 50 && !chosenOption.audioOnly) {
+            if (stats.size > VIDEO_UPLOAD_LIMIT_BYTES && !chosenOption.audioOnly) {
                 console.log(`[OVERSIZE BLOCKED] File size was ${fileSizeInMB.toFixed(2)} MB. Purging download.`);
                 await message.reply(
                     `❌ *File Too Large (${fileSizeInMB.toFixed(1)} MB)*\n\n` +
@@ -301,6 +474,7 @@ function processMediaInBackground(message, targetQuery, chosenOption, requestDir
                 }
             } else {
                 await message.client.sendMessage(message.from, media);
+                recordVideoTransfer(stats.size, Date.now() - processingStartedAt);
             }
 
         } catch (err) {
