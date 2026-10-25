@@ -382,7 +382,7 @@ function createCommandRouter(dependencies) {
                         return true;
                     }
         
-                    const result = transferCoins(economyUserId, recipientId, amount);
+                    const result = transferCoins(economyUserId, recipientId, amount, recipientName);
         
                     if (!result.success) {
                         await message.reply(result.message);
