@@ -242,7 +242,9 @@ function createCommandRouter(dependencies) {
                     lowerText === '!profile' ||
                     lowerText === '!daily' ||
                     lowerText === '!leaderboard' ||
-                    lowerText === '!lb'
+                    lowerText === '!lb' ||
+                    lowerText.startsWith('!leaderboard ') ||
+                    lowerText.startsWith('!lb ')
                 ) {
                     await handleProfileCommand(message, client);
                     return true;
