@@ -202,7 +202,7 @@ function getMoneyLeaderboard(limit = 5) {
                 String(user.name || '')
                     .normalize('NFKC')
                     .trim()
-                    .replace(/\\s+/g, ' ')
+                    .replace(/\s+/g, ' ')
                     .toLocaleLowerCase()
             )
             .filter(Boolean)
@@ -217,7 +217,7 @@ function getMoneyLeaderboard(limit = 5) {
             const normalizedName = String(user.name || '')
                 .normalize('NFKC')
                 .trim()
-                .replace(/\\s+/g, ' ')
+                .replace(/\s+/g, ' ')
                 .toLocaleLowerCase();
 
             return !(isLidProfile && normalizedName && phoneAccountNames.has(normalizedName));
