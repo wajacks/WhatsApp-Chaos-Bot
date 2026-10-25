@@ -89,6 +89,59 @@ function registerClientEvents(client, {
     });
 
 
+    // Reject direct incoming voice/video calls and ask callers to message instead.
+    client.on('call', async (call) => {
+        const callFrom = call?.from;
+        if (!callFrom || call.fromMe || call.isGroup || callFrom.endsWith('@g.us')) return;
+
+        let callerNumber = callFrom.split('@')[0];
+        let replyTo = callFrom;
+
+        try {
+            const contact = await client.getContactById(callFrom);
+            callerNumber = contact?.number || callerNumber;
+        } catch (err) {
+            console.warn('[CALL] Could not load caller contact:', err.message);
+        }
+
+        if (callFrom.endsWith('@lid')) {
+            try {
+                const mappings = await client.getContactLidAndPhone([callFrom]);
+                const resolved = Array.isArray(mappings)
+                    ? mappings.find((mapping) => mapping.lid === callFrom)
+                    : null;
+                const phoneJid = resolved?.pn;
+
+                callerNumber =
+                    phoneJid?.split('@')[0] ||
+                    callerNumber ||
+                    callFrom.split('@')[0];
+                replyTo = phoneJid || callFrom;
+            } catch (err) {
+                console.warn('[CALL] Could not resolve caller LID:', err.message);
+            }
+        }
+
+        const callType = call.isVideo ? 'video' : 'voice';
+        console.log(`[CALL] Received ${callType} call from ${callerNumber}`);
+
+        try {
+            await call.reject();
+            console.log(`[CALL] Rejected ${callType} call from ${callerNumber}`);
+        } catch (err) {
+            console.error('[CALL] Could not reject call:', err.message);
+        }
+
+        try {
+            await client.sendMessage(
+                replyTo,
+                "I don't accept calls on WhatsApp. Please send me a message instead."
+            );
+        } catch (err) {
+            console.error('[CALL] Could not send caller reply:', err.message);
+        }
+    });
+
     client.on('authenticated', () => {
         console.log('WhatsApp authenticated!');
     });
