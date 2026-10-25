@@ -70,9 +70,11 @@ function getPlayerName(player) {
 }
 
 function getWordChainPoints(word, requiredLetters) {
+    const normalizedWord = String(word || '').toLowerCase();
+    const normalizedRequiredLetters = String(requiredLetters || '').toLowerCase();
     const requiredCounts = new Map();
 
-    for (const letter of requiredLetters) {
+    for (const letter of normalizedRequiredLetters) {
         requiredCounts.set(
             letter,
             (requiredCounts.get(letter) || 0) + 1
@@ -80,19 +82,54 @@ function getWordChainPoints(word, requiredLetters) {
     }
 
     for (const [letter, count] of requiredCounts) {
-        const wordCount = word.split(letter).length - 1;
+        const wordCount = normalizedWord.split(letter).length - 1;
         if (wordCount < count) {
             return 0;
         }
     }
 
-    if (word.includes(requiredLetters)) {
+    if (normalizedRequiredLetters === 'ing') {
+        if (normalizedWord.includes('ing')) {
+            return 1;
+        }
+
+        // "ng" together with a separated "i" earns 4 points.
+        for (let nIndex = 0; nIndex < normalizedWord.length - 1; nIndex++) {
+            const gIndex = nIndex + 1;
+            if (normalizedWord[nIndex] !== 'n' || normalizedWord[gIndex] !== 'g') continue;
+
+            for (let iIndex = 0; iIndex < normalizedWord.length; iIndex++) {
+                if (normalizedWord[iIndex] === 'i' &&
+                    Math.abs(iIndex - nIndex) > 1 &&
+                    Math.abs(iIndex - gIndex) > 1) {
+                    return 4;
+                }
+            }
+        }
+
+        // Any order earns 2 when i, n, and g are each separated from the others.
+        for (let iIndex = 0; iIndex < normalizedWord.length; iIndex++) {
+            if (normalizedWord[iIndex] !== 'i') continue;
+            for (let nIndex = 0; nIndex < normalizedWord.length; nIndex++) {
+                if (normalizedWord[nIndex] !== 'n' || Math.abs(iIndex - nIndex) <= 1) continue;
+                for (let gIndex = 0; gIndex < normalizedWord.length; gIndex++) {
+                    if (normalizedWord[gIndex] === 'g' &&
+                        Math.abs(iIndex - gIndex) > 1 &&
+                        Math.abs(nIndex - gIndex) > 1) {
+                        return 2;
+                    }
+                }
+            }
+        }
+    }
+
+    if (normalizedWord.includes(normalizedRequiredLetters)) {
         return POINTS_CONSECUTIVE;
     }
 
     let searchFrom = 0;
-    for (const letter of requiredLetters) {
-        const index = word.indexOf(letter, searchFrom);
+    for (const letter of normalizedRequiredLetters) {
+        const index = normalizedWord.indexOf(letter, searchFrom);
         if (index === -1) {
             return POINTS_ANY_ORDER;
         }
@@ -357,7 +394,8 @@ async function startWordChainGame(message, client) {
         `Required letters: *${game.requiredLetters.toUpperCase()}*\n\n` +
         'Use one unused English word containing all 3 letters, in any order.\n' +
         'Example (T-H-E): ENTHUSIASTIC = 1, THUNDER = 2, THEATER = 3.\n' +
-        'Scoring: 1 any order; 2 in order (gaps OK); 3 consecutive in order.\n' +
+        'Other triples: 1 any order; 2 in order with gaps; 3 consecutive in order.\\n' +
+        'ING exception: consecutive ING = 1; separated I + NG = 4; I, N, and G all separated = 2.\\n' +
         'Each player gets 10 turns; the game ends after all 10 are used.\n' +
         'Each turn lasts 30 seconds.\n\n' +
         '⏳ First turn starts in 20 seconds so everyone can read.'
