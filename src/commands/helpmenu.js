@@ -16,6 +16,9 @@
 │👤 \`!profile\`
 │     ☞『_*Stats, level & assets*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🏆 \`!lb [xp|money]\`
+│     ☞『_*Global player rankings*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │💰 \`!bal\`
 │     ☞『_*Check your wallet*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ

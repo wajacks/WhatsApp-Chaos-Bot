@@ -1,6 +1,7 @@
 const {
     getUser,
     getLeaderboard,
+    getMoneyLeaderboard,
     readDB,
     writeDB
 } = require('../database/db');
@@ -249,24 +250,39 @@ async function handleProfileCommand(message, client) {
     }
 
     // 3. !leaderboard / !lb
+    const commandParts = text.toLowerCase().split(/\s+/);
 
     if (
-        text.toLowerCase() === '!leaderboard' ||
-        text.toLowerCase() === '!lb'
+        commandParts[0] === '!leaderboard' ||
+        commandParts[0] === '!lb'
     ) {
-        const topPlayers =
-            getLeaderboard(5);
+        const boardType = commandParts[1] || 'xp';
+
+        if (!['xp', 'money', 'cash'].includes(boardType)) {
+            await message.reply('Usage: !lb [xp|money]');
+            return;
+        }
+
+        const isMoneyLeaderboard =
+            boardType === 'money' || boardType === 'cash';
+
+        const topPlayers = isMoneyLeaderboard
+            ? getMoneyLeaderboard(5)
+            : getLeaderboard(5);
 
         if (topPlayers.length === 0) {
             await message.reply(
-                '🏆 Leaderboard is currently empty!'
+                isMoneyLeaderboard
+                    ? '💵 Money leaderboard is currently empty!'
+                    : '🏆 XP leaderboard is currently empty!'
             );
 
             return;
         }
 
-        let lbMessage =
-            `🏆 *CHAOS BOT LEADERBOARD* 🏆\n━━━━━━━━━━━━━━━━━━\n`;
+        let lbMessage = isMoneyLeaderboard
+            ? '💵 *GLOBAL MONEY LEADERBOARD* 💵\n━━━━━━━━━━━━━━━━━━\n'
+            : '🏆 *GLOBAL XP LEADERBOARD* 🏆\n━━━━━━━━━━━━━━━━━━\n';
 
         const medals = [
             '🥇',
@@ -277,12 +293,21 @@ async function handleProfileCommand(message, client) {
         ];
 
         topPlayers.forEach((p, index) => {
-            lbMessage +=
-                `${medals[index]} *${p.name}* — Lvl ${p.level || 1} (${p.xp || 0} XP)\n`;
+            if (isMoneyLeaderboard) {
+                const coins = Number(p.coins) || 0;
+                lbMessage +=
+                    medals[index] + ' *' + (p.name || 'Unknown Player') +
+                    '* — $' + coins.toLocaleString() + '\n';
+            } else {
+                lbMessage +=
+                    medals[index] + ' *' + (p.name || 'Unknown Player') +
+                    '* — Lvl ' + (p.level || 1) +
+                    ' (' + (p.xp || 0) + ' XP)\n';
+            }
         });
 
         lbMessage +=
-            `━━━━━━━━━━━━━━━━━━`;
+            '━━━━━━━━━━━━━━━━━━\nUse !lb money for dollars or !lb xp for experience.';
 
         await message.reply(lbMessage);
 
