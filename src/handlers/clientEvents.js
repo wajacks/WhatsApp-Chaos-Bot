@@ -94,8 +94,19 @@ function registerClientEvents(client, {
         const callFrom = call?.from;
         if (!callFrom || call.fromMe || call.isGroup || callFrom.endsWith('@g.us')) return;
 
+        const callType = call.isVideo ? 'video' : 'voice';
         let callerNumber = callFrom.split('@')[0];
         let replyTo = callFrom;
+
+        console.log(`[CALL] Detected incoming ${callType} call from ${callerNumber}`);
+
+        // Reject before contact/LID lookups so WhatsApp receives the action promptly.
+        try {
+            await call.reject();
+            console.log(`[CALL] Rejected ${callType} call from ${callerNumber}`);
+        } catch (err) {
+            console.error('[CALL] Could not reject call:', err.message);
+        }
 
         try {
             const contact = await client.getContactById(callFrom);
@@ -112,24 +123,11 @@ function registerClientEvents(client, {
                     : null;
                 const phoneJid = resolved?.pn;
 
-                callerNumber =
-                    phoneJid?.split('@')[0] ||
-                    callerNumber ||
-                    callFrom.split('@')[0];
+                callerNumber = phoneJid?.split('@')[0] || callerNumber;
                 replyTo = phoneJid || callFrom;
             } catch (err) {
                 console.warn('[CALL] Could not resolve caller LID:', err.message);
             }
-        }
-
-        const callType = call.isVideo ? 'video' : 'voice';
-        console.log(`[CALL] Received ${callType} call from ${callerNumber}`);
-
-        try {
-            await call.reject();
-            console.log(`[CALL] Rejected ${callType} call from ${callerNumber}`);
-        } catch (err) {
-            console.error('[CALL] Could not reject call:', err.message);
         }
 
         try {
@@ -141,6 +139,7 @@ function registerClientEvents(client, {
             console.error('[CALL] Could not send caller reply:', err.message);
         }
     });
+
 
     client.on('authenticated', () => {
         console.log('WhatsApp authenticated!');
