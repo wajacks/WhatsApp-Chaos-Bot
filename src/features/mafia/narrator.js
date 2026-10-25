@@ -7,6 +7,23 @@ function createMafiaNarrator({ ai, azureClient }) {
         const payload = JSON.stringify({ event, context });
     
         try {
+            const response = await azureClient.chat.completions.create({
+                model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || 'gpt-4o-mini',
+                messages: [
+                    { role: 'system', content: systemInstruction },
+                    { role: 'user', content: payload }
+                ],
+                max_tokens: 90
+            });
+            const azureReply = response.choices[0]?.message?.content?.trim();
+            if (azureReply) return azureReply;
+        } catch (azureError) {
+            console.warn('[MAFIA AI NARRATOR] Azure primary failed:', azureError.message);
+        }
+
+        if (!ai) return null;
+
+        try {
             const response = await ai.models.generateContent({
                 model: 'gemini-3.5-flash-lite',
                 contents: [{ role: 'user', parts: [{ text: payload }] }],
@@ -14,21 +31,8 @@ function createMafiaNarrator({ ai, azureClient }) {
             });
             return response.text?.trim() || null;
         } catch (geminiError) {
-            console.warn('[MAFIA AI NARRATOR] Gemini failed:', geminiError.message);
-            try {
-                const response = await azureClient.chat.completions.create({
-                    model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || 'gpt-4o-mini',
-                    messages: [
-                        { role: 'system', content: systemInstruction },
-                        { role: 'user', content: payload }
-                    ],
-                    max_tokens: 90
-                });
-                return response.choices[0]?.message?.content?.trim() || null;
-            } catch (azureError) {
-                console.warn('[MAFIA AI NARRATOR] Azure fallback failed:', azureError.message);
-                return null;
-            }
+            console.warn('[MAFIA AI NARRATOR] Gemini fallback failed:', geminiError.message);
+            return null;
         }
     };
 }

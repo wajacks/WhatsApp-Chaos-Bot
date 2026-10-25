@@ -144,16 +144,16 @@ const {
 } = require('./src/database/imageAccess');
 
 // ============================================================
-// CHAOS NEURAL CORE GEMINI INITIALIZATION
+// OPTIONAL GEMINI FALLBACK INITIALIZATION
 // ============================================================
 
 if (!process.env.GEMINI_API_KEY) {
-    console.warn('⚠️ A GEMINI_API_KEY is missing from .env');
+    console.warn('⚠️ GEMINI_API_KEY is missing; the Gemini fallback will be unavailable.');
 }
 
-const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY
-});
+const ai = process.env.GEMINI_API_KEY
+    ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+    : null;
 
 // AZURE INITIALIZATION
 if (!process.env.AZURE_OPENAI_KEY || !process.env.AZURE_OPENAI_ENDPOINT) {
