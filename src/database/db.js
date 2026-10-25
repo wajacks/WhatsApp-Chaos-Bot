@@ -138,7 +138,7 @@ function deductBalance(userId, amount) {
 }
 
 // Add this inside src/database/db.js
-function transferCoins(senderId, recipientId, amount) {
+function transferCoins(senderId, recipientId, amount, recipientName = 'Unknown Player') {
     const db = readDB();
     const sender = getUser(senderId);
     
@@ -149,7 +149,7 @@ function transferCoins(senderId, recipientId, amount) {
     sender.coins -= amount;
     db[senderId] = sender;
 
-    const recipient = getUser(recipientId);
+    const recipient = getUser(recipientId, recipientName);
     recipient.coins = (recipient.coins || 0) + amount;
     db[recipientId] = recipient;
 
@@ -192,7 +192,37 @@ function getLeaderboard(limit = 5) {
 // Get top users for money leaderboard
 function getMoneyLeaderboard(limit = 5) {
     const db = readDB();
-    return Object.values(db)
+    const accounts = Object.entries(db);
+    const phoneAccountNames = new Set(
+        accounts
+            .filter(([id, user]) =>
+                id.endsWith('@c.us') || user.id?.endsWith('@c.us')
+            )
+            .map(([, user]) =>
+                String(user.name || '')
+                    .normalize('NFKC')
+                    .trim()
+                    .replace(/\s+/g, ' ')
+                    .toLocaleLowerCase()
+            )
+            .filter(Boolean)
+    );
+
+    // Old LID profiles can coexist with a phone-number profile for the same
+    // contact. Prefer the phone-number wallet when both carry the same name.
+    return accounts
+        .filter(([id, user]) => {
+            const isLidProfile =
+                id.endsWith('@lid') || user.id?.endsWith('@lid');
+            const normalizedName = String(user.name || '')
+                .normalize('NFKC')
+                .trim()
+                .replace(/\s+/g, ' ')
+                .toLocaleLowerCase();
+
+            return !(isLidProfile && normalizedName && phoneAccountNames.has(normalizedName));
+        })
+        .map(([, user]) => user)
         .sort((a, b) => (b.coins || 0) - (a.coins || 0))
         .slice(0, limit);
 }
