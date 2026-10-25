@@ -119,17 +119,17 @@ nano .env
 
 | Variable | Required? | Purpose |
 |---|---|---|
-| `AZURE_OPENAI_KEY` | **Yes for startup** | Azure OpenAI credential. The current app constructs this client during startup. |
+| `AZURE_OPENAI_KEY` | **Yes for startup** | Azure OpenAI credential; Azure is the primary provider for AI chat and Mafia narration. |
 | `AZURE_OPENAI_ENDPOINT` | **Yes for startup** | Azure resource endpoint, for example `https://your-resource.openai.azure.com/`. |
-| `AZURE_OPENAI_CHAT_DEPLOYMENT` | Recommended | The deployment name configured in your Azure resource. The code falls back to `gpt-4o-mini`. |
+| `AZURE_OPENAI_CHAT_DEPLOYMENT` | Recommended | Azure chat deployment for AI chat and Mafia narration; defaults to `gpt-4o-mini`. |
 | `AZURE_OPENAI_IMAGE_DEPLOYMENT` | Optional | Azure deployment offered as choice 1 in `!draw`; defaults to `gpt-image-2`. |
 | `AZURE_OPENAI_IMAGE_TIMEOUT_MS` | Optional | Azure image request timeout in milliseconds; defaults to 300000 (5 minutes). |
 | `OWNER_NUMBER` | Recommended | Owner controls. Use the full international number with digits only, such as `254712345678`. |
-| `GEMINI_API_KEY` | Optional | Enables Gemini-powered features. |
+| `GEMINI_API_KEY` | Optional | Enables Gemini fallback for AI chat and Mafia narration when Azure OpenAI is unavailable. |
 | `OPENWEATHERMAP_API_KEY` | Optional | Enables live weather lookups. |
 | `PAIRING_NUMBER` | Optional | Request a WhatsApp pairing code. Leave blank to use a QR code. |
 
-The Azure key and endpoint are needed even if you do not plan to use the AI commands, because the current app initializes the Azure client when it starts. Keep your real `.env` private; never commit it or paste its contents into an issue.
+The Azure key and endpoint are required at startup; Azure OpenAI handles AI chat and Mafia narration as the primary provider. Gemini is only used as a fallback when `GEMINI_API_KEY` is configured. Keep your real `.env` private; never commit it or paste its contents into an issue.
 
 ### 4. Link WhatsApp and start the bot
 
