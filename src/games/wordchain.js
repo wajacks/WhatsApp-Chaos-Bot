@@ -40,7 +40,7 @@ const POINTS_ANY_ORDER = 1;
 const POINTS_IN_ORDER = 2;
 const POINTS_CONSECUTIVE = 3;
 const POINTS_ING_CONSECUTIVE = 1;
-const POINTS_ING_SEPARATE_I = 4;
+const POINTS_ING_SPLIT_GROUP = 4;
 const POINTS_ING_SEPARATED = 2;
 
 const COINS_PER_POINT = 1000;
@@ -105,7 +105,7 @@ function getWordChainPoints(word, requiredLetters) {
                 if (normalizedWord[iIndex] === 'i' &&
                     Math.abs(iIndex - nIndex) > 1 &&
                     Math.abs(iIndex - gIndex) > 1) {
-                    return POINTS_ING_SEPARATE_I;
+                    return POINTS_ING_SPLIT_GROUP;
                 }
             }
         }
@@ -118,7 +118,7 @@ function getWordChainPoints(word, requiredLetters) {
                 if (normalizedWord[gIndex] === 'g' &&
                     Math.abs(gIndex - iIndex) > 1 &&
                     Math.abs(gIndex - nIndex) > 1) {
-                    return POINTS_ING_SEPARATE_I;
+                    return POINTS_ING_SPLIT_GROUP;
                 }
             }
         }
