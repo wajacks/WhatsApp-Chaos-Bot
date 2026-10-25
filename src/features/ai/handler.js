@@ -4,7 +4,7 @@ const handleAiCommand = async (context) => {
         getWeather, buildWeatherResponse, aiCooldowns, AI_COOLDOWN_MS,
         aiMemory, MAX_AI_MEMORY, ai, azureClient
     } = context;
-        // !AI (HYBRID GEMINI WITH AZURE GPT-4O FALLBACK)
+        // !AI (AZURE OPENAI PRIMARY WITH GEMINI FALLBACK)
         // ====================================================
 
         if (lowerText.startsWith('!ai')) {
@@ -114,7 +114,7 @@ const handleAiCommand = async (context) => {
                 '- src/database contains economy/profile data, game-specific data, chat history, class data, and image access. Runtime data is stored locally under data/.',
                 '- src/tools contains supporting features such as weather, image analysis, and class-session monitoring.',
                 '- The class portal is implemented by src/commands/classHandler.js and src/tools/classSession.js with its own local data.',
-                '- The bot uses WhatsApp Web.js. AI chat uses Gemini first and Azure OpenAI as fallback; image features use configured image/vision services.',
+                '- The bot uses WhatsApp Web.js. AI chat uses Azure OpenAI first and Gemini as fallback; image features use configured image/vision services.',
                 '',
                 'FEATURES AND COMMANDS:',
                 '- !menu shows the command center; its game section opens lobbies. !games explains game commands and rules.',
@@ -133,67 +133,69 @@ const handleAiCommand = async (context) => {
 
             let aiReply = null;
 
-            // ----------------------------------------------------
-            // ATTEMPT 1: GOOGLE GEMINI (PRIMARY)
-            // ----------------------------------------------------
+            // ATTEMPT 1: AZURE OPENAI (PRIMARY)
+            const azureUserEntry = { role: 'user', content: contextualizedPrompt };
+            history.push(azureUserEntry);
             try {
-                history.push({ role: 'user', text: contextualizedPrompt });
                 const recentHistory = history.slice(-MAX_AI_MEMORY);
-                const contents = recentHistory.map(item => ({
-                    role: item.role === 'assistant' ? 'model' : item.role,
-                    parts: [{ text: item.text || item.content }]
+                const formattedAzureHistory = recentHistory.map(item => ({
+                    role: item.role === 'model' ? 'assistant' : (item.role || 'user'),
+                    content: item.content || item.text
                 }));
 
-                const response = await ai.models.generateContent({
-                    model: 'gemini-3.5-flash-lite',
-                    contents,
-                    config: { systemInstruction: systemInstructionText }
+                const response = await azureClient.chat.completions.create({
+                    model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || 'gpt-4o-mini',
+                    messages: [
+                        { role: 'system', content: systemInstructionText },
+                        ...formattedAzureHistory
+                    ],
+                    max_tokens: 1000
                 });
 
-                aiReply = response.text?.trim();
-
+                aiReply = response.choices[0]?.message?.content?.trim();
                 if (aiReply) {
-                    history.push({ role: 'model', text: aiReply });
+                    history.push({ role: 'assistant', content: aiReply });
+                } else {
+                    const entryIndex = history.lastIndexOf(azureUserEntry);
+                    if (entryIndex !== -1) history.splice(entryIndex, 1);
                 }
-
-            } catch (geminiErr) {
-                console.warn('⚠️ Gemini Primary Failed. Failing over to Azure GPT-4o:', geminiErr.message);
-                
-                // Roll back prompt from history array so it isn't duplicated on retry
-                history.pop();
+            } catch (azureErr) {
+                const entryIndex = history.lastIndexOf(azureUserEntry);
+                if (entryIndex !== -1) history.splice(entryIndex, 1);
+                console.warn('⚠️ Azure OpenAI primary failed. Falling back to Gemini:', azureErr.message);
             }
 
-            // ----------------------------------------------------
-            // ATTEMPT 2: AZURE GPT-4O (FALLBACK)
-            // ----------------------------------------------------
-            if (!aiReply) {
+            // ATTEMPT 2: GEMINI (FALLBACK)
+            if (!aiReply && ai) {
+                const geminiUserEntry = { role: 'user', content: contextualizedPrompt };
+                history.push(geminiUserEntry);
                 try {
-                    history.push({ role: 'user', content: contextualizedPrompt });
                     const recentHistory = history.slice(-MAX_AI_MEMORY);
-
-                    const formattedAzureHistory = recentHistory.map(item => ({
-                        role: item.role === 'model' ? 'assistant' : (item.role || 'user'),
-                        content: item.content || item.text
+                    const contents = recentHistory.map(item => ({
+                        role: item.role === 'assistant' || item.role === 'model' ? 'model' : 'user',
+                        parts: [{ text: item.content || item.text }]
                     }));
 
-                    const response = await azureClient.chat.completions.create({
-                        model: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || 'gpt-4o-mini',
-                        messages: [
-                            { role: 'system', content: systemInstructionText },
-                            ...formattedAzureHistory
-                        ],
-                        max_tokens: 1000
+                    const response = await ai.models.generateContent({
+                        model: 'gemini-3.5-flash-lite',
+                        contents,
+                        config: { systemInstruction: systemInstructionText }
                     });
 
-                    aiReply = response.choices[0]?.message?.content?.trim();
-
+                    aiReply = response.text?.trim();
                     if (aiReply) {
                         history.push({ role: 'assistant', content: aiReply });
+                    } else {
+                        const entryIndex = history.lastIndexOf(geminiUserEntry);
+                        if (entryIndex !== -1) history.splice(entryIndex, 1);
                     }
-
-                } catch (azureErr) {
-                    console.error('❌ Both Gemini & Azure OpenAI failed:', azureErr.message);
+                } catch (geminiErr) {
+                    const entryIndex = history.lastIndexOf(geminiUserEntry);
+                    if (entryIndex !== -1) history.splice(entryIndex, 1);
+                    console.error('❌ Gemini fallback failed:', geminiErr.message);
                 }
+            } else if (!aiReply) {
+                console.warn('⚠️ Gemini fallback skipped because GEMINI_API_KEY is not configured.');
             }
 
             // ----------------------------------------------------
