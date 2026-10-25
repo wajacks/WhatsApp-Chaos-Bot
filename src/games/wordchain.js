@@ -39,6 +39,9 @@ const TURNS_PER_PLAYER = 10;
 const POINTS_ANY_ORDER = 1;
 const POINTS_IN_ORDER = 2;
 const POINTS_CONSECUTIVE = 3;
+const POINTS_ING_CONSECUTIVE = 1;
+const POINTS_ING_SEPARATE_I = 4;
+const POINTS_ING_SEPARATED = 2;
 
 const COINS_PER_POINT = 1000;
 
@@ -90,7 +93,7 @@ function getWordChainPoints(word, requiredLetters) {
 
     if (normalizedRequiredLetters === 'ing') {
         if (normalizedWord.includes('ing')) {
-            return 1;
+            return POINTS_ING_CONSECUTIVE;
         }
 
         // "ng" together with a separated "i" earns 4 points.
@@ -102,7 +105,7 @@ function getWordChainPoints(word, requiredLetters) {
                 if (normalizedWord[iIndex] === 'i' &&
                     Math.abs(iIndex - nIndex) > 1 &&
                     Math.abs(iIndex - gIndex) > 1) {
-                    return 4;
+                    return POINTS_ING_SEPARATE_I;
                 }
             }
         }
@@ -116,7 +119,7 @@ function getWordChainPoints(word, requiredLetters) {
                     if (normalizedWord[gIndex] === 'g' &&
                         Math.abs(iIndex - gIndex) > 1 &&
                         Math.abs(nIndex - gIndex) > 1) {
-                        return 2;
+                        return POINTS_ING_SEPARATED;
                     }
                 }
             }
@@ -394,8 +397,8 @@ async function startWordChainGame(message, client) {
         `Required letters: *${game.requiredLetters.toUpperCase()}*\n\n` +
         'Use one unused English word containing all 3 letters, in any order.\n' +
         'Example (T-H-E): ENTHUSIASTIC = 1, THUNDER = 2, THEATER = 3.\n' +
-        'Other triples: 1 any order; 2 in order with gaps; 3 consecutive in order.\\n' +
-        'ING exception: consecutive ING = 1; separated I + NG = 4; I, N, and G all separated = 2.\\n' +
+        'Other triples: 1 any order; 2 in order with gaps; 3 consecutive in order.\n' +
+        'ING exception: consecutive ING = 1; separated I + NG = 4; I, N, and G all separated = 2.\n' +
         'Each player gets 10 turns; the game ends after all 10 are used.\n' +
         'Each turn lasts 30 seconds.\n\n' +
         '⏳ First turn starts in 20 seconds so everyone can read.'
