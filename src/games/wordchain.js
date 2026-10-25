@@ -96,7 +96,7 @@ function getWordChainPoints(word, requiredLetters) {
             return POINTS_ING_CONSECUTIVE;
         }
 
-        // "ng" together with a separated "i" earns 4 points.
+        // "ng" together with a separated "i", or "in" together with a separated "g", earns 4 points.
         for (let nIndex = 0; nIndex < normalizedWord.length - 1; nIndex++) {
             const gIndex = nIndex + 1;
             if (normalizedWord[nIndex] !== 'n' || normalizedWord[gIndex] !== 'g') continue;
@@ -105,6 +105,19 @@ function getWordChainPoints(word, requiredLetters) {
                 if (normalizedWord[iIndex] === 'i' &&
                     Math.abs(iIndex - nIndex) > 1 &&
                     Math.abs(iIndex - gIndex) > 1) {
+                    return POINTS_ING_SEPARATE_I;
+                }
+            }
+        }
+
+        for (let iIndex = 0; iIndex < normalizedWord.length - 1; iIndex++) {
+            const nIndex = iIndex + 1;
+            if (normalizedWord[iIndex] !== 'i' || normalizedWord[nIndex] !== 'n') continue;
+
+            for (let gIndex = 0; gIndex < normalizedWord.length; gIndex++) {
+                if (normalizedWord[gIndex] === 'g' &&
+                    Math.abs(gIndex - iIndex) > 1 &&
+                    Math.abs(gIndex - nIndex) > 1) {
                     return POINTS_ING_SEPARATE_I;
                 }
             }
@@ -398,7 +411,7 @@ async function startWordChainGame(message, client) {
         'Use one unused English word containing all 3 letters, in any order.\n' +
         'Example (T-H-E): ENTHUSIASTIC = 1, THUNDER = 2, THEATER = 3.\n' +
         'Other triples: 1 any order; 2 in order with gaps; 3 consecutive in order.\n' +
-        'ING exception: consecutive ING = 1; separated I + NG = 4; I, N, and G all separated = 2.\n' +
+        'ING exception: consecutive ING = 1; separate I + NG or IN + G = 4; I, N, and G all separated = 2.\n' +
         'Each player gets 10 turns; the game ends after all 10 are used.\n' +
         'Each turn lasts 30 seconds.\n\n' +
         '⏳ First turn starts in 20 seconds so everyone can read.'
