@@ -181,11 +181,19 @@ function addXP(userId, amount, userName) {
     return { user, leveledUp };
 }
 
-// Get top users for leaderboard
+// Get top users for XP leaderboard
 function getLeaderboard(limit = 5) {
     const db = readDB();
     return Object.values(db)
         .sort((a, b) => (b.xp || 0) - (a.xp || 0))
+        .slice(0, limit);
+}
+
+// Get top users for money leaderboard
+function getMoneyLeaderboard(limit = 5) {
+    const db = readDB();
+    return Object.values(db)
+        .sort((a, b) => (b.coins || 0) - (a.coins || 0))
         .slice(0, limit);
 }
 
@@ -201,6 +209,7 @@ module.exports = {
     readDB,
     writeDB,
     getLeaderboard,
+    getMoneyLeaderboard,
     transferCoins,
     resetEconomy
 };
