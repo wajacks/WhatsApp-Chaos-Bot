@@ -83,7 +83,7 @@
       ],
       "misconceptions": [
         {
-          "statement": "Bats are blind",
+          "statement": "All bats are blind",
           "explanation": "Bats can see and many also use echolocation",
           "sourceId": "SI_BATS"
         },
@@ -2905,8 +2905,8 @@
           "sourceId": "NHTSA_BELTS"
         },
         {
-          "statement": "A driver can be injured by an unsecured object during a crash",
-          "explanation": "Loose objects continue moving when a vehicle stops",
+          "statement": "A seat belt should fit snugly across the shoulder and low across the hips",
+          "explanation": "Correct positioning helps the restraint protect the body",
           "sourceId": "NHTSA_BELTS"
         },
         {
@@ -2982,8 +2982,8 @@
           "sourceId": "NHTSA_BELTS"
         },
         {
-          "statement": "Loose items inside a car cannot hurt anyone during a crash",
-          "explanation": "Unsecured objects can become dangerous projectiles",
+          "statement": "A lap belt is safest when it sits across the stomach",
+          "explanation": "NHTSA recommends that the lap belt fit low across the hips",
           "sourceId": "NHTSA_BELTS"
         },
         {
