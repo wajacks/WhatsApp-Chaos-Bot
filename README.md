@@ -131,7 +131,7 @@ nano .env
 | `OPENWEATHERMAP_API_KEY` | Optional | Enables live weather lookups. |
 | `PAIRING_NUMBER` | Optional | Request a WhatsApp pairing code. Leave blank to use a QR code. |
 
-The Azure key and endpoint are required at startup; Azure OpenAI handles AI chat and Mafia narration as the primary provider. Gemini is only used as a fallback when `GEMINI_API_KEY` is configured. Keep your real `.env` private; never commit it or paste its contents into an issue.
+Truth Hunt uses the Azure Responses API with its `web_search` tool and the configured chat deployment. If Azure web search is unavailable, Truth Hunt uses Gemini only when `GEMINI_API_KEY` is configured. The Azure key and endpoint are required at startup; Azure OpenAI is the primary provider for AI chat and Mafia narration too. Keep your real `.env` private; never commit it or paste its contents into an issue.
 
 ### 4. Link WhatsApp and start the bot
 
