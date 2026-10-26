@@ -282,6 +282,8 @@ async function openAnswerWindow(game) {
                 '🧠 *TRUTH HUNT — ROUND ' + game.roundNumber + '*\n' +
                 'Which group statement is true? Reply with 1, 2, or 3 within 10 seconds of this message. Your choice is private.'
             );
+            answer.promptedAt = Date.now();
+            answer.deadline = answer.promptedAt + ANSWER_TIME_MS;
             answer.delivered = true;
         } catch (error) {
             answer.delivered = false;
@@ -468,10 +470,15 @@ function stopTruthHuntGame(groupId, senderId) {
 
 async function handleTruthHuntGroupMessage(groupId, senderId, text) {
     const game = activeGames.get(groupId);
-    if (!game || !['SUGGESTIONS', 'TOPIC_VOTE'].includes(game.phase)) return false;
+    if (!game) return false;
 
     const body = String(text || '').trim();
     if (!body || body.startsWith('!')) return false;
+    if (['READING', 'SENDING_DMS', 'ANSWERING'].includes(game.phase) && /^[1-3]$/.test(body)) {
+        await sendGroup(game, '🔒 Send your 1, 2, or 3 choice in the private chat with the bot.');
+        return true;
+    }
+    if (!['SUGGESTIONS', 'TOPIC_VOTE'].includes(game.phase)) return false;
     const player = game.players.get(senderId);
     if (!player) return false;
 
