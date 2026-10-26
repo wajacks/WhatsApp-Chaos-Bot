@@ -1,3 +1,4 @@
+const { GEMINI_MODEL } = require('./geminiConfig');
 function createNumberRunBanter({ ai, azureClient }) {
     return async function generateNumberRunBanter({ playerName }) {
         const systemInstruction =
@@ -23,7 +24,7 @@ function createNumberRunBanter({ ai, azureClient }) {
 
         try {
             const response = await ai.models.generateContent({
-                model: 'gemini-3.5-flash-lite',
+                model: GEMINI_MODEL,
                 contents: [{ role: 'user', parts: [{ text: payload }] }],
                 config: { systemInstruction, maxOutputTokens: 55 }
             });
