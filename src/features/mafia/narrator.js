@@ -1,3 +1,4 @@
+const { GEMINI_MODEL } = require('../geminiConfig');
 function createMafiaNarrator({ ai, azureClient }) {
     return async function generateMafiaNarration({ audience, event, context = {} }) {
         const privateAudience = audience === 'private';
@@ -25,7 +26,7 @@ function createMafiaNarrator({ ai, azureClient }) {
 
         try {
             const response = await ai.models.generateContent({
-                model: 'gemini-3.5-flash-lite',
+                model: GEMINI_MODEL,
                 contents: [{ role: 'user', parts: [{ text: payload }] }],
                 config: { systemInstruction, maxOutputTokens: 90 }
             });
