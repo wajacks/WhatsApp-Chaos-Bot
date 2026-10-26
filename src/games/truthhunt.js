@@ -8,6 +8,8 @@ const MAX_PLAYERS = 10;
 const READING_TIME_MS = 60 * 1000;
 const ANSWER_TIME_MS = 15 * 1000;
 const ROUND_BREAK_MS = 2500;
+const HINT_DELAY_MIN_MS = 12000;
+const HINT_DELAY_MAX_MS = 36000;
 
 function randomInt(min, max) {
     return crypto.randomInt(min, max + 1);
@@ -110,22 +112,45 @@ function selectClaim(game, topic, listName, isTrue) {
 
 function buildRoundStatements(game) {
     const selectedTopics = shuffle(FACT_BANK.topics).slice(0, 3);
-    const truthTopic = randomItem(selectedTopics);
-    const falseTopics = selectedTopics.filter(topic => topic.id !== truthTopic.id);
-    const truth = selectClaim(game, truthTopic, 'truths', true);
-    const misconceptions = falseTopics.map(topic => selectClaim(game, topic, 'misconceptions', false));
-    if (!truth || misconceptions.some(item => !item)) return null;
-    return shuffle([truth, ...misconceptions]);
+    const truthExists = crypto.randomInt(0, 3) !== 0;
+    const truthTopic = truthExists ? randomItem(selectedTopics) : null;
+    const statements = selectedTopics.map(topic => {
+        const isTrue = Boolean(truthTopic && topic.id === truthTopic.id);
+        return selectClaim(game, topic, isTrue ? 'truths' : 'misconceptions', isTrue);
+    });
+    if (statements.some(item => !item)) return null;
+    return { statements: shuffle(statements), truthExists };
 }
 
-function sendGroup(game, message) {
+function sendGroup(game, message, options) {
     if (!game.client || !message) return Promise.resolve(false);
-    return game.client.sendMessage(game.groupId, message)
+    return game.client.sendMessage(game.groupId, message, options || {})
         .then(() => true)
         .catch(error => {
             console.warn('[TRUTH HUNT] Group message failed:', error.message);
             return false;
         });
+}
+
+async function sendReadingHint(game) {
+    if (activeGames.get(game.groupId) !== game || game.phase !== 'READING' || typeof game.generateHint !== 'function') return;
+    try {
+        const hint = await game.generateHint({
+            statements: game.statements.map(item => item.statement)
+        });
+        if (!hint || activeGames.get(game.groupId) !== game || game.phase !== 'READING') return;
+
+        const shouldTagPlayer = crypto.randomInt(0, 4) === 0;
+        if (shouldTagPlayer && game.players.size > 0) {
+            const player = randomItem(Array.from(game.players.values()));
+            const phone = String(player.id).split('@')[0];
+            await sendGroup(game, '🤫 @' + phone + ' ' + hint, { mentions: [player.id] });
+        } else {
+            await sendGroup(game, '🤫 ' + hint);
+        }
+    } catch (error) {
+        console.warn('[TRUTH HUNT AI] Optional hint failed:', error.message);
+    }
 }
 
 function clearTimer(game, key) {
@@ -179,7 +204,9 @@ function startTruthHuntLobby(groupId, hostId, hostName) {
         usedFacts: new Set(),
         statements: [],
         correctIndex: -1,
+        truthExists: false,
         answers: new Map(),
+        generateHint: null,
         timers: {},
         client: null
     });
@@ -211,7 +238,7 @@ function joinTruthHuntLobby(groupId, playerId, playerName) {
     return '✅ *' + safeName(playerName) + '* joined Truth Hunt (' + game.players.size + ' player(s)).';
 }
 
-async function startTruthHuntGame(groupId, senderId, client) {
+async function startTruthHuntGame(groupId, senderId, client, generateHint) {
     const game = activeGames.get(groupId);
     if (!game || game.phase !== 'LOBBY') return '❌ No Truth Hunt lobby is waiting to start.';
     if (senderId !== game.hostId) return '❌ Only the host can start Truth Hunt.';
@@ -219,6 +246,7 @@ async function startTruthHuntGame(groupId, senderId, client) {
     if (game.players.size < MIN_PLAYERS) return '❌ Truth Hunt needs at least 2 registered players.';
 
     game.client = client;
+    game.generateHint = typeof generateHint === 'function' ? generateHint : null;
     game.totalRounds = Math.min(7, Math.max(3, game.players.size + 1));
     await beginRound(game);
     return '';
@@ -229,39 +257,48 @@ async function beginRound(game) {
     game.roundNumber += 1;
     game.phase = 'PREPARING';
     game.statements = [];
+    game.truthExists = false;
     game.correctIndex = -1;
     game.answers = new Map();
 
-    const statements = buildRoundStatements(game);
-    if (!statements || statements.filter(item => item.isTrue).length !== 1) {
+    const round = buildRoundStatements(game);
+    if (!round || round.statements.length !== 3) {
         await sendGroup(game, '⚠️ I could not build a valid set of sourced statements. This round is void; no points change.');
         await finishRound(game, true);
         return;
     }
 
-    game.statements = statements;
-    game.correctIndex = statements.findIndex(item => item.isTrue);
+    game.statements = round.statements;
+    game.truthExists = round.truthExists;
+    game.correctIndex = game.statements.findIndex(item => item.isTrue);
     game.phase = 'READING';
-    const display = statements.map((item, index) => (index + 1) + '. ' + item.statement).join('\n');
+    const display = game.statements.map((item, index) => (index + 1) + '. ' + item.statement).join('\n');
     await sendGroup(game,
         '🧠 *TRUTH HUNT — ROUND ' + game.roundNumber + '/' + game.totalRounds + '*\n\n' +
-        'One statement is true. The other two are misconceptions from different topics.\n\n' +
-        '🧩 *Which statement is true?*\n' + display + '\n\n' +
-        'You have 1 minute to read. Please keep answers out of the group chat.'
+        'Some rounds have one true claim. Some have none. Decide what you believe for each statement.\n\n' +
+        '🧩 *Read the statements carefully*\n' + display + '\n\n' +
+        'You have 1 minute. Then the bot will DM you to choose Truth, False, or No Truth. Keep your answer private.'
     );
     if (game.phase !== 'READING') return;
     scheduleTimer(game, 'reading', READING_TIME_MS, () => openAnswerWindow(game));
+    if (game.generateHint) {
+        scheduleTimer(game, 'hint', crypto.randomInt(HINT_DELAY_MIN_MS, HINT_DELAY_MAX_MS), () => sendReadingHint(game));
+    }
 }
 
 async function openAnswerWindow(game) {
     if (game.phase !== 'READING') return;
     clearTimer(game, 'reading');
+    clearTimer(game, 'hint');
     game.phase = 'SENDING_DMS';
     game.answers = new Map();
 
     for (const player of game.players.values()) {
         game.answers.set(player.id, {
-            answer: null,
+            mode: null,
+            statementIndex: null,
+            stage: 'TYPE',
+            complete: false,
             promptedAt: null,
             deadline: null,
             delivered: false
@@ -273,14 +310,14 @@ async function openAnswerWindow(game) {
         try {
             await game.client.sendMessage(player.id,
                 '🧠 *TRUTH HUNT — ROUND ' + game.roundNumber + '*\n' +
-                'Which group statement is true? Reply with 1, 2, or 3 within 15 seconds of this message. Your choice is private.'
+                'Choose your answer type. Reply 1 for Truth, 2 for False, or 3 for No Truth.'
             );
             answer.promptedAt = Date.now();
             answer.deadline = answer.promptedAt + ANSWER_TIME_MS;
             answer.delivered = true;
         } catch (error) {
             answer.delivered = false;
-            answer.deadline = null;
+            answer.complete = true;
             console.warn('[TRUTH HUNT] Could not send answer DM:', error.message);
         }
     });
@@ -296,7 +333,7 @@ async function openAnswerWindow(game) {
     }
 
     game.phase = 'ANSWERING';
-    await sendGroup(game, '📩 Private prompts sent. Each player has 15 seconds from their own DM to reply with 1, 2, or 3.');
+    await sendGroup(game, '📩 Answer in your DM. The full choice-and-number process closes 15 seconds after your first prompt.');
     if (game.phase !== 'ANSWERING') return;
 
     const latestDeadline = Math.max(...delivered.map(answer => answer.deadline));
@@ -318,45 +355,75 @@ async function processTruthHuntDmMessage(senderId, text) {
     const game = findActiveGameForDm(senderId);
     if (!game) return { handled: false };
 
-    const body = String(text || '').trim();
+    const body = String(text || '').trim().toLowerCase();
     const answer = game.answers.get(senderId);
-    const isChoice = /^[1-3]$/.test(body);
+    const choiceNumber = /^[1-3]$/.test(body) ? Number(body) : null;
 
     if (game.phase === 'READING') {
-        return isChoice
+        return choiceNumber
             ? { handled: true, response: '⏳ Wait for the private answer prompt before choosing.' }
             : { handled: false };
     }
-
     if (!answer) return { handled: false };
     if (game.phase === 'SENDING_DMS' && !answer.delivered) {
-        return isChoice
+        return choiceNumber
             ? { handled: true, response: '⏳ Wait for the private answer prompt before choosing.' }
             : { handled: false };
     }
     if (game.phase === 'ANSWERING' && !answer.delivered) {
-        return { handled: true, response: '⚠️ The answer prompt could not be delivered, so your response cannot be recorded.' };
+        return { handled: true, response: '⚠️ The private answer prompt could not be delivered.' };
     }
     if (!answer.promptedAt) return { handled: false };
     if (answer.deadline && Date.now() > answer.deadline) {
         return { handled: true, response: '⏰ Your 15-second answer window has closed.' };
     }
-    if (answer.answer !== null) {
+    if (answer.complete) {
         return { handled: true, response: '🔒 Your answer is locked in.' };
     }
-    if (!isChoice) {
-        return { handled: true, response: 'Reply with 1, 2, or 3.' };
+
+    if (answer.stage === 'TYPE') {
+        const mode = ['1', 'truth', 'fact'].includes(body) ? 'TRUTH'
+            : ['2', 'false', 'falsehood', 'misconception'].includes(body) ? 'FALSE'
+                : ['3', 'no truth', 'none', 'no fact'].includes(body) ? 'NO_TRUTH'
+                    : null;
+        if (!mode) {
+            return { handled: true, response: 'Reply Truth, False, or No Truth. You can also reply 1, 2, or 3.' };
+        }
+
+        answer.mode = mode;
+        if (mode === 'NO_TRUTH') {
+            answer.complete = true;
+            if (game.phase === 'ANSWERING') await maybeResolveAnsweredRound(game);
+            return { handled: true, response: '✅ No Truth is locked in.' };
+        }
+
+        answer.stage = 'STATEMENT';
+        try {
+            await game.client.sendMessage(senderId,
+                'Choose the statement you are labelling ' + (mode === 'TRUTH' ? 'Truth' : 'False') +
+                '. Reply with 1, 2, or 3. Your original 15-second window is still running.'
+            );
+        } catch (error) {
+            answer.mode = null;
+            answer.complete = true;
+            console.warn('[TRUTH HUNT] Could not send statement-number prompt:', error.message);
+            if (game.phase === 'ANSWERING') await maybeResolveAnsweredRound(game);
+            return { handled: true, response: '⚠️ I could not send the second prompt. This answer will score zero.' };
+        }
+        return { handled: true, response: '📩 Choose the statement number in the next DM.' };
     }
 
-    answer.answer = Number(body) - 1;
+    if (!choiceNumber) return { handled: true, response: 'Reply with the statement number 1, 2, or 3.' };
+    answer.statementIndex = choiceNumber - 1;
+    answer.complete = true;
     if (game.phase === 'ANSWERING') await maybeResolveAnsweredRound(game);
-    return { handled: true, response: '✅ Your answer is locked in. I’ll reveal it when the round closes.' };
+    return { handled: true, response: '✅ Your answer is locked in.' };
 }
 
 async function maybeResolveAnsweredRound(game) {
     if (game.phase !== 'ANSWERING') return;
     const eligible = Array.from(game.answers.values()).filter(answer => answer.delivered);
-    if (eligible.length > 0 && eligible.every(answer => answer.answer !== null)) {
+    if (eligible.length > 0 && eligible.every(answer => answer.complete)) {
         await resolveAnswerRound(game);
     }
 }
@@ -370,36 +437,28 @@ async function resolveAnswerRound(game) {
     for (const player of game.players.values()) {
         const answer = game.answers.get(player.id);
         let gained = 0;
-        let detail = 'no answer';
-        if (answer && answer.delivered && answer.answer !== null) {
-            if (answer.answer === game.correctIndex) {
-                player.streak += 1;
-                gained = 2;
-                if (player.streak % 3 === 0) gained += 1;
-                player.score += gained;
-                detail = 'correct +' + gained;
-            } else {
-                player.streak = 0;
-                detail = 'not correct';
-            }
-        } else if (answer && answer.delivered) {
-            player.streak = 0;
+        if (answer && answer.delivered && answer.complete) {
+            const selected = answer.statementIndex === null ? null : game.statements[answer.statementIndex];
+            if (answer.mode === 'TRUTH' && game.truthExists && selected && selected.isTrue) gained = 3;
+            else if (answer.mode === 'FALSE' && selected && !selected.isTrue) gained = 1;
+            else if (answer.mode === 'NO_TRUTH' && !game.truthExists) gained = 5;
+            player.score += gained;
         }
-        changes.push('*' + player.name + '* — ' + detail);
+        changes.push('*' + player.name + '* — ' + (gained > 0 ? '+' + gained : '0') + ' pts');
     }
 
-    const correct = game.statements[game.correctIndex];
     const statements = game.statements.map((item, index) => {
-        const label = index + 1;
         const kind = item.isTrue ? 'TRUE' : 'MISCONCEPTION';
-        return label + '. ' + kind + ' — ' + item.topicName + '\n' + item.explanation +
+        return (index + 1) + '. ' + kind + ' — ' + item.topicName + '\n' + item.explanation +
             '\nSource — ' + item.sourceTitle + '\n' + item.sourceUrl;
     }).join('\n\n');
+    const truthReveal = game.truthExists
+        ? '✅ *A true claim was present.* It was statement ' + (game.correctIndex + 1) + ', about ' +
+            game.statements[game.correctIndex].topicName + '.'
+        : '🕵️ *No true claim was present.* All three statements were misconceptions.';
 
     await sendGroup(game,
-        '✅ *The true statement was ' + (game.correctIndex + 1) + '* — ' + correct.topicName + '\n' +
-        correct.explanation + '\nSource — ' + correct.sourceTitle + '\n' + correct.sourceUrl +
-        '\n\n*Fact check*\n' + statements +
+        truthReveal + '\n\n*Fact check*\n' + statements +
         '\n\n*Round points*\n' + changes.join('\n') +
         '\n\n*Scores*\n' + formatScores(game)
     );
@@ -417,6 +476,7 @@ function formatScores(game) {
 async function finishRound(game, voided) {
     clearTimer(game, 'reading');
     clearTimer(game, 'answers');
+    clearTimer(game, 'hint');
 
     if (activeGames.get(game.groupId) !== game) return;
     if (game.roundNumber >= game.totalRounds) {
@@ -464,7 +524,7 @@ async function handleTruthHuntGroupMessage(groupId, senderId, text) {
     const body = String(text || '').trim();
     if (!body || body.startsWith('!')) return false;
     if (['READING', 'SENDING_DMS', 'ANSWERING'].includes(game.phase) && /^[1-3]$/.test(body)) {
-        await sendGroup(game, '🔒 Send your 1, 2, or 3 choice in the private chat with the bot.');
+        await sendGroup(game, '🔒 Your Truth Hunt choice belongs in the private chat with the bot.');
         return true;
     }
     return false;
