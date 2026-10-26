@@ -18,6 +18,7 @@ const qrcode = require('qrcode-terminal');
 const { buildWeatherResponse } = require('./src/tools/weatherFormatter');
 const { createMafiaNarrator } = require('./src/features/mafia/narrator');
 const { createNumberRunBanter } = require('./src/features/numberrunNarrator');
+const { createTruthHuntHintGenerator } = require('./src/features/truthHuntHint');
 const { registerClientEvents } = require('./src/handlers/clientEvents');
 const { registerMessageHandler } = require('./src/handlers/messageHandler');
 const { reactToCommand } = require('./src/commands/commandReactions');
@@ -186,6 +187,7 @@ const azureClient = new AzureOpenAI({
 
 const generateMafiaNarration = createMafiaNarrator({ ai, azureClient });
 const generateNumberRunBanter = createNumberRunBanter({ ai, azureClient });
+const generateTruthHuntHint = createTruthHuntHintGenerator({ ai, azureClient });
 const { aiMemory, MAX_AI_MEMORY, aiCooldowns } = require('./src/features/ai/state');
 const imageState = require('./src/features/images/state');
 
@@ -355,6 +357,7 @@ function initializeChaosBot(options) {
         stopTruthHuntGame,
         handleTruthHuntGroupMessage,
         processTruthHuntDmMessage,
+        generateTruthHuntHint,
         getGamesList,
         handleBalanceCommand,
         getWeather,
