@@ -170,6 +170,8 @@ pm2 save
 
 See the [PM2 startup guide](https://pm2.keymetrics.io/docs/usage/startup/) for details. The setup script intentionally leaves process-manager installation and boot configuration to you. The in-chat `!owner restart` and `!owner update` commands require the bot to run in PM2 under the name `chaos-bot`.
 
+When `!owner update` finds local changes, it saves tracked and untracked non-ignored files to a named Git stash before pulling. It does not automatically reapply or delete the stash, and ignored files such as `.env` are left untouched. The WhatsApp update message gives the stash ID; inspect it with `git stash show -p <id>` and restore it with `git stash apply --index <id>`.
+
 Useful commands:
 
 ```bash
