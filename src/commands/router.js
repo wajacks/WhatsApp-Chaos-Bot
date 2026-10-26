@@ -52,6 +52,12 @@ function createCommandRouter(dependencies) {
             stopNumberRunGame,
             processNumberRunGuess,
             generateNumberRunBanter,
+            startTruthHuntLobby,
+            joinTruthHuntLobby,
+            startTruthHuntGame,
+            stopTruthHuntGame,
+            handleTruthHuntGroupMessage,
+            generateTruthHuntTrivia,
             getGamesList,
             handleBalanceCommand,
             getWeather,
@@ -499,6 +505,31 @@ function createCommandRouter(dependencies) {
                 }
 
                 // ====================================================
+                // TRUTH HUNT
+                // ====================================================
+
+                if (lowerText === '!truthhunt') {
+                    await message.reply(startTruthHuntLobby(chatId, senderId, userName));
+                    return true;
+                }
+
+                if (lowerText === '!jointruth') {
+                    await message.reply(joinTruthHuntLobby(chatId, senderId, userName));
+                    return true;
+                }
+
+                if (lowerText === '!starttruth') {
+                    const response = await startTruthHuntGame(chatId, senderId, client, generateTruthHuntTrivia);
+                    if (response) await message.reply(response);
+                    return true;
+                }
+
+                if (lowerText === '!stoptruth') {
+                    await message.reply(stopTruthHuntGame(chatId, senderId));
+                    return true;
+                }
+
+                // ====================================================
                 // WORD CHAIN
                 // ====================================================
         
@@ -624,6 +655,13 @@ function createCommandRouter(dependencies) {
                     return true;
                 }
         
+                // ====================================================
+                // TRUTH HUNT TOPIC INPUT AND VOTING
+                // ====================================================
+
+                const truthHuntHandled = await handleTruthHuntGroupMessage(chatId, senderId, text);
+                if (truthHuntHandled) return true;
+
                 // ====================================================
                 // WORD CHAIN TURN INPUT
                 // ====================================================
