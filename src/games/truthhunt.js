@@ -398,19 +398,11 @@ async function processTruthHuntDmMessage(senderId, text) {
         }
 
         answer.stage = 'STATEMENT';
-        try {
-            await game.client.sendMessage(senderId,
-                'Choose the statement you are labelling ' + (mode === 'TRUTH' ? 'Truth' : 'False') +
-                '. Reply with 1, 2, or 3. Your original 15-second window is still running.'
-            );
-        } catch (error) {
-            answer.mode = null;
-            answer.complete = true;
-            console.warn('[TRUTH HUNT] Could not send statement-number prompt:', error.message);
-            if (game.phase === 'ANSWERING') await maybeResolveAnsweredRound(game);
-            return { handled: true, response: '⚠️ I could not send the second prompt. This answer will score zero.' };
-        }
-        return { handled: true, response: '📩 Choose the statement number in the next DM.' };
+        return {
+            handled: true,
+            response: 'Which statement are you labelling ' + (mode === 'TRUTH' ? 'Truth' : 'False') +
+                '? Reply with 1, 2, or 3. Your original 15-second window is still running.'
+        };
     }
 
     if (!choiceNumber) return { handled: true, response: 'Reply with the statement number 1, 2, or 3.' };
