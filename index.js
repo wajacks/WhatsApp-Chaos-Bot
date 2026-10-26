@@ -7,7 +7,7 @@ const { promisify } = require('util');
 
 const execFileAsync = promisify(execFile);
 const { GoogleGenAI } = require('@google/genai');
-const { AzureOpenAI, OpenAI } = require('openai');
+const { AzureOpenAI } = require('openai');
 const axios = require('axios');
 const googleTTS = require('google-tts-api');
 const { EdgeTTS } = require('node-edge-tts');
@@ -183,17 +183,6 @@ const azureClient = new AzureOpenAI({
     apiKey: process.env.AZURE_OPENAI_KEY,
     apiVersion: '2024-05-01-preview'
 });
-
-const azureResourceEndpoint = process.env.AZURE_OPENAI_ENDPOINT
-    ? process.env.AZURE_OPENAI_ENDPOINT.replace(/\/+$/, '')
-    : '';
-const azureResponsesClient = process.env.AZURE_OPENAI_KEY && azureResourceEndpoint
-    ? new OpenAI({
-        baseURL: azureResourceEndpoint + '/openai/v1/',
-        apiKey: process.env.AZURE_OPENAI_KEY,
-        maxRetries: 0
-    })
-    : null;
 
 const generateMafiaNarration = createMafiaNarrator({ ai, azureClient });
 const generateNumberRunBanter = createNumberRunBanter({ ai, azureClient });
