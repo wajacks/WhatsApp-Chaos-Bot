@@ -62,7 +62,6 @@ function makePlayer(id, name) {
         roundsWon: 0,
         totalMisses: 0,
         missRemainder: 0,
-        missesThisRound: 0,
         roundDelta: 0,
         cyclesStarted: 0
     };
@@ -91,8 +90,6 @@ function getBanterLine(generateBanter, player, game) {
     return Promise.resolve()
         .then(() => generateBanter({
             playerName: player.name,
-            roundNumber: game.roundNumber,
-            cycleNumber: game.cycleNumber
         }))
         .then(value => {
             const line = String(value || '').replace(/[\r\n]+/g, ' ').trim();
@@ -189,7 +186,6 @@ async function beginNumberRound(game, generateBanter) {
     game.turnIndex = 0;
 
     for (const player of game.players.values()) {
-        player.missesThisRound = 0;
         player.roundDelta = 0;
     }
 
@@ -222,8 +218,7 @@ function startNumberRunLobby(groupId, hostId, hostName) {
         low: null,
         high: null,
         target: null,
-        usedNumbers: new Set(),
-        starterCounts: new Map()
+        usedNumbers: new Set()
     });
 
     return '🔢 *NUMBER RUN LOBBY OPEN*\n\n' +
@@ -254,14 +249,12 @@ async function startNumberRunGame(groupId, senderId, generateBanter) {
 
     game.playerCount = game.players.size;
     game.totalRounds = game.playerCount + 2;
-    game.starterCounts = new Map(getPlayers(game).map(player => [player.id, 0]));
 
     return beginNumberRound(game, generateBanter);
 }
 
-function recordMiss(game, player) {
+function recordMiss(player) {
     player.totalMisses += 1;
-    player.missesThisRound += 1;
     player.missRemainder += 1;
 
     if (player.missRemainder >= 2) {
@@ -285,6 +278,9 @@ async function processNumberRunGuess(groupId, senderId, messageText, generateBan
     if (game.phase === 'LOBBY') return '⚠️ The host still needs to start Number Run.';
     if (game.phase !== 'ACTIVE') return '⏳ The next Number Run turn is being prepared.';
 
+    const player = game.players.get(senderId);
+    if (!player) return '⚠️ Only registered Number Run players can guess.';
+
     const match = String(messageText || '').trim().match(/^!guessnumber(?:\s+(\d+))?$/i);
     if (!match || !match[1]) return 'Use !guessnumber followed by a whole number.';
 
@@ -293,8 +289,6 @@ async function processNumberRunGuess(groupId, senderId, messageText, generateBan
         return 'Choose a whole number from ' + game.low + ' to ' + game.high + '.';
     }
 
-    const player = game.players.get(senderId);
-    if (!player) return '⚠️ Only registered Number Run players can guess.';
     const currentPlayer = game.order[game.turnIndex];
     if (!currentPlayer || currentPlayer.id !== senderId) {
         return '⏳ It is *' + (currentPlayer ? currentPlayer.name : 'another player') + '’s* turn.';
@@ -306,8 +300,7 @@ async function processNumberRunGuess(groupId, senderId, messageText, generateBan
         const solvedSummary =
             '🎯 *Correct!* ' + player.name + ' found ' + game.target + '.\n' +
             '🏅 +' + points + ' win points.\n' +
-            '*This round:* ' + formatRoundChanges(game) + '\n' +
-            '*Match scores*\n' + formatLeaderboard(game);
+            '*This round:* ' + formatRoundChanges(game);
 
         if (game.roundNumber >= game.totalRounds) {
             finishMatch(game);
@@ -316,10 +309,10 @@ async function processNumberRunGuess(groupId, senderId, messageText, generateBan
 
         const nextRound = await beginNumberRound(game, generateBanter);
         if (!nextRound) return solvedSummary;
-        return solvedSummary + '\n\n' + nextRound;
+        return solvedSummary + '\n*Match scores*\n' + formatLeaderboard(game) + '\n\n' + nextRound;
     }
 
-    recordMiss(game, player);
+    recordMiss(player);
     const feedback = guess < game.target ? '⬆️ Higher.' : '⬇️ Lower.';
     game.turnIndex += 1;
 
