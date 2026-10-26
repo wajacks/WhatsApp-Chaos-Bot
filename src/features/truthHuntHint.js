@@ -16,7 +16,7 @@ function validateHint(value, statements) {
         .replace(/\s+/g, ' ')
         .trim();
 
-    if (hint.length < 8 || hint.length > 110 || hint.split(/\\s+/).length > 9 || BLOCKED_HINT_PATTERN.test(hint)) return null;
+    if (hint.length < 8 || hint.length > 110 || hint.split(/\s+/).length > 9 || BLOCKED_HINT_PATTERN.test(hint)) return null;
 
     const claimWords = new Set(
         statements.flatMap(statement => String(statement || '').toLowerCase().match(/[a-z]{6,}/g) || [])
