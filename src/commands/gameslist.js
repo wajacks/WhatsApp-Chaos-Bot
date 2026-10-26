@@ -8,7 +8,7 @@ function getGamesList() {
 • Word Chain — take turns with words starting at the last letter. Open with \`!wordchain\`
 • Scrambled Word — race to unscramble each word. Open with \`!scramble\`
 • Word Forge — build words from a private rack and rule. Open with \`!wordforge\`
-• Number Run — take turns guessing a number with Higher/Lower feedback. Open with \`!numberrun\`
+• Number Run — take turns guessing a number with Higher/Lower feedback; send a number on your turn. Open with \`!numberrun\`
 • Mafia — discuss, vote, and use secret roles. Open with \`!mafia\`
 
 *How play works*
@@ -23,7 +23,7 @@ function getGamesList() {
 • Word Chain: \`!wjoin\`, \`!startwordchain\`, \`!stopwordchain\`
 • Scramble: \`!joinscramble\`, \`!scramblehint\`, \`!startscramble\`, \`!stopscramble\`
 • Word Forge: \`!joinforge\`, \`!startforge\`, \`!stopforge\`
-• Number Run: \`!joinnumberrun\`, \`!startnumberrun\`, \`!stopnumberrun\`, \`!guessnumber <integer>\`
+• Number Run: \`!joinnumberrun\`, \`!startnumberrun\`, \`!stopnumberrun\` (send a number to guess)
 • Mafia: \`!joinmafia\`, host: \`!startmafia\` / \`!stopmafia\`; vote with \`!vote\` and use assigned night actions in DM.
 
 Type \`!menu\` for the command center.`;
