@@ -1201,8 +1201,8 @@ function registerMessageHandler(client, dependencies) {
                     let localChangesStash = null;
                     const stashRecoveryNote = () => {
                         if (!localChangesStash) return '';
-                        return '\n\nRecovery stash: ' + localChangesStash +
-                            '. Inspect with git stash show -p ' + localChangesStash +
+                        return '\n\nLocal changes remain saved in Git stash ' + localChangesStash +
+                            ' and are not reapplied automatically. Inspect with git stash show -p ' + localChangesStash +
                             ' and restore with git stash apply --index ' + localChangesStash + '.';
                     };
 
@@ -1351,7 +1351,7 @@ function registerMessageHandler(client, dependencies) {
                             );
                             await message.reply(
                                 '*UPDATE STOPPED*\n\n' +
-                                'I could not verify a recovery stash, so nothing was pulled or restarted. Your local files were left in place.' +
+                                'I did not pull or restart. Any recovery stash is preserved, and changes not stashed remain on disk.' +
                                 stashRecoveryNote() +
                                 '\n\nInspect them with git status --short and try again after resolving the issue.'
                             );
