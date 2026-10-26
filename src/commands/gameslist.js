@@ -9,7 +9,7 @@ function getGamesList() {
 • Scrambled Word — race to unscramble each word. Open with \`!scramble\`
 • Word Forge — build words from a private rack and rule. Open with \`!wordforge\`
 • Number Run — take turns guessing a number with Higher/Lower feedback; send a number on your turn. Open with \`!numberrun\`
-• Truth Hunt — spot the true claim among a shuffled mix of facts and misconceptions, then answer privately. Open with \`!truthhunt\`
+• Truth Hunt — label a claim as Truth or False, or spot rounds with no truth. Answer privately. Open with \`!truthhunt\`
 • Mafia — discuss, vote, and use secret roles. Open with \`!mafia\`
 
 *How play works*
@@ -25,7 +25,7 @@ function getGamesList() {
 • Scramble: \`!joinscramble\`, \`!scramblehint\`, \`!startscramble\`, \`!stopscramble\`
 • Word Forge: \`!joinforge\`, \`!startforge\`, \`!stopforge\`
 • Number Run: \`!joinnumberrun\`, \`!startnumberrun\`, \`!stopnumberrun\` (send a number to guess)
-• Truth Hunt: \`!jointruth\`, \`!starttruth\`, \`!stoptruth\`; read the statements in the group, then answer 1–3 in DM
+• Truth Hunt: \`!jointruth\`, \`!starttruth\`, \`!stoptruth\`; read the group statements, then choose Truth, False, or No Truth in DM
 • Mafia: \`!joinmafia\`, host: \`!startmafia\` / \`!stopmafia\`; vote with \`!vote\` and use assigned night actions in DM.
 
 Type \`!menu\` for the command center.`;
