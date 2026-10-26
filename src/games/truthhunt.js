@@ -319,6 +319,7 @@ async function openAnswerWindow(game) {
         try {
             await game.client.sendMessage(player.id,
                 '🧠 *TRUTH HUNT — ROUND ' + game.roundNumber + '*\n' +
+                'Your anonymous tag is *' + player.anonymousId + '* for group results.\n' +
                 'Choose your answer type. Reply 1 for Truth (+3), 2 for False (+1), or 3 for No Truth (+5 if correct). If you choose 1 or 2, I will ask for the statement number. You have 15 seconds for both replies.'
             );
             answer.promptedAt = Date.now();
