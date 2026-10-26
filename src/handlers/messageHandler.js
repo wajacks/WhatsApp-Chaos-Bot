@@ -61,6 +61,7 @@ function registerMessageHandler(client, dependencies) {
         startWordForgeGame,
         stopWordForgeGame,
         processWordForgeDmMessage,
+        processTruthHuntDmMessage,
         handleWordForgeStealCommand,
         getGamesList,
         handleBalanceCommand,
@@ -179,6 +180,15 @@ function registerMessageHandler(client, dependencies) {
         const wasHandledAsVideoReply = await handleVideoQualityReply(message);
         if (wasHandledAsVideoReply) {
             return;
+        }
+
+        // Truth Hunt answers are plain numbers sent privately during the answer window.
+        if (!isGroup) {
+            const truthHuntResult = await processTruthHuntDmMessage(senderId, text);
+            if (truthHuntResult && truthHuntResult.handled) {
+                if (truthHuntResult.response) await client.sendMessage(chatId, truthHuntResult.response);
+                return;
+            }
         }
 
         // Word Forge guesses are plain one-word DM messages; no quoted reply is required.
