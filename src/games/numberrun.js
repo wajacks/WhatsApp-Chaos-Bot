@@ -126,7 +126,7 @@ async function beginCycle(game, generateBanter) {
 
     lines.push('Current turn: *' + first.name + '*.');
     lines.push('🎭 *' + first.name + '*, ' + banter);
-    lines.push('When ready, send !guessnumber followed by an integer.');
+    lines.push('When ready, send a whole number on its own.');
     return lines.join('\n');
 }
 
@@ -274,17 +274,16 @@ function recordWin(game, player) {
 
 async function processNumberRunGuess(groupId, senderId, messageText, generateBanter) {
     const game = activeGames.get(groupId);
-    if (!game) return '❌ No Number Run match is active in this group. Start one with !numberrun.';
-    if (game.phase === 'LOBBY') return '⚠️ The host still needs to start Number Run.';
+    if (!game || game.phase === 'LOBBY') return null;
+
+    const guessText = String(messageText || '').trim();
+    if (!/^-?\d+$/.test(guessText)) return null;
     if (game.phase !== 'ACTIVE') return '⏳ The next Number Run turn is being prepared.';
 
     const player = game.players.get(senderId);
     if (!player) return '⚠️ Only registered Number Run players can guess.';
 
-    const match = String(messageText || '').trim().match(/^!guessnumber(?:\s+(\d+))?$/i);
-    if (!match || !match[1]) return 'Use !guessnumber followed by a whole number.';
-
-    const guess = Number(match[1]);
+    const guess = Number(guessText);
     if (!Number.isSafeInteger(guess) || guess < game.low || guess > game.high) {
         return 'Choose a whole number from ' + game.low + ' to ' + game.high + '.';
     }
