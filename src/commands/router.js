@@ -498,13 +498,6 @@ function createCommandRouter(dependencies) {
                     return true;
                 }
 
-                if (lowerText === '!guessnumber' || lowerText.startsWith('!guessnumber ')) {
-                    await message.reply(await processNumberRunGuess(
-                        chatId, senderId, text, generateNumberRunBanter
-                    ));
-                    return true;
-                }
-
                 // ====================================================
                 // WORD CHAIN
                 // ====================================================
@@ -638,6 +631,18 @@ function createCommandRouter(dependencies) {
                 const wordChainHandled = await processWordChain(message, client);
                 if (wordChainHandled) return true;
         
+                // ====================================================
+                // NUMBER RUN BARE-NUMBER GUESS
+                // ====================================================
+
+                const numberRunResponse = await processNumberRunGuess(
+                    chatId, senderId, text, generateNumberRunBanter
+                );
+                if (numberRunResponse) {
+                    await message.reply(numberRunResponse);
+                    return true;
+                }
+
                 // ====================================================
                 // WORDLE GUESS
                 // ====================================================
