@@ -143,7 +143,7 @@ function createTruthHuntTriviaGenerator({ ai }) {
                     explanation: item.explanation.trim(),
                     sourceTitle: String(item.sourceTitle).trim(),
                     sourceUrl: item.sourceUrl,
-                    verificationSourceUrl: checks.checks[index].sourceUrl
+                    verificationSourceUrl: checks.checks.find(entry => entry.index === index).sourceUrl
                 }))
             };
         } catch (error) {
