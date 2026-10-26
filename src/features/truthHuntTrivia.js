@@ -1,3 +1,4 @@
+const { GEMINI_MODEL } = require('./geminiConfig');
 const BLOCKED_TOPIC_PATTERN = /\b(?:medical advice|diagnosis|treatment|legal advice|election|politics|religion|breaking news|private person|sexual|porn|self[- ]harm|suicide|terrorism|graphic violence|gore)\b/i;
 const BLOCKED_OUTPUT_PATTERN = /\b(?:sexual assault|pornography|self[- ]harm|suicide instructions|terrorist recruitment|graphic gore)\b/i;
 
@@ -190,7 +191,7 @@ function createTruthHuntTriviaGenerator({ ai, azureResponsesClient }) {
 
         try {
             const draft = await ai.models.generateContent({
-                model: process.env.GEMINI_TRIVIA_MODEL || 'gemini-3.8-flash',
+                model: GEMINI_MODEL,
                 contents: createPrompt,
                 config: {
                     systemInstruction,
@@ -212,7 +213,7 @@ function createTruthHuntTriviaGenerator({ ai, azureResponsesClient }) {
                 'Set verified false if evidence is weak, conflicting, or unclear. safe is true only for general-audience trivia. unambiguous is true only if each statement has one clear interpretation.\n' + claims;
 
             const checked = await ai.models.generateContent({
-                model: process.env.GEMINI_TRIVIA_MODEL || 'gemini-3.8-flash',
+                model: GEMINI_MODEL,
                 contents: checkPrompt,
                 config: {
                     systemInstruction: 'You are a cautious fact checker. Search for evidence for every claim. Do not trust the draft verdict or citation. If a claim is unclear, return verified false.',
