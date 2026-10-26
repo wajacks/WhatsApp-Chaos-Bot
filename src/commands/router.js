@@ -57,7 +57,6 @@ function createCommandRouter(dependencies) {
             startTruthHuntGame,
             stopTruthHuntGame,
             handleTruthHuntGroupMessage,
-            generateTruthHuntTrivia,
             getGamesList,
             handleBalanceCommand,
             getWeather,
@@ -519,7 +518,7 @@ function createCommandRouter(dependencies) {
                 }
 
                 if (lowerText === '!starttruth') {
-                    const response = await startTruthHuntGame(chatId, senderId, client, generateTruthHuntTrivia);
+                    const response = await startTruthHuntGame(chatId, senderId, client);
                     if (response) await message.reply(response);
                     return true;
                 }
