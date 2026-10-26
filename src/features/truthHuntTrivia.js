@@ -85,7 +85,7 @@ function validChecks(data, statements, sources) {
 }
 
 function createTruthHuntTriviaGenerator({ ai }) {
-    return async function generateTruthHuntTrivia(topic) {
+    const generateTruthHuntTrivia = async function (topic) {
         const safeTopic = sanitizeTopic(topic);
         if (!ai || !safeTopic) return null;
 
@@ -151,6 +151,8 @@ function createTruthHuntTriviaGenerator({ ai }) {
             return null;
         }
     };
+    generateTruthHuntTrivia.available = Boolean(ai);
+    return generateTruthHuntTrivia;
 }
 
 module.exports = { createTruthHuntTriviaGenerator, sanitizeTopic };
