@@ -128,10 +128,11 @@ nano .env
 | `AZURE_OPENAI_IMAGE_TIMEOUT_MS` | Optional | Azure image request timeout in milliseconds; defaults to 300000 (5 minutes). |
 | `OWNER_NUMBER` | Recommended | Owner controls. Use the full international number with digits only, such as `254712345678`. |
 | `GEMINI_API_KEY` | Optional | Enables Gemini fallback for AI chat, Mafia narration, and Truth Hunt when Azure web search is unavailable. |
+| `GEMINI_TRIVIA_MODEL` | Optional | Gemini fallback model for Truth Hunt; defaults to `gemini-3.8-flash`. |
 | `OPENWEATHERMAP_API_KEY` | Optional | Enables live weather lookups. |
 | `PAIRING_NUMBER` | Optional | Request a WhatsApp pairing code. Leave blank to use a QR code. |
 
-Truth Hunt uses the Azure Responses API with its `web_search` tool and the configured chat deployment. If Azure web search is unavailable, Truth Hunt uses Gemini only when `GEMINI_API_KEY` is configured. The Azure key and endpoint are required at startup; Azure OpenAI is the primary provider for AI chat and Mafia narration too. Keep your real `.env` private; never commit it or paste its contents into an issue.
+Truth Hunt uses the Azure Responses API with its `web_search` tool and the configured chat deployment. If Azure web search is unavailable, Truth Hunt uses Gemini only when `GEMINI_API_KEY` is configured. Its fallback model defaults to `gemini-3.8-flash` and can be overridden with `GEMINI_TRIVIA_MODEL`. The Azure key and endpoint are required at startup; Azure OpenAI is the primary provider for AI chat and Mafia narration too. Keep your real `.env` private; never commit it or paste its contents into an issue.
 
 ### 4. Link WhatsApp and start the bot
 
