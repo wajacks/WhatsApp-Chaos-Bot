@@ -275,8 +275,6 @@ async function openAnswerWindow(game) {
 
     const tasks = Array.from(game.players.values()).map(async player => {
         const answer = game.answers.get(player.id);
-        answer.promptedAt = Date.now();
-        answer.deadline = answer.promptedAt + ANSWER_TIME_MS;
         try {
             await game.client.sendMessage(player.id,
                 '🧠 *TRUTH HUNT — ROUND ' + game.roundNumber + '*\n' +
@@ -335,16 +333,17 @@ async function processTruthHuntDmMessage(senderId, text) {
             : { handled: false };
     }
 
-    if (game.phase === 'SENDING_DMS' && (!answer || !answer.promptedAt)) {
+    if (!answer) return { handled: false };
+    if (game.phase === 'SENDING_DMS' && !answer.delivered) {
         return isChoice
             ? { handled: true, response: '⏳ Wait for the private answer prompt before choosing.' }
             : { handled: false };
     }
-    if (!answer || !answer.promptedAt) return { handled: false };
-    if (!answer.delivered && game.phase === 'ANSWERING') {
+    if (game.phase === 'ANSWERING' && !answer.delivered) {
         return { handled: true, response: '⚠️ The answer prompt could not be delivered, so your response cannot be recorded.' };
     }
-    if (game.phase === 'ANSWERING' && answer.deadline && Date.now() > answer.deadline) {
+    if (!answer.promptedAt) return { handled: false };
+    if (answer.deadline && Date.now() > answer.deadline) {
         return { handled: true, response: '⏰ Your 10-second answer window has closed.' };
     }
     if (answer.answer !== null) {
