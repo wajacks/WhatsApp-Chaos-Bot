@@ -113,7 +113,6 @@ const {
     handleTruthHuntGroupMessage,
     processTruthHuntDmMessage
 } = require('./src/games/truthhunt');
-const { createTruthHuntTriviaGenerator } = require('./src/features/truthHuntTrivia');
 
 const { getGamesList } = require('./src/commands/gameslist');
 const { handleBalanceCommand } = require('./src/commands/balance');
@@ -198,7 +197,6 @@ const azureResponsesClient = process.env.AZURE_OPENAI_KEY && azureResourceEndpoi
 
 const generateMafiaNarration = createMafiaNarrator({ ai, azureClient });
 const generateNumberRunBanter = createNumberRunBanter({ ai, azureClient });
-const generateTruthHuntTrivia = createTruthHuntTriviaGenerator({ ai, azureResponsesClient });
 const { aiMemory, MAX_AI_MEMORY, aiCooldowns } = require('./src/features/ai/state');
 const imageState = require('./src/features/images/state');
 
@@ -368,7 +366,6 @@ function initializeChaosBot(options) {
         stopTruthHuntGame,
         handleTruthHuntGroupMessage,
         processTruthHuntDmMessage,
-        generateTruthHuntTrivia,
         getGamesList,
         handleBalanceCommand,
         getWeather,
