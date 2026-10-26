@@ -2551,32 +2551,32 @@
         {
           "statement": "A Hoover vacuum from 1927 is part of the Smithsonian household collection",
           "explanation": "The museum documents early household appliances",
-          "sourceId": "SMITH_HOUSE"
+          "sourceId": "SMITH_OBJECT_LIST"
         },
         {
           "statement": "A Toastmaster toaster from the 1920s is in the Smithsonian household collection",
           "explanation": "The collection includes an early electric toaster",
-          "sourceId": "SMITH_HOUSE"
+          "sourceId": "SMITH_OBJECT_LIST"
         },
         {
           "statement": "The Smithsonian household exhibit includes a transistor radio from 1954",
           "explanation": "The museum displays the radio as a household technology",
-          "sourceId": "SMITH_HOUSE"
+          "sourceId": "SMITH_OBJECT_LIST"
         },
         {
           "statement": "The Smithsonian household collection includes a grocery cart from 1937",
           "explanation": "The Object Project documents the cart as an everyday innovation",
-          "sourceId": "SMITH_HOUSE"
+          "sourceId": "SMITH_OBJECT_LIST"
         },
         {
           "statement": "Air filled bicycle tires appeared in the 1890s",
           "explanation": "The Smithsonian bicycle collection includes tires from that period",
-          "sourceId": "SMITH_HOUSE"
+          "sourceId": "SMITH_OBJECT_LIST"
         },
         {
           "statement": "The Smithsonian collection includes a Tupperware item from 1954",
           "explanation": "The museum documents early household plastic storage",
-          "sourceId": "SMITH_HOUSE"
+          "sourceId": "SMITH_OBJECT_LIST"
         },
         {
           "statement": "A Raytheon Radarange was bought by a Cleveland restaurant in 1947",
@@ -2604,7 +2604,7 @@
           "sourceId": "DOE_BULB"
         },
         {
-          "statement": "A vacuum cleaner became a common household convenience as electric appliances spread",
+          "statement": "Incandescent bulbs turn much of their energy into heat rather than visible light",
           "explanation": "The Smithsonian household exhibit documents vacuums as transforming home work",
           "sourceId": "DOE_BULB"
         }
@@ -2628,32 +2628,32 @@
         {
           "statement": "The Smithsonian household exhibit shows a vacuum from the 1800s",
           "explanation": "Its Hoover vacuum example dates to 1927",
-          "sourceId": "SMITH_HOUSE"
+          "sourceId": "SMITH_OBJECT_LIST"
         },
         {
           "statement": "The Smithsonian toaster example is from the 2000s",
           "explanation": "The Toastmaster example is from the 1920s",
-          "sourceId": "SMITH_HOUSE"
+          "sourceId": "SMITH_OBJECT_LIST"
         },
         {
           "statement": "The Smithsonian household collection has no radios",
           "explanation": "It includes a 1954 transistor radio",
-          "sourceId": "SMITH_HOUSE"
+          "sourceId": "SMITH_OBJECT_LIST"
         },
         {
           "statement": "The Smithsonian collection lists a grocery cart from 1970",
           "explanation": "Its example is dated 1937",
-          "sourceId": "SMITH_HOUSE"
+          "sourceId": "SMITH_OBJECT_LIST"
         },
         {
           "statement": "Air filled bicycle tires appeared only after 1950",
           "explanation": "The Smithsonian bicycle collection includes 1890s tires",
-          "sourceId": "SMITH_HOUSE"
+          "sourceId": "SMITH_OBJECT_LIST"
         },
         {
           "statement": "Tupperware was first made in the 1990s",
           "explanation": "The museum documents an item from 1954",
-          "sourceId": "SMITH_HOUSE"
+          "sourceId": "SMITH_OBJECT_LIST"
         },
         {
           "statement": "The first microwave oven was made for a home kitchen in 1947",
@@ -2681,8 +2681,8 @@
           "sourceId": "DOE_BULB"
         },
         {
-          "statement": "A vacuum cleaner makes a home clean without any electricity or power source",
-          "explanation": "Modern household vacuums use powered suction",
+          "statement": "An incandescent bulb filament stays cool while the bulb is on",
+          "explanation": "Incandescent bulbs release much of their energy as heat",
           "sourceId": "DOE_BULB"
         }
       ]
@@ -3364,6 +3364,10 @@
     "LOC_ACOUSTICAL": {
       "title": "Library of Congress on Acoustic Recording",
       "url": "https://www.loc.gov/collections/national-jukebox/articles-and-essays/acoustical-recording/"
+    },
+    "SMITH_OBJECT_LIST": {
+      "title": "Smithsonian Object Project Object List",
+      "url": "https://americanhistory.si.edu/explore/exhibitions/object-project/online/object-list"
     }
   }
 }
