@@ -1,16 +1,15 @@
 const crypto = require('crypto');
 const { claimGame, releaseGame } = require('./gameRegistry');
-const { sanitizeTopic } = require('../features/truthHuntTrivia');
+const FACT_BANK = require('../data/truthHuntFacts.json');
 
 const activeGames = new Map();
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 10;
-const SUGGESTION_TIME_MS = 30 * 1000;
-const TOPIC_VOTE_TIME_MS = 30 * 1000;
-const READING_TIME_MS = 30 * 1000;
-const ANSWER_TIME_MS = 10 * 1000;
+const READING_TIME_MS = 60 * 1000;
+const ANSWER_TIME_MS = 15 * 1000;
 const ROUND_BREAK_MS = 2500;
-const SAFE_FALLBACK_TOPICS = ['Animals', 'Football', 'Space'];
+const HINT_DELAY_MIN_MS = 12000;
+const HINT_DELAY_MAX_MS = 36000;
 
 function randomInt(min, max) {
     return crypto.randomInt(min, max + 1);
@@ -39,14 +38,128 @@ function safeName(value) {
     return name || 'Player';
 }
 
-function sendGroup(game, message) {
+function makeAnonymousId(game) {
+    const used = new Set(Array.from(game.players.values()).map(player => player.anonymousId));
+    let candidate;
+    do {
+        candidate = 'TH-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+    } while (used.has(candidate));
+    return candidate;
+}
+
+function validateClaim(claim, sources, topicId) {
+    if (!claim || typeof claim.statement !== 'string' || claim.statement.length < 15 || claim.statement.length > 240) {
+        throw new Error('Invalid statement in Truth Hunt topic ' + topicId);
+    }
+    if (claim.statement.includes(':') || /[\r\n]/.test(claim.statement)) {
+        throw new Error('Truth Hunt statements must be single flowing sentences');
+    }
+    if (typeof claim.explanation !== 'string' || claim.explanation.length < 12 || claim.explanation.length > 360) {
+        throw new Error('Invalid explanation in Truth Hunt topic ' + topicId);
+    }
+    const source = sources[claim.sourceId];
+    if (!source || typeof source.title !== 'string' || !source.title.trim()) {
+        throw new Error('Missing source metadata in Truth Hunt topic ' + topicId);
+    }
+    try {
+        if (new URL(source.url).protocol !== 'https:') throw new Error('not https');
+    } catch {
+        throw new Error('Invalid HTTPS source in Truth Hunt topic ' + topicId);
+    }
+}
+
+function validateFactBank(bank) {
+    if (!bank || bank.version !== 1 || !Array.isArray(bank.topics) || bank.topics.length !== 19) {
+        throw new Error('Truth Hunt fact bank must contain exactly 19 topics');
+    }
+    if (!bank.sources || typeof bank.sources !== 'object') {
+        throw new Error('Truth Hunt fact bank is missing its source catalog');
+    }
+
+    const topicIds = new Set();
+    for (const topic of bank.topics) {
+        if (!topic || typeof topic.id !== 'string' || !topic.id || topicIds.has(topic.id)) {
+            throw new Error('Truth Hunt topic IDs must be unique');
+        }
+        topicIds.add(topic.id);
+        if (typeof topic.name !== 'string' || !topic.name.trim()) {
+            throw new Error('Truth Hunt topic is missing its display name');
+        }
+        if (!Array.isArray(topic.truths) || topic.truths.length !== 15) {
+            throw new Error('Truth Hunt topic ' + topic.id + ' must have exactly 15 truths');
+        }
+        if (!Array.isArray(topic.misconceptions) || topic.misconceptions.length !== 15) {
+            throw new Error('Truth Hunt topic ' + topic.id + ' must have exactly 15 misconceptions');
+        }
+        for (const claim of topic.truths) validateClaim(claim, bank.sources, topic.id);
+        for (const claim of topic.misconceptions) validateClaim(claim, bank.sources, topic.id);
+    }
+}
+
+validateFactBank(FACT_BANK);
+
+function claimKey(topic, claim) {
+    return topic.id + '|' + claim.sourceId + '|' + claim.statement;
+}
+
+function selectClaim(game, topic, listName, isTrue) {
+    const choices = topic[listName].filter(claim => !game.usedFacts.has(claimKey(topic, claim)));
+    if (choices.length === 0) return null;
+    const claim = randomItem(choices);
+    game.usedFacts.add(claimKey(topic, claim));
+    const source = FACT_BANK.sources[claim.sourceId];
+    return {
+        topicId: topic.id,
+        topicName: topic.name,
+        statement: claim.statement,
+        explanation: claim.explanation,
+        sourceTitle: source.title,
+        sourceUrl: source.url,
+        isTrue
+    };
+}
+
+function buildRoundStatements(game) {
+    const selectedTopics = shuffle(FACT_BANK.topics).slice(0, 3);
+    const truthExists = crypto.randomInt(0, 6) !== 0;
+    const truthTopic = truthExists ? randomItem(selectedTopics) : null;
+    const statements = selectedTopics.map(topic => {
+        const isTrue = Boolean(truthTopic && topic.id === truthTopic.id);
+        return selectClaim(game, topic, isTrue ? 'truths' : 'misconceptions', isTrue);
+    });
+    if (statements.some(item => !item)) return null;
+    return { statements: shuffle(statements), truthExists };
+}
+
+function sendGroup(game, message, options) {
     if (!game.client || !message) return Promise.resolve(false);
-    return game.client.sendMessage(game.groupId, message)
+    return game.client.sendMessage(game.groupId, message, options || {})
         .then(() => true)
         .catch(error => {
             console.warn('[TRUTH HUNT] Group message failed:', error.message);
             return false;
         });
+}
+
+async function sendReadingHint(game) {
+    if (activeGames.get(game.groupId) !== game || game.phase !== 'READING' || typeof game.generateHint !== 'function') return;
+    try {
+        const hint = await game.generateHint({
+            statements: game.statements.map(item => item.statement)
+        });
+        if (!hint || activeGames.get(game.groupId) !== game || game.phase !== 'READING') return;
+
+        const shouldTagPlayer = crypto.randomInt(0, 4) === 0;
+        if (shouldTagPlayer && game.players.size > 0) {
+            const player = randomItem(Array.from(game.players.values()));
+            const phone = String(player.id).split('@')[0];
+            await sendGroup(game, '🤫 @' + phone + ' ' + hint, { mentions: [player.id] });
+        } else {
+            await sendGroup(game, '🤫 ' + hint);
+        }
+    } catch (error) {
+        console.warn('[TRUTH HUNT AI] Optional hint failed:', error.message);
+    }
 }
 
 function clearTimer(game, key) {
@@ -97,21 +210,20 @@ function startTruthHuntLobby(groupId, hostId, hostName) {
         players: new Map(),
         roundNumber: 0,
         totalRounds: 0,
-        suggestions: new Map(),
-        topics: [],
-        votes: new Map(),
+        usedFacts: new Set(),
         statements: [],
         correctIndex: -1,
+        truthExists: false,
         answers: new Map(),
+        generateHint: null,
         timers: {},
-        client: null,
-        generateTrivia: null
+        client: null
     });
 
     return '🧠 *TRUTH HUNT LOBBY OPEN*\n\n' +
         '*' + safeName(hostName) + '* is the host and must join with !jointruth.\n' +
         'Players use !jointruth to register. The host starts with !starttruth or closes with !stoptruth.\n' +
-        'Each round starts with player topic suggestions and a group vote. Answers are sent privately.';
+        'Each round mixes claims from three different topics. Read in the group, then answer privately.';
 }
 
 function joinTruthHuntLobby(groupId, playerId, playerName) {
@@ -129,22 +241,21 @@ function joinTruthHuntLobby(groupId, playerId, playerName) {
     game.players.set(playerId, {
         id: playerId,
         name: safeName(playerName),
-        score: 0,
-        streak: 0
+        anonymousId: makeAnonymousId(game),
+        score: 0
     });
     return '✅ *' + safeName(playerName) + '* joined Truth Hunt (' + game.players.size + ' player(s)).';
 }
 
-async function startTruthHuntGame(groupId, senderId, client, generateTrivia) {
+async function startTruthHuntGame(groupId, senderId, client, generateHint) {
     const game = activeGames.get(groupId);
     if (!game || game.phase !== 'LOBBY') return '❌ No Truth Hunt lobby is waiting to start.';
     if (senderId !== game.hostId) return '❌ Only the host can start Truth Hunt.';
     if (!game.players.has(senderId)) return '❌ The host must join with !jointruth before starting.';
     if (game.players.size < MIN_PLAYERS) return '❌ Truth Hunt needs at least 2 registered players.';
-    if (typeof generateTrivia !== 'function' || generateTrivia.available === false) return '❌ Search-grounded trivia is unavailable. Check Azure OpenAI credentials, endpoint, and deployment; Gemini is an optional fallback.';
 
     game.client = client;
-    game.generateTrivia = generateTrivia;
+    game.generateHint = typeof generateHint === 'function' ? generateHint : null;
     game.totalRounds = Math.min(7, Math.max(3, game.players.size + 1));
     await beginRound(game);
     return '';
@@ -153,120 +264,50 @@ async function startTruthHuntGame(groupId, senderId, client, generateTrivia) {
 async function beginRound(game) {
     if (activeGames.get(game.groupId) !== game) return;
     game.roundNumber += 1;
-    game.phase = 'SUGGESTIONS';
-    game.suggestions = new Map();
-    game.topics = [];
-    game.votes = new Map();
+    game.phase = 'PREPARING';
     game.statements = [];
+    game.truthExists = false;
     game.correctIndex = -1;
     game.answers = new Map();
 
+    const round = buildRoundStatements(game);
+    if (!round || round.statements.length !== 3) {
+        await sendGroup(game, '⚠️ I could not build a valid set of sourced statements. This round is void; no points change.');
+        await finishRound(game, true);
+        return;
+    }
+
+    game.statements = round.statements;
+    game.truthExists = round.truthExists;
+    game.correctIndex = game.statements.findIndex(item => item.isTrue);
+    game.phase = 'READING';
+    const display = game.statements.map((item, index) => (index + 1) + '. ' + item.statement).join('\n');
     await sendGroup(game,
         '🧠 *TRUTH HUNT — ROUND ' + game.roundNumber + '/' + game.totalRounds + '*\n\n' +
-        'Each registered player, send one short topic suggestion in this group.\n' +
-        'Suggestions close in 30 seconds or when everyone has sent one.'
-    );
-    if (game.phase !== 'SUGGESTIONS') return;
-
-    scheduleTimer(game, 'suggestions', SUGGESTION_TIME_MS, () => openTopicPoll(game));
-}
-
-async function openTopicPoll(game) {
-    if (game.phase !== 'SUGGESTIONS') return;
-    clearTimer(game, 'suggestions');
-
-    const unique = [];
-    const seen = new Set();
-    for (const topic of game.suggestions.values()) {
-        const key = topic.toLowerCase();
-        if (!seen.has(key)) {
-            seen.add(key);
-            unique.push(topic);
-        }
-    }
-
-    if (unique.length < 2) {
-        for (const fallback of shuffle(SAFE_FALLBACK_TOPICS)) {
-            const key = fallback.toLowerCase();
-            if (!seen.has(key)) {
-                seen.add(key);
-                unique.push(fallback);
-            }
-            if (unique.length >= 3) break;
-        }
-    }
-    game.topics = unique;
-    game.votes = new Map();
-    game.phase = 'TOPIC_VOTE';
-
-    const options = game.topics.map((topic, index) => (index + 1) + '. ' + topic).join('\n');
-    await sendGroup(game,
-        '🗳️ *Choose this round’s topic*\n' + options + '\n\n' +
-        'Registered players, vote by sending the option number here. The poll closes in 30 seconds or when everyone votes.'
-    );
-    if (game.phase !== 'TOPIC_VOTE') return;
-
-    scheduleTimer(game, 'topicVote', TOPIC_VOTE_TIME_MS, () => closeTopicPoll(game));
-}
-
-async function closeTopicPoll(game) {
-    if (game.phase !== 'TOPIC_VOTE') return;
-    clearTimer(game, 'topicVote');
-
-    const counts = game.topics.map((_, index) => ({
-        index,
-        votes: Array.from(game.votes.values()).filter(vote => vote === index).length
-    }));
-    const highest = Math.max(0, ...counts.map(item => item.votes));
-    const tied = counts.filter(item => item.votes === highest);
-    const winner = randomItem(tied.length > 0 ? tied : counts);
-    const topic = game.topics[winner.index];
-
-    game.phase = 'GENERATING';
-    await sendGroup(game, '📚 The topic is *' + topic + '*. I’m checking sources and preparing three statements.');
-    if (activeGames.get(game.groupId) !== game || game.phase !== 'GENERATING') return;
-
-    let trivia = await game.generateTrivia(topic);
-    if (!trivia && activeGames.get(game.groupId) === game && game.phase === 'GENERATING') {
-        trivia = await game.generateTrivia(topic);
-    }
-    if (activeGames.get(game.groupId) !== game || game.phase !== 'GENERATING') return;
-
-    if (!trivia || !Array.isArray(trivia.statements) || trivia.statements.length !== 3) {
-        await sendGroup(game, '⚠️ I couldn’t verify a safe set with exactly one true statement. This round is void; no points change.');
-        await finishRound(game, true);
-        return;
-    }
-
-    const statements = shuffle(trivia.statements);
-    game.statements = statements;
-    game.correctIndex = statements.findIndex(item => item.isTrue === true);
-    if (game.correctIndex < 0 || statements.filter(item => item.isTrue === true).length !== 1) {
-        await sendGroup(game, '⚠️ The fact check did not produce exactly one true statement. This round is void; no points change.');
-        await finishRound(game, true);
-        return;
-    }
-
-    game.phase = 'READING';
-    const display = statements.map((item, index) => (index + 1) + '. ' + item.statement).join('\n');
-    await sendGroup(game,
-        '🧩 *Which statement is true?*\n\n' + display + '\n\n' +
-        'Read the statements in the group. You have 30 seconds before private answers open. Please don’t post your answer here.'
+        'Most rounds have one true claim. Occasionally, none are true. Decide what you believe for each statement.\n\n' +
+        '🧩 *Read the statements carefully*\n' + display + '\n\n' +
+        'You have 1 minute. Then DM Truth for +3, False for +1, or No Truth for +5 if correct. If you choose Truth or False, the bot will ask for a statement number.'
     );
     if (game.phase !== 'READING') return;
-
     scheduleTimer(game, 'reading', READING_TIME_MS, () => openAnswerWindow(game));
+    if (game.generateHint) {
+        scheduleTimer(game, 'hint', crypto.randomInt(HINT_DELAY_MIN_MS, HINT_DELAY_MAX_MS), () => sendReadingHint(game));
+    }
 }
 
 async function openAnswerWindow(game) {
     if (game.phase !== 'READING') return;
     clearTimer(game, 'reading');
+    clearTimer(game, 'hint');
     game.phase = 'SENDING_DMS';
     game.answers = new Map();
 
     for (const player of game.players.values()) {
         game.answers.set(player.id, {
-            answer: null,
+            mode: null,
+            statementIndex: null,
+            stage: 'TYPE',
+            complete: false,
             promptedAt: null,
             deadline: null,
             delivered: false
@@ -278,14 +319,15 @@ async function openAnswerWindow(game) {
         try {
             await game.client.sendMessage(player.id,
                 '🧠 *TRUTH HUNT — ROUND ' + game.roundNumber + '*\n' +
-                'Which group statement is true? Reply with 1, 2, or 3 within 10 seconds of this message. Your choice is private.'
+                'Your anonymous tag is *' + player.anonymousId + '* for group results.\n' +
+                'Choose your answer type. Reply 1 for Truth (+3), 2 for False (+1), or 3 for No Truth (+5 if correct). If you choose 1 or 2, I will ask for the statement number. You have 15 seconds for both replies.'
             );
             answer.promptedAt = Date.now();
             answer.deadline = answer.promptedAt + ANSWER_TIME_MS;
             answer.delivered = true;
         } catch (error) {
             answer.delivered = false;
-            answer.deadline = null;
+            answer.complete = true;
             console.warn('[TRUTH HUNT] Could not send answer DM:', error.message);
         }
     });
@@ -295,13 +337,13 @@ async function openAnswerWindow(game) {
 
     const delivered = Array.from(game.answers.values()).filter(answer => answer.delivered);
     if (delivered.length === 0) {
-        await sendGroup(game, '⚠️ I couldn’t deliver the private answer prompts. This round is void; no points change.');
+        await sendGroup(game, '⚠️ I could not deliver the private answer prompts. This round is void; no points change.');
         await finishRound(game, true);
         return;
     }
 
     game.phase = 'ANSWERING';
-    await sendGroup(game, '📩 Private prompts sent. Each player has 10 seconds from their own DM to reply with 1, 2, or 3.');
+    await sendGroup(game, '📩 Answer in your DM. The full choice-and-number process closes 15 seconds after your first prompt.');
     if (game.phase !== 'ANSWERING') return;
 
     const latestDeadline = Math.max(...delivered.map(answer => answer.deadline));
@@ -323,45 +365,67 @@ async function processTruthHuntDmMessage(senderId, text) {
     const game = findActiveGameForDm(senderId);
     if (!game) return { handled: false };
 
-    const body = String(text || '').trim();
+    const body = String(text || '').trim().toLowerCase();
     const answer = game.answers.get(senderId);
-    const isChoice = /^[1-3]$/.test(body);
+    const choiceNumber = /^[1-3]$/.test(body) ? Number(body) : null;
 
     if (game.phase === 'READING') {
-        return isChoice
+        return choiceNumber
             ? { handled: true, response: '⏳ Wait for the private answer prompt before choosing.' }
             : { handled: false };
     }
-
     if (!answer) return { handled: false };
     if (game.phase === 'SENDING_DMS' && !answer.delivered) {
-        return isChoice
+        return choiceNumber
             ? { handled: true, response: '⏳ Wait for the private answer prompt before choosing.' }
             : { handled: false };
     }
     if (game.phase === 'ANSWERING' && !answer.delivered) {
-        return { handled: true, response: '⚠️ The answer prompt could not be delivered, so your response cannot be recorded.' };
+        return { handled: true, response: '⚠️ The private answer prompt could not be delivered.' };
     }
     if (!answer.promptedAt) return { handled: false };
     if (answer.deadline && Date.now() > answer.deadline) {
-        return { handled: true, response: '⏰ Your 10-second answer window has closed.' };
+        return { handled: true, response: '⏰ Your 15-second answer window has closed.' };
     }
-    if (answer.answer !== null) {
+    if (answer.complete) {
         return { handled: true, response: '🔒 Your answer is locked in.' };
     }
-    if (!isChoice) {
-        return { handled: true, response: 'Reply with 1, 2, or 3.' };
+
+    if (answer.stage === 'TYPE') {
+        const mode = ['1', 'truth', 'fact'].includes(body) ? 'TRUTH'
+            : ['2', 'false', 'falsehood', 'misconception'].includes(body) ? 'FALSE'
+                : ['3', 'no truth', 'none', 'no fact'].includes(body) ? 'NO_TRUTH'
+                    : null;
+        if (!mode) {
+            return { handled: true, response: 'Reply Truth, False, or No Truth. You can also reply 1, 2, or 3.' };
+        }
+
+        answer.mode = mode;
+        if (mode === 'NO_TRUTH') {
+            answer.complete = true;
+            if (game.phase === 'ANSWERING') await maybeResolveAnsweredRound(game);
+            return { handled: true, response: '✅ No Truth is locked in.' };
+        }
+
+        answer.stage = 'STATEMENT';
+        return {
+            handled: true,
+            response: 'Which statement are you labelling ' + (mode === 'TRUTH' ? 'Truth' : 'False') +
+                '? Reply with 1, 2, or 3. Your original 15-second window is still running.'
+        };
     }
 
-    answer.answer = Number(body) - 1;
+    if (!choiceNumber) return { handled: true, response: 'Reply with the statement number 1, 2, or 3.' };
+    answer.statementIndex = choiceNumber - 1;
+    answer.complete = true;
     if (game.phase === 'ANSWERING') await maybeResolveAnsweredRound(game);
-    return { handled: true, response: '✅ Your answer is locked in. I’ll reveal it when the round closes.' };
+    return { handled: true, response: '✅ Your answer is locked in.' };
 }
 
 async function maybeResolveAnsweredRound(game) {
     if (game.phase !== 'ANSWERING') return;
     const eligible = Array.from(game.answers.values()).filter(answer => answer.delivered);
-    if (eligible.length > 0 && eligible.every(answer => answer.answer !== null)) {
+    if (eligible.length > 0 && eligible.every(answer => answer.complete)) {
         await resolveAnswerRound(game);
     }
 }
@@ -375,39 +439,28 @@ async function resolveAnswerRound(game) {
     for (const player of game.players.values()) {
         const answer = game.answers.get(player.id);
         let gained = 0;
-        let detail = 'no answer';
-        if (answer && answer.delivered && answer.answer !== null) {
-            if (answer.answer === game.correctIndex) {
-                player.streak += 1;
-                gained = 2;
-                if (player.streak % 3 === 0) gained += 1;
-                player.score += gained;
-                detail = 'correct +' + gained;
-            } else {
-                player.streak = 0;
-                detail = 'not correct';
-            }
-        } else if (answer && answer.delivered) {
-            player.streak = 0;
+        if (answer && answer.delivered && answer.complete) {
+            const selected = answer.statementIndex === null ? null : game.statements[answer.statementIndex];
+            if (answer.mode === 'TRUTH' && game.truthExists && selected && selected.isTrue) gained = 3;
+            else if (answer.mode === 'FALSE' && selected && !selected.isTrue) gained = 1;
+            else if (answer.mode === 'NO_TRUTH' && !game.truthExists) gained = 5;
+            player.score += gained;
         }
-        changes.push('*' + player.name + '* — ' + detail);
+        changes.push('*' + player.anonymousId + '* — ' + (gained > 0 ? '+' + gained : '0') + ' pts');
     }
 
-    const correct = game.statements[game.correctIndex];
     const statements = game.statements.map((item, index) => {
-        const label = index + 1;
         const kind = item.isTrue ? 'TRUE' : 'MISCONCEPTION';
-        return label + '. ' + kind + ' — ' + item.explanation +
-            '\nSource: ' + item.sourceTitle + ' ' + item.sourceUrl +
-            (item.verificationSourceUrl && item.verificationSourceUrl !== item.sourceUrl
-                ? '\nCross-check: ' + item.verificationSourceUrl
-                : '');
+        return (index + 1) + '. ' + kind + ' — ' + item.topicName + '\n' + item.explanation +
+            '\nSource — ' + item.sourceTitle + '\n' + item.sourceUrl;
     }).join('\n\n');
+    const truthReveal = game.truthExists
+        ? '✅ *A true claim was present.* It was statement ' + (game.correctIndex + 1) + ', about ' +
+            game.statements[game.correctIndex].topicName + '.'
+        : '🕵️ *No true claim was present.* All three statements were misconceptions.';
 
     await sendGroup(game,
-        '✅ *The true statement was ' + (game.correctIndex + 1) + '*\n' +
-        correct.explanation + '\nSource: ' + correct.sourceTitle + ' ' + correct.sourceUrl +
-        '\n\n*Fact check*\n' + statements +
+        truthReveal + '\n\n*Fact check*\n' + statements +
         '\n\n*Round points*\n' + changes.join('\n') +
         '\n\n*Scores*\n' + formatScores(game)
     );
@@ -415,18 +468,22 @@ async function resolveAnswerRound(game) {
     await finishRound(game, false);
 }
 
-function formatScores(game) {
+function formatScores(game, revealNames) {
     return Array.from(game.players.values())
-        .sort((left, right) => right.score - left.score || left.name.localeCompare(right.name))
-        .map((player, index) => (index + 1) + '. *' + player.name + '* — ' + player.score + ' pts')
+        .sort((left, right) => right.score - left.score || left.anonymousId.localeCompare(right.anonymousId))
+        .map((player, index) => {
+            const identity = revealNames
+                ? '*' + player.name + '* (' + player.anonymousId + ')'
+                : '*' + player.anonymousId + '*';
+            return (index + 1) + '. ' + identity + ' — ' + player.score + ' pts';
+        })
         .join('\n');
 }
 
 async function finishRound(game, voided) {
-    clearTimer(game, 'suggestions');
-    clearTimer(game, 'topicVote');
     clearTimer(game, 'reading');
     clearTimer(game, 'answers');
+    clearTimer(game, 'hint');
 
     if (activeGames.get(game.groupId) !== game) return;
     if (game.roundNumber >= game.totalRounds) {
@@ -438,14 +495,14 @@ async function finishRound(game, voided) {
         const winnerText = winners.length === 1
             ? '🏆 *' + winners[0].name + '* wins Truth Hunt!'
             : '🏆 Truth Hunt is tied between ' + winners.map(player => '*' + player.name + '*').join(', ') + '.';
-        await sendGroup(game, '🏁 *TRUTH HUNT COMPLETE*\n' + winnerText + '\n\n*Final scores*\n' + formatScores(game));
+        await sendGroup(game, '🏁 *TRUTH HUNT COMPLETE*\n' + winnerText + '\n\n*Final scores*\n' + formatScores(game, true));
         endGame(game);
         return;
     }
 
     game.phase = 'BREAK';
     if (!voided) {
-        await sendGroup(game, 'Next round begins in a moment. Topic suggestions will open shortly.');
+        await sendGroup(game, 'Next round begins in a moment. The topics and statements will be shuffled again.');
     }
     scheduleTimer(game, 'break', ROUND_BREAK_MS, () => beginRound(game));
 }
@@ -474,43 +531,10 @@ async function handleTruthHuntGroupMessage(groupId, senderId, text) {
     const body = String(text || '').trim();
     if (!body || body.startsWith('!')) return false;
     if (['READING', 'SENDING_DMS', 'ANSWERING'].includes(game.phase) && /^[1-3]$/.test(body)) {
-        await sendGroup(game, '🔒 Send your 1, 2, or 3 choice in the private chat with the bot.');
+        await sendGroup(game, '🔒 Your Truth Hunt choice belongs in the private chat with the bot.');
         return true;
     }
-    if (!['SUGGESTIONS', 'TOPIC_VOTE'].includes(game.phase)) return false;
-    const player = game.players.get(senderId);
-    if (!player) return false;
-
-    if (game.phase === 'SUGGESTIONS') {
-        const topic = sanitizeTopic(body);
-        if (!topic) {
-            await sendGroup(game, '⚠️ Send one short, safe topic phrase without a link or command.');
-            return true;
-        }
-        if (game.suggestions.has(senderId)) {
-            await sendGroup(game, '*' + player.name + '*, your topic suggestion is already recorded for this round.');
-            return true;
-        }
-        game.suggestions.set(senderId, topic);
-        await sendGroup(game, '✅ Topic suggestion received from *' + player.name + '*.');
-        if (game.phase === 'SUGGESTIONS' && game.suggestions.size >= game.players.size) {
-            await openTopicPoll(game);
-        }
-        return true;
-    }
-
-    if (!/^\d+$/.test(body)) return false;
-    const choice = Number(body) - 1;
-    if (!Number.isInteger(choice) || choice < 0 || choice >= game.topics.length) {
-        await sendGroup(game, '⚠️ Choose a topic option from 1 to ' + game.topics.length + '.');
-        return true;
-    }
-    game.votes.set(senderId, choice);
-    await sendGroup(game, '✅ Vote recorded for *' + game.topics[choice] + '*.');
-    if (game.phase === 'TOPIC_VOTE' && game.votes.size >= game.players.size) {
-        await closeTopicPoll(game);
-    }
-    return true;
+    return false;
 }
 
 module.exports = {
