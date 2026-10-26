@@ -102,12 +102,26 @@ function responseText(response) {
 }
 
 function responseGroundedSources(response) {
-    return (response && Array.isArray(response.output) ? response.output : [])
+    const output = response && Array.isArray(response.output) ? response.output : [];
+    const searchSources = output
+        .filter(item => item && item.type === 'web_search_call')
+        .flatMap(item => item.action && Array.isArray(item.action.sources) ? item.action.sources : [])
+        .map(item => typeof item === 'string' ? { url: item } : item);
+    const citations = output
         .filter(item => item && item.type === 'message')
         .flatMap(item => Array.isArray(item.content) ? item.content : [])
         .flatMap(item => Array.isArray(item.annotations) ? item.annotations : [])
-        .filter(item => item && item.type === 'url_citation' && /^https:\/\//i.test(item.url || ''))
-        .map(item => ({ url: item.url, title: item.title || hostOf(item.url) }));
+        .filter(item => item && item.type === 'url_citation');
+
+    const unique = new Map();
+    for (const source of [...searchSources, ...citations]) {
+        if (!source || !/^https:\/\//i.test(source.url || '')) continue;
+        const key = canonicalUrl(source.url);
+        if (key && !unique.has(key)) {
+            unique.set(key, { url: source.url, title: source.title || hostOf(source.url) });
+        }
+    }
+    return Array.from(unique.values());
 }
 
 async function runAzureWebSearch(client, instructions, input) {
@@ -117,6 +131,7 @@ async function runAzureWebSearch(client, instructions, input) {
         instructions,
         input,
         tools: [{ type: 'web_search' }],
+        include: ['web_search_call.action.sources'],
         max_output_tokens: 1800
     });
     const usedWebSearch = (response && Array.isArray(response.output) ? response.output : [])
@@ -161,7 +176,11 @@ function createTruthHuntTriviaGenerator({ ai, azureResponsesClient }) {
                 const draftSources = responseGroundedSources(draft);
                 const data = parseJson(responseText(draft));
                 if (!validSet(data, draftSources)) {
-                    throw new Error('Azure draft failed source or statement validation');
+                    const statementCount = data && Array.isArray(data.statements) ? data.statements.length : 0;
+                    throw new Error(
+                        'Azure draft failed source or statement validation (statements=' +
+                        statementCount + ', groundedSources=' + draftSources.length + ')'
+                    );
                 }
 
                 const claims = data.statements.map((item, index) =>
