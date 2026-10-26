@@ -82,14 +82,14 @@ function createCycleOrder(game) {
     return [first].concat(rest);
 }
 
-function getBanterLine(generateBanter, player, game) {
+function getBanterLine(generateBanter, player) {
     if (typeof generateBanter !== 'function') {
         return Promise.resolve(randomItem(FALLBACK_BANTER));
     }
 
     return Promise.resolve()
         .then(() => generateBanter({
-            playerName: player.name,
+            playerName: player.name
         }))
         .then(value => {
             const line = String(value || '').replace(/[\r\n]+/g, ' ').trim();
@@ -111,7 +111,7 @@ async function beginCycle(game, generateBanter) {
     game.turnIndex = 0;
 
     const first = game.order[0];
-    const banter = await getBanterLine(generateBanter, first, game);
+    const banter = await getBanterLine(generateBanter, first);
     if (activeGames.get(game.groupId) !== game || game.phase === 'ENDED') return '';
 
     game.phase = 'ACTIVE';
