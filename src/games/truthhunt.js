@@ -284,7 +284,7 @@ async function beginRound(game) {
     const display = game.statements.map((item, index) => (index + 1) + '. ' + item.statement).join('\n');
     await sendGroup(game,
         '🧠 *TRUTH HUNT — ROUND ' + game.roundNumber + '/' + game.totalRounds + '*\n\n' +
-        'Some rounds have one true claim. Some have none. Decide what you believe for each statement.\n\n' +
+        'Most rounds have one true claim. Occasionally, none are true. Decide what you believe for each statement.\n\n' +
         '🧩 *Read the statements carefully*\n' + display + '\n\n' +
         'You have 1 minute. Then DM Truth for +3, False for +1, or No Truth for +5 if correct. If you choose Truth or False, the bot will ask for a statement number.'
     );
