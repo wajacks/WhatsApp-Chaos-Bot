@@ -182,7 +182,7 @@ function registerMessageHandler(client, dependencies) {
             return;
         }
 
-        // Truth Hunt answers are plain numbers sent privately during the answer window.
+        // Truth Hunt answers are plain-message DM replies during the answer window.
         if (!isGroup) {
             const truthHuntResult = await processTruthHuntDmMessage(senderId, text);
             if (truthHuntResult && truthHuntResult.handled) {
