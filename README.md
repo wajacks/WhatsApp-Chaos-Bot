@@ -123,15 +123,16 @@ nano .env
 |---|---|---|
 | `AZURE_OPENAI_KEY` | **Yes for startup** | Azure OpenAI credential; Azure is the primary provider for AI chat and Mafia narration. |
 | `AZURE_OPENAI_ENDPOINT` | **Yes for startup** | Azure resource endpoint, for example `https://your-resource.openai.azure.com/`. |
-| `AZURE_OPENAI_CHAT_DEPLOYMENT` | Recommended | Azure chat deployment for AI chat and Mafia narration; defaults to `gpt-4o-mini`. |
+| `AZURE_OPENAI_CHAT_DEPLOYMENT` | Recommended | Azure deployment for AI chat, Mafia narration, and Truth Hunt web-grounded trivia; defaults to `gpt-4o-mini`. |
 | `AZURE_OPENAI_IMAGE_DEPLOYMENT` | Optional | Azure deployment offered as choice 1 in `!draw`; defaults to `gpt-image-2`. |
 | `AZURE_OPENAI_IMAGE_TIMEOUT_MS` | Optional | Azure image request timeout in milliseconds; defaults to 300000 (5 minutes). |
 | `OWNER_NUMBER` | Recommended | Owner controls. Use the full international number with digits only, such as `254712345678`. |
-| `GEMINI_API_KEY` | Optional | Enables Gemini fallback for AI chat and Mafia narration when Azure OpenAI is unavailable. |
+| `GEMINI_API_KEY` | Optional | Enables Gemini fallback for AI chat, Mafia narration, Number Run, and Truth Hunt when Azure is unavailable. |
+| `GEMINI_MODEL` | Optional | Model used for every Gemini fallback; defaults to `gemini-3.8-flash`. |
 | `OPENWEATHERMAP_API_KEY` | Optional | Enables live weather lookups. |
 | `PAIRING_NUMBER` | Optional | Request a WhatsApp pairing code. Leave blank to use a QR code. |
 
-The Azure key and endpoint are required at startup; Azure OpenAI handles AI chat and Mafia narration as the primary provider. Gemini is only used as a fallback when `GEMINI_API_KEY` is configured. Keep your real `.env` private; never commit it or paste its contents into an issue.
+Truth Hunt uses the Azure Responses API with its `web_search` tool and the configured chat deployment. If Azure web search is unavailable, Truth Hunt uses Gemini only when `GEMINI_API_KEY` is configured. Gemini fallbacks across the bot use `gemini-3.8-flash` by default and can be overridden with `GEMINI_MODEL`. The Azure key and endpoint are required at startup; Azure OpenAI is the primary provider for AI chat and Mafia narration too. Keep your real `.env` private; never commit it or paste its contents into an issue.
 
 ### 4. Link WhatsApp and start the bot
 

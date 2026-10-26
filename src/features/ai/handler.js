@@ -1,3 +1,4 @@
+const { GEMINI_MODEL } = require('../geminiConfig');
 const handleAiCommand = async (context) => {
     const {
         message, text, lowerText, chatId, senderId, userName,
@@ -177,7 +178,7 @@ const handleAiCommand = async (context) => {
                     }));
 
                     const response = await ai.models.generateContent({
-                        model: 'gemini-3.5-flash-lite',
+                        model: GEMINI_MODEL,
                         contents,
                         config: { systemInstruction: systemInstructionText }
                     });
