@@ -190,7 +190,7 @@ function createTruthHuntTriviaGenerator({ ai, azureResponsesClient }) {
 
         try {
             const draft = await ai.models.generateContent({
-                model: process.env.GEMINI_TRIVIA_MODEL || 'gemini-3.5-flash-lite',
+                model: process.env.GEMINI_TRIVIA_MODEL || 'gemini-3.8-flash',
                 contents: createPrompt,
                 config: {
                     systemInstruction,
@@ -212,7 +212,7 @@ function createTruthHuntTriviaGenerator({ ai, azureResponsesClient }) {
                 'Set verified false if evidence is weak, conflicting, or unclear. safe is true only for general-audience trivia. unambiguous is true only if each statement has one clear interpretation.\n' + claims;
 
             const checked = await ai.models.generateContent({
-                model: process.env.GEMINI_TRIVIA_MODEL || 'gemini-3.5-flash-lite',
+                model: process.env.GEMINI_TRIVIA_MODEL || 'gemini-3.8-flash',
                 contents: checkPrompt,
                 config: {
                     systemInstruction: 'You are a cautious fact checker. Search for evidence for every claim. Do not trust the draft verdict or citation. If a claim is unclear, return verified false.',
