@@ -108,9 +108,9 @@ function startTruthHuntLobby(groupId, hostId, hostName) {
         generateTrivia: null
     });
 
-    return '🧠 *TRUTH HUNT LOBBY OPEN*\\n\\n' +
-        '*' + safeName(hostName) + '* is the host and must join with !jointruth.\\n' +
-        'Players use !jointruth to register. The host starts with !starttruth or closes with !stoptruth.\\n' +
+    return '🧠 *TRUTH HUNT LOBBY OPEN*\n\n' +
+        '*' + safeName(hostName) + '* is the host and must join with !jointruth.\n' +
+        'Players use !jointruth to register. The host starts with !starttruth or closes with !stoptruth.\n' +
         'Each round starts with player topic suggestions and a group vote. Answers are sent privately.';
 }
 
@@ -162,8 +162,8 @@ async function beginRound(game) {
     game.answers = new Map();
 
     await sendGroup(game,
-        '🧠 *TRUTH HUNT — ROUND ' + game.roundNumber + '/' + game.totalRounds + '*\\n\\n' +
-        'Each registered player, send one short topic suggestion in this group.\\n' +
+        '🧠 *TRUTH HUNT — ROUND ' + game.roundNumber + '/' + game.totalRounds + '*\n\n' +
+        'Each registered player, send one short topic suggestion in this group.\n' +
         'Suggestions close in 30 seconds or when everyone has sent one.'
     );
     if (game.phase !== 'SUGGESTIONS') return;
@@ -199,9 +199,9 @@ async function openTopicPoll(game) {
     game.votes = new Map();
     game.phase = 'TOPIC_VOTE';
 
-    const options = game.topics.map((topic, index) => (index + 1) + '. ' + topic).join('\\n');
+    const options = game.topics.map((topic, index) => (index + 1) + '. ' + topic).join('\n');
     await sendGroup(game,
-        '🗳️ *Choose this round’s topic*\\n' + options + '\\n\\n' +
+        '🗳️ *Choose this round’s topic*\n' + options + '\n\n' +
         'Registered players, vote by sending the option number here. The poll closes in 30 seconds or when everyone votes.'
     );
     if (game.phase !== 'TOPIC_VOTE') return;
@@ -248,9 +248,9 @@ async function closeTopicPoll(game) {
     }
 
     game.phase = 'READING';
-    const display = statements.map((item, index) => (index + 1) + '. ' + item.statement).join('\\n');
+    const display = statements.map((item, index) => (index + 1) + '. ' + item.statement).join('\n');
     await sendGroup(game,
-        '🧩 *Which statement is true?*\\n\\n' + display + '\\n\\n' +
+        '🧩 *Which statement is true?*\n\n' + display + '\n\n' +
         'Read the statements in the group. You have 30 seconds before private answers open. Please don’t post your answer here.'
     );
     if (game.phase !== 'READING') return;
@@ -279,7 +279,7 @@ async function openAnswerWindow(game) {
         answer.deadline = answer.promptedAt + ANSWER_TIME_MS;
         try {
             await game.client.sendMessage(player.id,
-                '🧠 *TRUTH HUNT — ROUND ' + game.roundNumber + '*\\n' +
+                '🧠 *TRUTH HUNT — ROUND ' + game.roundNumber + '*\n' +
                 'Which group statement is true? Reply with 1, 2, or 3 within 10 seconds of this message. Your choice is private.'
             );
             answer.delivered = true;
@@ -397,18 +397,18 @@ async function resolveAnswerRound(game) {
         const label = index + 1;
         const kind = item.isTrue ? 'TRUE' : 'MISCONCEPTION';
         return label + '. ' + kind + ' — ' + item.explanation +
-            '\\nSource: ' + item.sourceTitle + ' ' + item.sourceUrl +
+            '\nSource: ' + item.sourceTitle + ' ' + item.sourceUrl +
             (item.verificationSourceUrl && item.verificationSourceUrl !== item.sourceUrl
-                ? '\\nCross-check: ' + item.verificationSourceUrl
+                ? '\nCross-check: ' + item.verificationSourceUrl
                 : '');
-    }).join('\\n\\n');
+    }).join('\n\n');
 
     await sendGroup(game,
-        '✅ *The true statement was ' + (game.correctIndex + 1) + '*\\n' +
-        correct.explanation + '\\nSource: ' + correct.sourceTitle + ' ' + correct.sourceUrl +
-        '\\n\\n*Fact check*\\n' + statements +
-        '\\n\\n*Round points*\\n' + changes.join('\\n') +
-        '\\n\\n*Scores*\\n' + formatScores(game)
+        '✅ *The true statement was ' + (game.correctIndex + 1) + '*\n' +
+        correct.explanation + '\nSource: ' + correct.sourceTitle + ' ' + correct.sourceUrl +
+        '\n\n*Fact check*\n' + statements +
+        '\n\n*Round points*\n' + changes.join('\n') +
+        '\n\n*Scores*\n' + formatScores(game)
     );
 
     await finishRound(game, false);
@@ -418,7 +418,7 @@ function formatScores(game) {
     return Array.from(game.players.values())
         .sort((left, right) => right.score - left.score || left.name.localeCompare(right.name))
         .map((player, index) => (index + 1) + '. *' + player.name + '* — ' + player.score + ' pts')
-        .join('\\n');
+        .join('\n');
 }
 
 async function finishRound(game, voided) {
@@ -437,7 +437,7 @@ async function finishRound(game, voided) {
         const winnerText = winners.length === 1
             ? '🏆 *' + winners[0].name + '* wins Truth Hunt!'
             : '🏆 Truth Hunt is tied between ' + winners.map(player => '*' + player.name + '*').join(', ') + '.';
-        await sendGroup(game, '🏁 *TRUTH HUNT COMPLETE*\\n' + winnerText + '\\n\\n*Final scores*\\n' + formatScores(game));
+        await sendGroup(game, '🏁 *TRUTH HUNT COMPLETE*\n' + winnerText + '\n\n*Final scores*\n' + formatScores(game));
         endGame(game);
         return;
     }
@@ -463,7 +463,7 @@ function stopTruthHuntGame(groupId, senderId) {
 
     const scores = formatScores(game);
     endGame(game);
-    return '🛑 *Truth Hunt stopped.*\\n\\n' + (scores ? '*Scores so far*\\n' + scores : 'No scores recorded.');
+    return '🛑 *Truth Hunt stopped.*\n\n' + (scores ? '*Scores so far*\n' + scores : 'No scores recorded.');
 }
 
 async function handleTruthHuntGroupMessage(groupId, senderId, text) {
