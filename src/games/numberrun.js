@@ -167,8 +167,8 @@ function formatFinalResult(game) {
         ? '🏆 *' + winners[0].name + '* wins the match!'
         : '🏆 Match tied: ' + winners.map(player => '*' + player.name + '*').join(', ') + '.';
 
-    return '🏁 *NUMBER RUN COMPLETE*\\n\\n' + winnerText +
-        '\\n\\n*Final leaderboard*\\n' + formatLeaderboard(game);
+    return '🏁 *NUMBER RUN COMPLETE*\n\n' + winnerText +
+        '\n\n*Final leaderboard*\n' + formatLeaderboard(game);
 }
 
 function finishMatch(game) {
@@ -226,10 +226,10 @@ function startNumberRunLobby(groupId, hostId, hostName) {
         starterCounts: new Map()
     });
 
-    return '🔢 *NUMBER RUN LOBBY OPEN*\\n\\n' +
-        '*' + hostName + '* is the host and must also join with !joinnumberrun.\\n' +
-        'Players: use !joinnumberrun (2 or more players).\\n' +
-        'The host starts with !startnumberrun or closes the lobby with !stopnumberrun.\\n' +
+    return '🔢 *NUMBER RUN LOBBY OPEN*\n\n' +
+        '*' + hostName + '* is the host and must also join with !joinnumberrun.\n' +
+        'Players: use !joinnumberrun (2 or more players).\n' +
+        'The host starts with !startnumberrun or closes the lobby with !stopnumberrun.\n' +
         'No turn timer; each player gets one guess per turn.';
 }
 
@@ -304,19 +304,19 @@ async function processNumberRunGuess(groupId, senderId, messageText, generateBan
         game.phase = 'TRANSITION';
         const points = recordWin(game, player);
         const solvedSummary =
-            '🎯 *Correct!* ' + player.name + ' found ' + game.target + '.\\n' +
-            '🏅 +' + points + ' win points.\\n' +
-            '*This round:* ' + formatRoundChanges(game) + '\\n' +
-            '*Match scores*\\n' + formatLeaderboard(game);
+            '🎯 *Correct!* ' + player.name + ' found ' + game.target + '.\n' +
+            '🏅 +' + points + ' win points.\n' +
+            '*This round:* ' + formatRoundChanges(game) + '\n' +
+            '*Match scores*\n' + formatLeaderboard(game);
 
         if (game.roundNumber >= game.totalRounds) {
             finishMatch(game);
-            return solvedSummary + '\\n\\n' + formatFinalResult(game);
+            return solvedSummary + '\n\n' + formatFinalResult(game);
         }
 
         const nextRound = await beginNumberRound(game, generateBanter);
         if (!nextRound) return solvedSummary;
-        return solvedSummary + '\\n\\n' + nextRound;
+        return solvedSummary + '\n\n' + nextRound;
     }
 
     recordMiss(game, player);
@@ -325,12 +325,12 @@ async function processNumberRunGuess(groupId, senderId, messageText, generateBan
 
     if (game.turnIndex < game.order.length) {
         const nextPlayer = game.order[game.turnIndex];
-        return feedback + '\\nNext turn: *' + nextPlayer.name + '*.';
+        return feedback + '\nNext turn: *' + nextPlayer.name + '*.';
     }
 
     const nextCycle = await beginCycle(game, generateBanter);
     if (!nextCycle) return feedback;
-    return feedback + '\\n\\n' + nextCycle;
+    return feedback + '\n\n' + nextCycle;
 }
 
 function stopNumberRunGame(groupId, senderId) {
@@ -342,8 +342,8 @@ function stopNumberRunGame(groupId, senderId) {
     game.phase = 'ENDED';
     activeGames.delete(groupId);
     releaseGame(groupId, 'numberrun');
-    return '🛑 *Number Run stopped.*\\n\\n' +
-        (scores ? '*Scores so far*\\n' + scores : 'No scores recorded.');
+    return '🛑 *Number Run stopped.*\n\n' +
+        (scores ? '*Scores so far*\n' + scores : 'No scores recorded.');
 }
 
 module.exports = {
