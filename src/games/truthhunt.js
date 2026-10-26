@@ -344,7 +344,7 @@ async function processTruthHuntDmMessage(senderId, text) {
     if (!answer.delivered && game.phase === 'ANSWERING') {
         return { handled: true, response: '⚠️ The answer prompt could not be delivered, so your response cannot be recorded.' };
     }
-    if (answer.deadline && Date.now() > answer.deadline) {
+    if (game.phase === 'ANSWERING' && answer.deadline && Date.now() > answer.deadline) {
         return { handled: true, response: '⏰ Your 10-second answer window has closed.' };
     }
     if (answer.answer !== null) {
