@@ -1,0 +1,3357 @@
+{
+  "version": 1,
+  "topics": [
+    {
+      "id": "animals",
+      "name": "Animals",
+      "truths": [
+        {
+          "statement": "Bats are mammals and the only mammals capable of sustained powered flight",
+          "explanation": "Their wings are modified forelimbs with a skin membrane",
+          "sourceId": "SI_BATS"
+        },
+        {
+          "statement": "Most bat species use echolocation to navigate and find food",
+          "explanation": "Echolocation is widespread among bats but not universal",
+          "sourceId": "SI_BATS"
+        },
+        {
+          "statement": "Many bats eat insects and help reduce insect populations",
+          "explanation": "Insect eating is common among bats though diets vary",
+          "sourceId": "SI_BATS"
+        },
+        {
+          "statement": "Sloths are capable swimmers",
+          "explanation": "They can move through water more quickly than they move on land",
+          "sourceId": "SI_SLOTH"
+        },
+        {
+          "statement": "Algae can grow in the fur of some sloths",
+          "explanation": "Their coarse fur can host algae and other tiny organisms",
+          "sourceId": "SI_SLOTH"
+        },
+        {
+          "statement": "Sloths descend from trees to defecate",
+          "explanation": "This unusual behavior is part of their regular routine",
+          "sourceId": "SI_SLOTH"
+        },
+        {
+          "statement": "Penguins live in the Southern Hemisphere and not every species lives in Antarctica",
+          "explanation": "Some species live in warmer regions such as South America and Africa",
+          "sourceId": "OCEAN_PENGUINS"
+        },
+        {
+          "statement": "Penguin feathers are densely packed and help insulate them",
+          "explanation": "Their plumage provides both waterproofing and insulation",
+          "sourceId": "OCEAN_PENGUINS"
+        },
+        {
+          "statement": "Emperor penguins are the tallest living penguin species",
+          "explanation": "Adult emperors are larger than other living penguin species",
+          "sourceId": "OCEAN_PENGUINS"
+        },
+        {
+          "statement": "Sharks are fish with skeletons made mostly of cartilage",
+          "explanation": "Cartilage is lighter and more flexible than bone",
+          "sourceId": "AMNH_SHARKS"
+        },
+        {
+          "statement": "Most shark species are not dangerous to people",
+          "explanation": "A small minority of shark species are responsible for most recorded serious incidents",
+          "sourceId": "AMNH_SHARKS"
+        },
+        {
+          "statement": "Sharks have existed for hundreds of millions of years",
+          "explanation": "Their lineage predates the dinosaurs",
+          "sourceId": "AMNH_SHARKS"
+        },
+        {
+          "statement": "Elephants use their trunks for breathing smelling drinking and grasping",
+          "explanation": "The trunk combines the nose and upper lip and has many functions",
+          "sourceId": "AMNH_ELEPHANT"
+        },
+        {
+          "statement": "Asian elephants generally have smaller ears than African elephants",
+          "explanation": "The different ear size is one visible distinction between the groups",
+          "sourceId": "AMNH_ELEPHANT"
+        },
+        {
+          "statement": "Elephant family groups are often led by an experienced female",
+          "explanation": "A matriarch can guide a family group",
+          "sourceId": "AMNH_ELEPHANT"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "Bats are blind",
+          "explanation": "Bats can see and many also use echolocation",
+          "sourceId": "SI_BATS"
+        },
+        {
+          "statement": "Every bat species drinks blood",
+          "explanation": "Most bats eat insects fruit nectar or other foods and only a few feed on blood",
+          "sourceId": "SI_BATS"
+        },
+        {
+          "statement": "Bats are birds because they fly",
+          "explanation": "Bats are mammals with fur and nurse their young",
+          "sourceId": "SI_BATS"
+        },
+        {
+          "statement": "Sloths cannot swim",
+          "explanation": "Sloths are capable swimmers",
+          "sourceId": "SI_SLOTH"
+        },
+        {
+          "statement": "Sloths sleep all day every day",
+          "explanation": "Wild sloths sleep less than the old stereotype suggests",
+          "sourceId": "SI_SLOTH"
+        },
+        {
+          "statement": "Sloth fur is always clean and sterile",
+          "explanation": "Some sloth fur supports algae and small organisms",
+          "sourceId": "SI_SLOTH"
+        },
+        {
+          "statement": "All penguins live in Antarctica",
+          "explanation": "Several penguin species live in warmer Southern Hemisphere regions",
+          "sourceId": "OCEAN_PENGUINS"
+        },
+        {
+          "statement": "Penguins can fly through the air",
+          "explanation": "Their wings are adapted for underwater propulsion rather than powered flight",
+          "sourceId": "OCEAN_PENGUINS"
+        },
+        {
+          "statement": "Penguins and polar bears naturally share the same habitat",
+          "explanation": "Penguins live in the Southern Hemisphere while wild polar bears live in the Arctic",
+          "sourceId": "OCEAN_PENGUINS"
+        },
+        {
+          "statement": "Sharks have skeletons made entirely of bone",
+          "explanation": "Most of a sharks skeleton is cartilage",
+          "sourceId": "AMNH_SHARKS"
+        },
+        {
+          "statement": "Every shark species is a threat to people",
+          "explanation": "Only a small number of species are implicated in serious incidents",
+          "sourceId": "AMNH_SHARKS"
+        },
+        {
+          "statement": "Sharks are mammals because they give birth to live young",
+          "explanation": "Sharks are fish and reproductive methods vary by species",
+          "sourceId": "AMNH_SHARKS"
+        },
+        {
+          "statement": "An elephant trunk is only a long nose",
+          "explanation": "The trunk combines the nose and upper lip and serves many tasks",
+          "sourceId": "AMNH_ELEPHANT"
+        },
+        {
+          "statement": "Asian and African elephants have identical sized ears",
+          "explanation": "Asian elephants generally have smaller ears",
+          "sourceId": "AMNH_ELEPHANT"
+        },
+        {
+          "statement": "Elephants are born knowing everything their herd knows",
+          "explanation": "Young elephants learn social and survival behavior within their group",
+          "sourceId": "AMNH_ELEPHANT"
+        }
+      ]
+    },
+    {
+      "id": "football",
+      "name": "Football",
+      "truths": [
+        {
+          "statement": "A standard senior football match has two halves of 45 minutes",
+          "explanation": "The Laws set two equal halves unless competition rules modify their duration",
+          "sourceId": "IFAB_DURATION"
+        },
+        {
+          "statement": "The referee may add time for delays in each half",
+          "explanation": "Stoppage time accounts for lost playing time",
+          "sourceId": "IFAB_DURATION"
+        },
+        {
+          "statement": "Half time normally lasts no more than 15 minutes",
+          "explanation": "The Laws set a maximum half time interval",
+          "sourceId": "IFAB_DURATION"
+        },
+        {
+          "statement": "A player cannot be offside directly from a goal kick",
+          "explanation": "The offside law lists goal kicks among its exceptions",
+          "sourceId": "IFAB_OFFSIDE"
+        },
+        {
+          "statement": "Being in an offside position alone is not an offence",
+          "explanation": "The player must become involved in active play",
+          "sourceId": "IFAB_OFFSIDE"
+        },
+        {
+          "statement": "A player level with the second last opponent is not in an offside position",
+          "explanation": "The law requires being nearer the goal line than both ball and second last opponent",
+          "sourceId": "IFAB_OFFSIDE"
+        },
+        {
+          "statement": "A ball is out of play only when it has wholly crossed a boundary line or play is stopped by the referee",
+          "explanation": "The whole ball must cross the line",
+          "sourceId": "IFAB_BALL"
+        },
+        {
+          "statement": "A ball can remain in play after bouncing off the goalpost",
+          "explanation": "The goalposts are part of the field equipment and a rebound alone does not stop play",
+          "sourceId": "IFAB_BALL"
+        },
+        {
+          "statement": "A goal is scored when the whole ball crosses the goal line between the posts and beneath the crossbar",
+          "explanation": "The entire ball must pass the line",
+          "sourceId": "IFAB_BALL"
+        },
+        {
+          "statement": "The same Laws of the Game apply worldwide under IFAB",
+          "explanation": "IFAB maintains the global Laws with limited permitted competition adaptations",
+          "sourceId": "IFAB_LAWS"
+        },
+        {
+          "statement": "A dropped ball restarts play after certain accidental stoppages",
+          "explanation": "The referee uses a dropped ball in situations specified by the Laws",
+          "sourceId": "IFAB_LAWS"
+        },
+        {
+          "statement": "The referee can show a yellow card as a caution",
+          "explanation": "Yellow cards formally record cautions",
+          "sourceId": "IFAB_LAWS"
+        },
+        {
+          "statement": "The player taking a penalty kick must kick the ball forward",
+          "explanation": "The Laws require the ball to be kicked forward",
+          "sourceId": "IFAB_PENALTY"
+        },
+        {
+          "statement": "A penalty shootout is separate from the match itself",
+          "explanation": "Kicks from the penalty mark decide a tied match when competition rules require it",
+          "sourceId": "IFAB_PENALTY"
+        },
+        {
+          "statement": "The goalkeeper must remain on the goal line until the kick is taken",
+          "explanation": "The goalkeeper has positioning restrictions for a penalty kick",
+          "sourceId": "IFAB_PENALTY"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "A player is penalized whenever they are standing in an offside position",
+          "explanation": "An offside player must become involved in active play for an offence",
+          "sourceId": "IFAB_OFFSIDE"
+        },
+        {
+          "statement": "A player can be offside directly from a goal kick",
+          "explanation": "The Laws list a goal kick as an offside exception",
+          "sourceId": "IFAB_OFFSIDE"
+        },
+        {
+          "statement": "A player level with the second last opponent is offside",
+          "explanation": "Being level is not nearer the opponents goal line",
+          "sourceId": "IFAB_OFFSIDE"
+        },
+        {
+          "statement": "The referee must end the match exactly when the displayed clock reaches 90 minutes",
+          "explanation": "The referee adds time for delays and controls when each half ends",
+          "sourceId": "IFAB_DURATION"
+        },
+        {
+          "statement": "Half time can last as long as teams want",
+          "explanation": "The Laws normally limit half time to 15 minutes",
+          "sourceId": "IFAB_DURATION"
+        },
+        {
+          "statement": "Every football match has extra time after 90 minutes",
+          "explanation": "Extra time depends on the competition format and a tied score",
+          "sourceId": "IFAB_DURATION"
+        },
+        {
+          "statement": "A ball touching any part of a boundary line is out",
+          "explanation": "It is out only when the whole ball crosses the line",
+          "sourceId": "IFAB_BALL"
+        },
+        {
+          "statement": "A rebound off a goalpost automatically ends play",
+          "explanation": "The ball remains in play unless it wholly crosses a boundary or play is stopped",
+          "sourceId": "IFAB_BALL"
+        },
+        {
+          "statement": "A goal counts when most of the ball crosses the goal line",
+          "explanation": "The whole ball must cross the line",
+          "sourceId": "IFAB_BALL"
+        },
+        {
+          "statement": "The offside law applies directly from a throw in",
+          "explanation": "A player cannot be penalized for offside directly from a throw in",
+          "sourceId": "IFAB_LAWS"
+        },
+        {
+          "statement": "A yellow card means the player is sent off",
+          "explanation": "A yellow card is a caution while a red card means dismissal",
+          "sourceId": "IFAB_LAWS"
+        },
+        {
+          "statement": "The referee can never add time for substitutions or injuries",
+          "explanation": "The referee allows for time lost during each half",
+          "sourceId": "IFAB_LAWS"
+        },
+        {
+          "statement": "The penalty taker may touch the ball twice in a row",
+          "explanation": "The kicker cannot play the ball again until another player touches it",
+          "sourceId": "IFAB_PENALTY"
+        },
+        {
+          "statement": "The goalkeeper can stand several steps in front of the goal line before a penalty",
+          "explanation": "The goalkeeper must meet the positioning requirements on the goal line",
+          "sourceId": "IFAB_PENALTY"
+        },
+        {
+          "statement": "A penalty shootout is the same thing as a penalty kick during normal play",
+          "explanation": "Kicks from the penalty mark are a separate procedure used to decide certain tied matches",
+          "sourceId": "IFAB_PENALTY"
+        }
+      ]
+    },
+    {
+      "id": "space",
+      "name": "Space and astronomy",
+      "truths": [
+        {
+          "statement": "Our solar system has eight recognised planets",
+          "explanation": "Pluto is classified as a dwarf planet rather than one of the eight planets",
+          "sourceId": "NASA_SOLAR"
+        },
+        {
+          "statement": "The solar system formed about 4.6 billion years ago",
+          "explanation": "NASA gives this approximate age for the solar system",
+          "sourceId": "NASA_SOLAR"
+        },
+        {
+          "statement": "The solar system is located in the Milky Way galaxy",
+          "explanation": "The Sun is one star among many in our galaxy",
+          "sourceId": "NASA_SOLAR"
+        },
+        {
+          "statement": "Mercury is the closest planet to the Sun",
+          "explanation": "Mercury orbits nearer the Sun than the other planets",
+          "sourceId": "NASA_PLANETS"
+        },
+        {
+          "statement": "Venus is hotter at its surface than Mercury",
+          "explanation": "Venus thick atmosphere traps heat very effectively",
+          "sourceId": "NASA_PLANETS"
+        },
+        {
+          "statement": "Jupiter is the largest planet in our solar system",
+          "explanation": "It is larger than every other solar system planet",
+          "sourceId": "NASA_PLANETS"
+        },
+        {
+          "statement": "Moons can orbit dwarf planets as well as planets",
+          "explanation": "Natural satellites are not limited to full sized planets",
+          "sourceId": "NASA_MOONS"
+        },
+        {
+          "statement": "Earth has one natural moon",
+          "explanation": "NASA lists the Moon as Earths only natural satellite",
+          "sourceId": "NASA_MOONS"
+        },
+        {
+          "statement": "Some asteroids have small moons",
+          "explanation": "Small bodies in the solar system can have natural satellites",
+          "sourceId": "NASA_MOONS"
+        },
+        {
+          "statement": "The Moon rotates once in about the same time it orbits Earth",
+          "explanation": "This synchronous rotation keeps nearly the same lunar hemisphere facing Earth",
+          "sourceId": "NASA_MOON"
+        },
+        {
+          "statement": "The Moon is slowly moving farther from Earth",
+          "explanation": "Lunar laser ranging measures its gradual recession",
+          "sourceId": "NASA_MOON"
+        },
+        {
+          "statement": "The Moon shines by reflecting sunlight",
+          "explanation": "It does not make its own visible light",
+          "sourceId": "NASA_MOON"
+        },
+        {
+          "statement": "Earth is the only planet in our solar system known to support life",
+          "explanation": "NASA describes Earth as our home world and the only known world with life",
+          "sourceId": "NASA_EARTH"
+        },
+        {
+          "statement": "Earth is not a perfect sphere",
+          "explanation": "Its rotation makes it slightly wider around the equator",
+          "sourceId": "NASA_EARTH"
+        },
+        {
+          "statement": "Earth has one natural satellite",
+          "explanation": "The Moon is Earths sole natural moon",
+          "sourceId": "NASA_EARTH"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "Pluto is one of the eight recognised planets",
+          "explanation": "Pluto is classified as a dwarf planet",
+          "sourceId": "NASA_PLANETS"
+        },
+        {
+          "statement": "Mercury is the hottest planet because it is closest to the Sun",
+          "explanation": "Venus has the hotter surface because of its dense heat trapping atmosphere",
+          "sourceId": "NASA_PLANETS"
+        },
+        {
+          "statement": "The Sun orbits Earth once every year",
+          "explanation": "Earth orbits the Sun",
+          "sourceId": "NASA_PLANETS"
+        },
+        {
+          "statement": "The far side of the Moon is permanently dark",
+          "explanation": "The far side receives sunlight during its lunar day",
+          "sourceId": "NASA_MOON_QA"
+        },
+        {
+          "statement": "The Moon makes its own visible light",
+          "explanation": "Moonlight is reflected sunlight",
+          "sourceId": "NASA_MOON_QA"
+        },
+        {
+          "statement": "The Moon changes shape during each phase",
+          "explanation": "Its shape stays essentially the same while the lit portion we see changes",
+          "sourceId": "NASA_MOON_QA"
+        },
+        {
+          "statement": "Our solar system is outside the Milky Way",
+          "explanation": "Our solar system is within the Milky Way",
+          "sourceId": "NASA_SOLAR"
+        },
+        {
+          "statement": "The solar system formed only a few million years ago",
+          "explanation": "NASA dates its formation to about 4.6 billion years ago",
+          "sourceId": "NASA_SOLAR"
+        },
+        {
+          "statement": "The Sun is the largest star in the universe",
+          "explanation": "The Sun is one star and many known stars are larger",
+          "sourceId": "NASA_SOLAR"
+        },
+        {
+          "statement": "Only planets can have moons",
+          "explanation": "Dwarf planets and asteroids can also have natural satellites",
+          "sourceId": "NASA_MOONS"
+        },
+        {
+          "statement": "Earth has two natural moons",
+          "explanation": "Earth has one natural moon",
+          "sourceId": "NASA_MOONS"
+        },
+        {
+          "statement": "All moons orbit planets in the same direction",
+          "explanation": "Orbital directions can vary and some moons have unusual or retrograde orbits",
+          "sourceId": "NASA_MOONS"
+        },
+        {
+          "statement": "Earth is a perfect sphere",
+          "explanation": "Earth is slightly wider around its equator than pole to pole",
+          "sourceId": "NASA_EARTH"
+        },
+        {
+          "statement": "Earth is the only planet in the universe with life",
+          "explanation": "Earth is the only world currently known to support life",
+          "sourceId": "NASA_EARTH"
+        },
+        {
+          "statement": "The Moon is larger than Earth",
+          "explanation": "Earth is much larger than its Moon",
+          "sourceId": "NASA_EARTH"
+        }
+      ]
+    },
+    {
+      "id": "geography",
+      "name": "Geography maps and flags",
+      "truths": [
+        {
+          "statement": "Every flat world map distorts at least one property of Earth",
+          "explanation": "A globe can represent the whole planet without the same projection distortions",
+          "sourceId": "GEOG_MAPS"
+        },
+        {
+          "statement": "Map projections trade off properties such as area shape distance or direction",
+          "explanation": "No flat projection preserves all those properties everywhere",
+          "sourceId": "GEOG_MAPS"
+        },
+        {
+          "statement": "Maps use symbols and scale to represent real places",
+          "explanation": "A map is a selective model rather than a perfect copy",
+          "sourceId": "GEOG_MAPS"
+        },
+        {
+          "statement": "South America is mostly east of Florida",
+          "explanation": "A world map can make this east west relationship surprising",
+          "sourceId": "GEOG_MENTAL"
+        },
+        {
+          "statement": "Greenland is far smaller than South America",
+          "explanation": "Some common map projections visually enlarge Greenland",
+          "sourceId": "GEOG_MENTAL"
+        },
+        {
+          "statement": "Brazil is larger in area than the contiguous United States",
+          "explanation": "National Geographic compares the country sizes to challenge familiar map impressions",
+          "sourceId": "GEOG_MENTAL"
+        },
+        {
+          "statement": "The Mercator projection preserves local angles and shapes",
+          "explanation": "It was designed for navigation but enlarges areas near the poles",
+          "sourceId": "GEOG_PROJ"
+        },
+        {
+          "statement": "A projection that preserves area can distort shapes",
+          "explanation": "Equal area maps trade shape fidelity for area accuracy",
+          "sourceId": "GEOG_PROJ"
+        },
+        {
+          "statement": "The map projection affects how continents appear",
+          "explanation": "Changing projection changes visual size and shape",
+          "sourceId": "GEOG_PROJ"
+        },
+        {
+          "statement": "The United Nations flag shows a map centered on the North Pole",
+          "explanation": "The emblem uses an azimuthal equidistant projection",
+          "sourceId": "GEOG_UN_FLAG"
+        },
+        {
+          "statement": "Olive branches on the UN emblem symbolize peace",
+          "explanation": "The branches surround the world map",
+          "sourceId": "GEOG_UN_FLAG"
+        },
+        {
+          "statement": "The UN flag was approved in 1947",
+          "explanation": "The emblem was adopted before the UN flag was formally approved",
+          "sourceId": "GEOG_UN_FLAG"
+        },
+        {
+          "statement": "The current United States flag has 13 stripes",
+          "explanation": "The stripes represent the original thirteen colonies",
+          "sourceId": "GEOG_LOC_FLAG"
+        },
+        {
+          "statement": "The United States flag has 50 stars",
+          "explanation": "Each star represents a state",
+          "sourceId": "GEOG_LOC_FLAG"
+        },
+        {
+          "statement": "The current 50 star flag was adopted in 1960",
+          "explanation": "Hawaii became a state in 1959 and the 50 star design followed",
+          "sourceId": "GEOG_LOC_FLAG"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "The Mercator map keeps country sizes accurate everywhere",
+          "explanation": "Mercator strongly enlarges areas farther from the equator",
+          "sourceId": "GEOG_PROJ"
+        },
+        {
+          "statement": "One flat map can show every distance area and shape perfectly",
+          "explanation": "Every projection makes tradeoffs and distortions",
+          "sourceId": "GEOG_PROJ"
+        },
+        {
+          "statement": "A map projection changes the actual size of continents",
+          "explanation": "Projection changes only how the curved surface is represented",
+          "sourceId": "GEOG_PROJ"
+        },
+        {
+          "statement": "Greenland is larger than South America",
+          "explanation": "Greenland is much smaller than South America",
+          "sourceId": "GEOG_MENTAL"
+        },
+        {
+          "statement": "South America lies mostly west of Florida",
+          "explanation": "Most of South America lies east of Florida",
+          "sourceId": "GEOG_MENTAL"
+        },
+        {
+          "statement": "Alaska is larger than the entire African continent",
+          "explanation": "Alaska is far smaller than Africa",
+          "sourceId": "GEOG_MENTAL"
+        },
+        {
+          "statement": "All world maps must put north at the top",
+          "explanation": "North up is a common convention but maps can use other orientations",
+          "sourceId": "GEOG_MAPS"
+        },
+        {
+          "statement": "A map is an exact copy of the real world",
+          "explanation": "Maps simplify and symbolize selected features",
+          "sourceId": "GEOG_MAPS"
+        },
+        {
+          "statement": "The shortest route between two faraway places is always a straight line on a flat map",
+          "explanation": "A great circle route can curve on common flat projections",
+          "sourceId": "GEOG_MAPS"
+        },
+        {
+          "statement": "The United Nations emblem centers the map on the South Pole",
+          "explanation": "The UN map is centered on the North Pole",
+          "sourceId": "GEOG_UN_FLAG"
+        },
+        {
+          "statement": "The olive branches on the UN flag represent victory in war",
+          "explanation": "The emblem uses them as a symbol of peace",
+          "sourceId": "GEOG_UN_FLAG"
+        },
+        {
+          "statement": "The UN flag was adopted before the United Nations existed",
+          "explanation": "The flag was approved in 1947 after the UN was established",
+          "sourceId": "GEOG_UN_FLAG"
+        },
+        {
+          "statement": "The United States flag has one stripe for each state",
+          "explanation": "It has 13 stripes for the original colonies",
+          "sourceId": "GEOG_LOC_FLAG"
+        },
+        {
+          "statement": "The current United States flag has 13 stars",
+          "explanation": "It has 50 stars representing the states",
+          "sourceId": "GEOG_LOC_FLAG"
+        },
+        {
+          "statement": "Betsy Ross is conclusively documented as the sole designer of the first US flag",
+          "explanation": "The Betsy Ross story is a historical legend without conclusive proof",
+          "sourceId": "GEOG_LOC_FLAG"
+        }
+      ]
+    },
+    {
+      "id": "food",
+      "name": "Food and cooking",
+      "truths": [
+        {
+          "statement": "Tomatoes originated in the Americas",
+          "explanation": "They were brought to Europe after contact between the continents",
+          "sourceId": "FOOD_STAPLES"
+        },
+        {
+          "statement": "Cacao was first cultivated in the Americas",
+          "explanation": "Cacao has deep Indigenous American histories",
+          "sourceId": "FOOD_STAPLES"
+        },
+        {
+          "statement": "Chili peppers also originated in the Americas",
+          "explanation": "Many varieties later spread around the world",
+          "sourceId": "FOOD_STAPLES"
+        },
+        {
+          "statement": "Pasta was eaten in Italy before Marco Polo returned from Asia",
+          "explanation": "The popular Marco Polo origin story is unsupported",
+          "sourceId": "FOOD_PASTA"
+        },
+        {
+          "statement": "Spaghetti and meatballs became especially popular among Italian immigrants in the United States",
+          "explanation": "The combination is more associated with Italian American cuisine than everyday Italian food",
+          "sourceId": "FOOD_PASTA"
+        },
+        {
+          "statement": "Pasta comes in many regional shapes and traditions",
+          "explanation": "Italian pasta cuisine is not a single uniform dish",
+          "sourceId": "FOOD_PASTA"
+        },
+        {
+          "statement": "Pizza as we know it developed in Naples",
+          "explanation": "Naples is strongly associated with the modern pizza tradition",
+          "sourceId": "FOOD_PIZZA"
+        },
+        {
+          "statement": "Pizza was sold as an affordable street food in Naples",
+          "explanation": "The dish had a practical everyday history before global popularity",
+          "sourceId": "FOOD_PIZZA"
+        },
+        {
+          "statement": "The Margherita story is linked to a late nineteenth century visit by Queen Margherita",
+          "explanation": "The exact legend is debated but the pizza style is associated with Naples",
+          "sourceId": "FOOD_PIZZA"
+        },
+        {
+          "statement": "Cacao drinks were consumed in the Americas before chocolate became a European sweet",
+          "explanation": "Early cacao preparations were often drinks rather than modern candy bars",
+          "sourceId": "FOOD_CHOCOLATE"
+        },
+        {
+          "statement": "Chocolate making involves processing cacao beans",
+          "explanation": "The familiar product begins with cacao seeds and several processing steps",
+          "sourceId": "FOOD_CHOCOLATE"
+        },
+        {
+          "statement": "Modern chocolate bars are not the original form of cacao",
+          "explanation": "Historical cacao drinks differed from sweet solid bars",
+          "sourceId": "FOOD_CHOCOLATE"
+        },
+        {
+          "statement": "Vanilla originated in the Americas",
+          "explanation": "Vanilla was cultivated by Indigenous peoples before spreading globally",
+          "sourceId": "FOOD_STAPLES"
+        },
+        {
+          "statement": "Potatoes originated in South America",
+          "explanation": "They became a major crop far beyond their origin",
+          "sourceId": "FOOD_STAPLES"
+        },
+        {
+          "statement": "Corn was domesticated in the Americas",
+          "explanation": "It spread to other continents after transoceanic contact",
+          "sourceId": "FOOD_STAPLES"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "Marco Polo brought pasta to Italy from China",
+          "explanation": "Pasta was eaten in Italy before Polo returned from Asia",
+          "sourceId": "FOOD_PASTA"
+        },
+        {
+          "statement": "Spaghetti and meatballs is the everyday national dish of Italy",
+          "explanation": "The pairing is especially associated with Italian American cuisine",
+          "sourceId": "FOOD_PASTA"
+        },
+        {
+          "statement": "Pasta has always been made only from wheat",
+          "explanation": "Pasta recipes and ingredients vary by region and type",
+          "sourceId": "FOOD_PASTA"
+        },
+        {
+          "statement": "Tomatoes originated in Italy",
+          "explanation": "Tomatoes originated in the Americas",
+          "sourceId": "FOOD_STAPLES"
+        },
+        {
+          "statement": "Potatoes originated in Ireland",
+          "explanation": "Potatoes originated in South America before reaching Europe",
+          "sourceId": "FOOD_STAPLES"
+        },
+        {
+          "statement": "Chili peppers originated in India",
+          "explanation": "Chili peppers originated in the Americas",
+          "sourceId": "FOOD_STAPLES"
+        },
+        {
+          "statement": "Modern pizza was invented in New York",
+          "explanation": "The modern pizza tradition is strongly tied to Naples",
+          "sourceId": "FOOD_PIZZA"
+        },
+        {
+          "statement": "Pizza began as an expensive royal meal",
+          "explanation": "Early Neapolitan pizza was affordable street food",
+          "sourceId": "FOOD_PIZZA"
+        },
+        {
+          "statement": "The Margherita pizza story proves pizza was invented for a queen",
+          "explanation": "The royal visit story is a later association and pizza already existed",
+          "sourceId": "FOOD_PIZZA"
+        },
+        {
+          "statement": "Chocolate was invented as a European candy bar",
+          "explanation": "Cacao drinks were made in the Americas long before modern bars",
+          "sourceId": "FOOD_CHOCOLATE"
+        },
+        {
+          "statement": "Cacao beans grow inside chocolate bars on trees",
+          "explanation": "Cacao pods contain seeds that are processed into chocolate",
+          "sourceId": "FOOD_CHOCOLATE"
+        },
+        {
+          "statement": "Ancient cacao drinks always tasted like modern sweet hot chocolate",
+          "explanation": "Early drinks and modern sweet chocolate differ greatly",
+          "sourceId": "FOOD_CHOCOLATE"
+        },
+        {
+          "statement": "Raw tomatoes are poisonous to people",
+          "explanation": "The idea that tomatoes were poisonous was a historical misconception",
+          "sourceId": "FOOD_TOMATO"
+        },
+        {
+          "statement": "Europeans proved tomatoes were poisonous before they became popular",
+          "explanation": "The feared poison explanation was based on a misunderstanding and social context",
+          "sourceId": "FOOD_TOMATO"
+        },
+        {
+          "statement": "Tomatoes were native to Italy before Europeans encountered the Americas",
+          "explanation": "Tomatoes originated in the Americas and reached Europe later",
+          "sourceId": "FOOD_TOMATO"
+        }
+      ]
+    },
+    {
+      "id": "oceans",
+      "name": "Oceans and marine life",
+      "truths": [
+        {
+          "statement": "Most ocean surface waves are generated by wind",
+          "explanation": "Wind transfers energy to the ocean surface",
+          "sourceId": "NOAA_WAVES"
+        },
+        {
+          "statement": "Ocean waves mainly carry energy forward rather than transporting the same water all the way",
+          "explanation": "Water particles mostly move in small orbital paths as a wave passes",
+          "sourceId": "NOAA_WAVES"
+        },
+        {
+          "statement": "A tsunami is not caused by the Moon pulling a tidal wave",
+          "explanation": "Tsunamis are usually caused by sudden displacement of water",
+          "sourceId": "NOAA_WAVES"
+        },
+        {
+          "statement": "Rivers carry dissolved minerals from land into the sea",
+          "explanation": "Weathering and runoff move ions into the ocean",
+          "sourceId": "NOAA_SALT"
+        },
+        {
+          "statement": "Hydrothermal vents also add dissolved minerals to seawater",
+          "explanation": "Seafloor processes contribute ions as well as rivers",
+          "sourceId": "NOAA_SALT"
+        },
+        {
+          "statement": "Sodium and chloride make up most of the dissolved ions in seawater",
+          "explanation": "Together they account for most ocean salinity",
+          "sourceId": "NOAA_SALT"
+        },
+        {
+          "statement": "The Great Pacific Garbage Patch is not a solid floating island of trash",
+          "explanation": "The debris is dispersed over a large area and much is tiny plastic",
+          "sourceId": "NOAA_MYTHS"
+        },
+        {
+          "statement": "The spray from a whale blow is mostly exhaled air and moisture",
+          "explanation": "Whales breathe air and the visible plume includes droplets",
+          "sourceId": "NOAA_MYTHS"
+        },
+        {
+          "statement": "Melting floating sea ice does not directly raise sea level much",
+          "explanation": "Floating ice already displaces water while land ice melt adds water",
+          "sourceId": "NOAA_MYTHS"
+        },
+        {
+          "statement": "Drinking seawater can worsen dehydration",
+          "explanation": "The kidneys cannot remove the extra salt without losing more water",
+          "sourceId": "NOAA_DRINK"
+        },
+        {
+          "statement": "The ocean covers most of Earths surface",
+          "explanation": "Ocean water covers roughly seventy percent of the surface",
+          "sourceId": "NOAA_DRINK"
+        },
+        {
+          "statement": "Coral reefs support many marine species",
+          "explanation": "Reefs create complex habitats for marine life",
+          "sourceId": "NOAA_DRINK"
+        },
+        {
+          "statement": "The Moon and Sun both influence ocean tides",
+          "explanation": "Their gravity helps produce regular tidal cycles",
+          "sourceId": "NOAA_OCEAN"
+        },
+        {
+          "statement": "The ocean floor includes underwater mountains and deep trenches",
+          "explanation": "Seafloor topography is varied rather than flat",
+          "sourceId": "NOAA_OCEAN"
+        },
+        {
+          "statement": "Tsunamis can be triggered by undersea earthquakes",
+          "explanation": "Sudden movement of the seafloor can displace a large volume of water",
+          "sourceId": "NOAA_OCEAN"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "The Great Pacific Garbage Patch is a solid island you can walk on",
+          "explanation": "The debris is spread throughout a broad area and much is small or below the surface",
+          "sourceId": "NOAA_MYTHS"
+        },
+        {
+          "statement": "Every shark is likely to attack a swimmer",
+          "explanation": "Most shark species are not considered dangerous to people",
+          "sourceId": "NOAA_MYTHS"
+        },
+        {
+          "statement": "A whale sprays seawater from its mouth when it breathes",
+          "explanation": "The plume is mainly exhaled air mixed with moisture",
+          "sourceId": "NOAA_MYTHS"
+        },
+        {
+          "statement": "Ocean waves carry the same water all the way to shore",
+          "explanation": "Waves mostly transmit energy while water particles move locally",
+          "sourceId": "NOAA_WAVES"
+        },
+        {
+          "statement": "A tsunami is simply an unusually high tide",
+          "explanation": "A tsunami is usually generated by displacement of water rather than tides",
+          "sourceId": "NOAA_WAVES"
+        },
+        {
+          "statement": "Every ocean wave is created by the Moon",
+          "explanation": "Most surface waves are generated by wind",
+          "sourceId": "NOAA_WAVES"
+        },
+        {
+          "statement": "The ocean is salty only because fish release salt",
+          "explanation": "Rivers and seafloor processes contribute dissolved minerals",
+          "sourceId": "NOAA_SALT"
+        },
+        {
+          "statement": "All seawater salt comes from underwater volcanoes",
+          "explanation": "Weathering and runoff from land are major sources too",
+          "sourceId": "NOAA_SALT"
+        },
+        {
+          "statement": "Ocean water is mostly pure sodium chloride with no other dissolved material",
+          "explanation": "Seawater contains many dissolved ions though sodium and chloride dominate",
+          "sourceId": "NOAA_SALT"
+        },
+        {
+          "statement": "Drinking seawater is a safe way to hydrate during a hike",
+          "explanation": "Its salt load can worsen dehydration",
+          "sourceId": "NOAA_DRINK"
+        },
+        {
+          "statement": "Melting floating sea ice directly raises sea level as much as melting land ice",
+          "explanation": "Floating ice already displaces water while land ice adds water",
+          "sourceId": "NOAA_DRINK"
+        },
+        {
+          "statement": "The ocean covers less than half of Earth",
+          "explanation": "Ocean covers roughly seventy percent of Earths surface",
+          "sourceId": "NOAA_DRINK"
+        },
+        {
+          "statement": "A coral reef is made only of underwater rocks",
+          "explanation": "Coral reefs are built by living coral animals and provide habitats",
+          "sourceId": "NOAA_OCEAN"
+        },
+        {
+          "statement": "The deepest parts of the ocean are all flat",
+          "explanation": "The seafloor has trenches ridges mountains and plains",
+          "sourceId": "NOAA_OCEAN"
+        },
+        {
+          "statement": "Tides and wind waves are the same ocean movement",
+          "explanation": "Tides follow gravitational cycles while surface waves are commonly wind generated",
+          "sourceId": "NOAA_WAVES"
+        }
+      ]
+    },
+    {
+      "id": "physics",
+      "name": "Everyday physics",
+      "truths": [
+        {
+          "statement": "Earths axial tilt is the main reason for the seasons",
+          "explanation": "Tilt changes the angle and duration of sunlight during the year",
+          "sourceId": "NATGEO_SEASONS"
+        },
+        {
+          "statement": "When it is summer in one hemisphere it is winter in the other",
+          "explanation": "The two hemispheres tilt toward the Sun at opposite times",
+          "sourceId": "NATGEO_SEASONS"
+        },
+        {
+          "statement": "Earth is slightly closer to the Sun during part of Northern Hemisphere winter",
+          "explanation": "Seasons are not caused by Earth moving much closer or farther",
+          "sourceId": "NATGEO_SEASONS"
+        },
+        {
+          "statement": "Thomas Edison improved practical incandescent lighting with a team of collaborators",
+          "explanation": "The history involved many inventors and earlier designs",
+          "sourceId": "DOE_BULB"
+        },
+        {
+          "statement": "Incandescent bulbs turn much of their energy into heat",
+          "explanation": "Only a small part of their electricity becomes visible light",
+          "sourceId": "DOE_BULB"
+        },
+        {
+          "statement": "LED bulbs generally use less energy than incandescent bulbs for similar light output",
+          "explanation": "LEDs are more energy efficient",
+          "sourceId": "DOE_BULB"
+        },
+        {
+          "statement": "Boiling water is a physical change rather than a chemical reaction",
+          "explanation": "Water changes state but remains water molecules",
+          "sourceId": "ACS_WATER"
+        },
+        {
+          "statement": "Water expands when it freezes",
+          "explanation": "Ice has a more open structure than liquid water",
+          "sourceId": "ACS_WATER"
+        },
+        {
+          "statement": "Water can exist as solid liquid and gas on Earth",
+          "explanation": "Temperature and pressure affect its state",
+          "sourceId": "ACS_WATER"
+        },
+        {
+          "statement": "The Moon can look larger near the horizon because of a visual illusion",
+          "explanation": "Its apparent size changes with perception and context not its physical size",
+          "sourceId": "NASA_ILLUSION"
+        },
+        {
+          "statement": "The Moon does not suddenly grow larger when it rises",
+          "explanation": "The apparent horizon effect is not a change in lunar diameter",
+          "sourceId": "NASA_ILLUSION"
+        },
+        {
+          "statement": "A lunar eclipse occurs when Earths shadow falls on the Moon",
+          "explanation": "The Sun Earth and Moon align with Earth in the middle",
+          "sourceId": "NASA_ILLUSION"
+        },
+        {
+          "statement": "Earth rotates once in about a day",
+          "explanation": "Its rotation produces the day and night cycle",
+          "sourceId": "NASA_EARTH"
+        },
+        {
+          "statement": "Earths gravity helps keep the Moon in orbit",
+          "explanation": "The Moon is bound to Earth by gravity",
+          "sourceId": "NASA_EARTH"
+        },
+        {
+          "statement": "Sunlight takes a little over eight minutes to reach Earth",
+          "explanation": "Light travels fast but the Sun is about 150 million kilometers away",
+          "sourceId": "NASA_EARTH"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "Summer happens because Earth is closer to the Sun",
+          "explanation": "Axial tilt changes the sunlight angle and day length and drives seasons",
+          "sourceId": "NATGEO_SEASONS"
+        },
+        {
+          "statement": "Both hemispheres have summer at the same time",
+          "explanation": "The hemispheres have opposite seasons",
+          "sourceId": "NATGEO_SEASONS"
+        },
+        {
+          "statement": "Earths axis has no effect on how much sunlight a place receives",
+          "explanation": "Tilt changes the angle and duration of sunlight through the year",
+          "sourceId": "NATGEO_SEASONS"
+        },
+        {
+          "statement": "An incandescent bulb turns nearly all its electricity into visible light",
+          "explanation": "Much of its energy is released as heat",
+          "sourceId": "DOE_BULB"
+        },
+        {
+          "statement": "Thomas Edison invented every kind of light bulb by himself",
+          "explanation": "Practical electric lighting developed through many inventors including a team around Edison",
+          "sourceId": "DOE_BULB"
+        },
+        {
+          "statement": "LED bulbs are less efficient than traditional incandescent bulbs",
+          "explanation": "LEDs produce similar light with less electricity",
+          "sourceId": "DOE_BULB"
+        },
+        {
+          "statement": "Boiling water breaks its molecules into hydrogen and oxygen",
+          "explanation": "Boiling changes liquid water into vapor without splitting water molecules",
+          "sourceId": "ACS_WATER"
+        },
+        {
+          "statement": "Ice sinks in liquid water",
+          "explanation": "Ice is less dense than liquid water and floats",
+          "sourceId": "ACS_WATER"
+        },
+        {
+          "statement": "Water cannot exist as a gas",
+          "explanation": "Water vapor is a gaseous form of water",
+          "sourceId": "ACS_WATER"
+        },
+        {
+          "statement": "The Moon physically grows larger when it reaches the horizon",
+          "explanation": "The horizon Moon illusion is perceptual",
+          "sourceId": "NASA_ILLUSION"
+        },
+        {
+          "statement": "A lunar eclipse happens when the Moon blocks the Sun from Earth",
+          "explanation": "That is a solar eclipse while lunar eclipses involve Earths shadow",
+          "sourceId": "NASA_ILLUSION"
+        },
+        {
+          "statement": "The Moon has no gravity",
+          "explanation": "The Moon has gravity though it is weaker than Earths",
+          "sourceId": "NASA_ILLUSION"
+        },
+        {
+          "statement": "Electricity is created only inside power plants and cannot be stored",
+          "explanation": "Energy can be stored in batteries and other systems",
+          "sourceId": "DOE_ELECTRICITY"
+        },
+        {
+          "statement": "Lightning can be captured cheaply to power a city",
+          "explanation": "Lightning is too unpredictable and difficult to harness economically",
+          "sourceId": "DOE_ELECTRICITY"
+        },
+        {
+          "statement": "A wire uses up electric current as it carries energy",
+          "explanation": "In ordinary circuits current flows around a loop while energy is transferred",
+          "sourceId": "DOE_ELECTRICITY"
+        }
+      ]
+    },
+    {
+      "id": "music",
+      "name": "Music and instruments",
+      "truths": [
+        {
+          "statement": "Blues grew from African American musical traditions in the United States",
+          "explanation": "Its roots include work songs spirituals and other Black musical forms",
+          "sourceId": "LOC_BLUES"
+        },
+        {
+          "statement": "Blues music can tell stories about joy as well as hardship",
+          "explanation": "The genre is broader than sad songs alone",
+          "sourceId": "LOC_BLUES"
+        },
+        {
+          "statement": "Blues influenced later popular music styles",
+          "explanation": "Its musical language shaped many genres",
+          "sourceId": "LOC_BLUES"
+        },
+        {
+          "statement": "The piano produces sound when hammers strike strings",
+          "explanation": "Keys operate a mechanical action that hits strings",
+          "sourceId": "LOC_INSTRUMENTS"
+        },
+        {
+          "statement": "A flute produces sound when air is directed across an opening",
+          "explanation": "It belongs to the woodwind family despite commonly being made of metal",
+          "sourceId": "LOC_INSTRUMENTS"
+        },
+        {
+          "statement": "A trumpet produces sound when a player buzzes their lips into a mouthpiece",
+          "explanation": "Lip vibration begins the sound",
+          "sourceId": "LOC_INSTRUMENTS"
+        },
+        {
+          "statement": "The harmonica is a free reed instrument",
+          "explanation": "Airflow makes small reeds vibrate",
+          "sourceId": "SMITH_HARMONICA"
+        },
+        {
+          "statement": "The Chinese sheng is an older instrument that uses free reeds",
+          "explanation": "It is part of the long history of free reed instruments",
+          "sourceId": "SMITH_HARMONICA"
+        },
+        {
+          "statement": "A harmonica can play melodies and chords",
+          "explanation": "Its multiple reeds allow different notes from blowing and drawing",
+          "sourceId": "SMITH_HARMONICA"
+        },
+        {
+          "statement": "Recorded sound existed before digital streaming",
+          "explanation": "Sound recording has a history spanning more than a century",
+          "sourceId": "LOC_RECORDINGS"
+        },
+        {
+          "statement": "Vinyl records store sound as physical grooves",
+          "explanation": "A stylus follows groove variations to reproduce sound",
+          "sourceId": "LOC_RECORDINGS"
+        },
+        {
+          "statement": "A microphone converts sound vibrations into an electrical signal",
+          "explanation": "Microphones transduce sound into signals for recording",
+          "sourceId": "LOC_RECORDINGS"
+        },
+        {
+          "statement": "The cat piano is best known as a satirical imagined instrument",
+          "explanation": "The historical story is not evidence of a real concert instrument",
+          "sourceId": "SMITH_CATPIANO"
+        },
+        {
+          "statement": "Musical instruments are grouped by how they produce sound",
+          "explanation": "Classification often considers vibrating strings air or percussion",
+          "sourceId": "SMITH_CATPIANO"
+        },
+        {
+          "statement": "A drum can make sound when its membrane vibrates",
+          "explanation": "Striking the drumhead sets it vibrating",
+          "sourceId": "SMITH_CATPIANO"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "Blues music began as a European royal court style",
+          "explanation": "Blues developed in African American communities in the United States",
+          "sourceId": "LOC_BLUES"
+        },
+        {
+          "statement": "Every blues song must be sad",
+          "explanation": "Blues can express many subjects and emotions",
+          "sourceId": "LOC_BLUES"
+        },
+        {
+          "statement": "Blues had no influence on later popular music",
+          "explanation": "Its sounds and structures influenced later genres",
+          "sourceId": "LOC_BLUES"
+        },
+        {
+          "statement": "A flute is a brass instrument because many flutes are made of metal",
+          "explanation": "Flutes are classified as woodwinds by how sound is produced",
+          "sourceId": "LOC_INSTRUMENTS"
+        },
+        {
+          "statement": "A piano makes sound by blowing air through pipes",
+          "explanation": "Hammers strike strings inside a piano",
+          "sourceId": "LOC_INSTRUMENTS"
+        },
+        {
+          "statement": "A trumpet makes sound when air alone vibrates inside its tube",
+          "explanation": "The player buzzes their lips at the mouthpiece",
+          "sourceId": "LOC_INSTRUMENTS"
+        },
+        {
+          "statement": "A harmonica has no vibrating parts",
+          "explanation": "Free reeds vibrate as air moves through the instrument",
+          "sourceId": "SMITH_HARMONICA"
+        },
+        {
+          "statement": "The harmonica can only make sound when the player blows",
+          "explanation": "Players produce notes by both blowing and drawing air",
+          "sourceId": "SMITH_HARMONICA"
+        },
+        {
+          "statement": "Free reed instruments were invented only in modern Europe",
+          "explanation": "The sheng is an older free reed instrument",
+          "sourceId": "SMITH_HARMONICA"
+        },
+        {
+          "statement": "The cat piano is a standard historical instrument used in orchestras",
+          "explanation": "The story is a satirical imagined instrument rather than a normal real instrument",
+          "sourceId": "SMITH_CATPIANO"
+        },
+        {
+          "statement": "Every musical instrument belongs to only one simple sound category",
+          "explanation": "Some instruments combine features and classifications vary",
+          "sourceId": "SMITH_CATPIANO"
+        },
+        {
+          "statement": "A drumhead stays still while the drum makes sound",
+          "explanation": "The membrane vibrates to create sound",
+          "sourceId": "SMITH_CATPIANO"
+        },
+        {
+          "statement": "Recorded sound began with online streaming",
+          "explanation": "Sound recording began long before the digital era",
+          "sourceId": "LOC_RECORDINGS"
+        },
+        {
+          "statement": "Vinyl grooves are flat and contain no information",
+          "explanation": "Groove variations store the recorded sound pattern",
+          "sourceId": "LOC_RECORDINGS"
+        },
+        {
+          "statement": "A microphone can record sound without converting it to another signal",
+          "explanation": "Microphones convert sound vibrations into electrical signals",
+          "sourceId": "LOC_RECORDINGS"
+        }
+      ]
+    },
+    {
+      "id": "brands",
+      "name": "Brands logos and product origins",
+      "truths": [
+        {
+          "statement": "Nike began as Blue Ribbon Sports",
+          "explanation": "The company used that name before becoming Nike",
+          "sourceId": "BRAND_NIKE"
+        },
+        {
+          "statement": "The Nike name was adopted in 1971",
+          "explanation": "The company history records the rename",
+          "sourceId": "BRAND_NIKE"
+        },
+        {
+          "statement": "The Swoosh was created before the Just Do It slogan",
+          "explanation": "The logo dates to 1971 and the slogan came later",
+          "sourceId": "BRAND_NIKE"
+        },
+        {
+          "statement": "Coca-Cola was created in 1886 by pharmacist John Pemberton",
+          "explanation": "The company traces its origin to a drink first served in Atlanta",
+          "sourceId": "BRAND_COCA"
+        },
+        {
+          "statement": "Frank Robinson wrote the Coca-Cola name in its distinctive script",
+          "explanation": "Robinson was Pembertons bookkeeper and named the drink",
+          "sourceId": "BRAND_COCA"
+        },
+        {
+          "statement": "Coca-Cola did not invent Santa Claus",
+          "explanation": "The company helped popularize a modern image but Santa traditions predate its ads",
+          "sourceId": "BRAND_COCA"
+        },
+        {
+          "statement": "The LEGO Group began by making wooden toys",
+          "explanation": "Its early products were wooden rather than plastic bricks",
+          "sourceId": "BRAND_LEGO"
+        },
+        {
+          "statement": "LEGO comes from the Danish phrase leg godt meaning play well",
+          "explanation": "The company name was formed from those Danish words",
+          "sourceId": "BRAND_LEGO"
+        },
+        {
+          "statement": "The familiar stud and tube brick design was patented after LEGO first made plastic bricks",
+          "explanation": "The system developed over several years",
+          "sourceId": "BRAND_LEGO"
+        },
+        {
+          "statement": "A trademark can protect a recognizable brand sign or name",
+          "explanation": "Trademark law distinguishes products in the marketplace",
+          "sourceId": "BRAND_TRADE"
+        },
+        {
+          "statement": "The Coca-Cola contour bottle was introduced in 1916",
+          "explanation": "The distinctive bottle shape became a major brand identifier",
+          "sourceId": "BRAND_TRADE"
+        },
+        {
+          "statement": "Levis red tab was introduced in the 1930s",
+          "explanation": "The small tab was used as a distinctive product mark",
+          "sourceId": "BRAND_TRADE"
+        },
+        {
+          "statement": "LEGO bricks are designed to lock together through studs and tubes",
+          "explanation": "The connection system gives the bricks clutch power",
+          "sourceId": "BRAND_BRICK"
+        },
+        {
+          "statement": "LEGO produced early plastic bricks before its modern system was finalized",
+          "explanation": "The companys plastic brick history began before the stud and tube system",
+          "sourceId": "BRAND_BRICK"
+        },
+        {
+          "statement": "The LEGO Group name predates the modern plastic brick",
+          "explanation": "The company started as a toy maker in the 1930s",
+          "sourceId": "BRAND_BRICK"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "Nike was always called Nike from its first day",
+          "explanation": "It began as Blue Ribbon Sports",
+          "sourceId": "BRAND_NIKE"
+        },
+        {
+          "statement": "The Swoosh was introduced after Just Do It",
+          "explanation": "The logo predates the slogan",
+          "sourceId": "BRAND_NIKE"
+        },
+        {
+          "statement": "Nike started by making smartphones",
+          "explanation": "The company began in athletic footwear distribution",
+          "sourceId": "BRAND_NIKE"
+        },
+        {
+          "statement": "Coca-Cola was invented in the 1980s",
+          "explanation": "The drink dates to 1886",
+          "sourceId": "BRAND_COCA"
+        },
+        {
+          "statement": "The Coca-Cola name was written by its inventor John Pemberton",
+          "explanation": "Bookkeeper Frank Robinson coined and wrote the name",
+          "sourceId": "BRAND_COCA"
+        },
+        {
+          "statement": "Coca-Cola invented the entire modern Santa Claus tradition",
+          "explanation": "Santa traditions were older though Coca-Cola advertising influenced a popular image",
+          "sourceId": "BRAND_COCA"
+        },
+        {
+          "statement": "The LEGO Group began as a maker of plastic bricks",
+          "explanation": "It first made wooden toys",
+          "sourceId": "BRAND_LEGO"
+        },
+        {
+          "statement": "LEGO is a Latin phrase meaning I assemble",
+          "explanation": "The name comes from Danish words meaning play well",
+          "sourceId": "BRAND_LEGO"
+        },
+        {
+          "statement": "The stud and tube brick system existed from the companys first toy",
+          "explanation": "The companys plastic bricks came before the modern connection system",
+          "sourceId": "BRAND_LEGO"
+        },
+        {
+          "statement": "A trademark can only be a written company name",
+          "explanation": "Brand identifiers can include distinctive signs and product marks",
+          "sourceId": "BRAND_TRADE"
+        },
+        {
+          "statement": "The Coca-Cola contour bottle was introduced in the 1800s",
+          "explanation": "The famous bottle design was introduced in 1916",
+          "sourceId": "BRAND_TRADE"
+        },
+        {
+          "statement": "Levis red tab appeared before the jeans brand existed",
+          "explanation": "The tab was introduced decades after the company began",
+          "sourceId": "BRAND_TRADE"
+        },
+        {
+          "statement": "LEGO bricks connect because their surfaces are glued together",
+          "explanation": "Studs and tubes create a reusable clutch connection",
+          "sourceId": "BRAND_BRICK"
+        },
+        {
+          "statement": "All LEGO bricks from all eras were designed identically",
+          "explanation": "The brick system evolved over time",
+          "sourceId": "BRAND_BRICK"
+        },
+        {
+          "statement": "The LEGO Group began as a company selling toy computers",
+          "explanation": "Its early business made wooden toys",
+          "sourceId": "BRAND_BRICK"
+        }
+      ]
+    },
+    {
+      "id": "cars",
+      "name": "Cars and transport",
+      "truths": [
+        {
+          "statement": "An all electric car uses an electric motor rather than an internal combustion engine",
+          "explanation": "Its traction motor turns electrical energy into motion",
+          "sourceId": "CAR_EV_WORK"
+        },
+        {
+          "statement": "Regenerative braking can send some energy back to an electric car battery",
+          "explanation": "The motor can act as a generator while slowing",
+          "sourceId": "CAR_EV_WORK"
+        },
+        {
+          "statement": "Battery electric cars do not have tailpipe emissions",
+          "explanation": "They have no combustion exhaust pipe though electricity production varies",
+          "sourceId": "CAR_EV_WORK"
+        },
+        {
+          "statement": "Electric vehicles can be plugged in to recharge their batteries",
+          "explanation": "Charging replenishes stored electrical energy",
+          "sourceId": "CAR_EV"
+        },
+        {
+          "statement": "Many electric vehicles use a lithium ion battery pack",
+          "explanation": "Battery chemistry and design vary by model",
+          "sourceId": "CAR_EV"
+        },
+        {
+          "statement": "Electric cars still need tires brakes and suspension",
+          "explanation": "They share many ordinary vehicle components",
+          "sourceId": "CAR_EV"
+        },
+        {
+          "statement": "Seat belts reduce the risk of death and serious injury in crashes",
+          "explanation": "They help keep occupants inside the vehicle and distribute forces",
+          "sourceId": "NHTSA_BELTS"
+        },
+        {
+          "statement": "Air bags are designed to work with seat belts",
+          "explanation": "They supplement restraints rather than replace them",
+          "sourceId": "NHTSA_BELTS"
+        },
+        {
+          "statement": "A seat belt should lie across the shoulder and hips",
+          "explanation": "Correct positioning helps restrain strong parts of the body",
+          "sourceId": "NHTSA_BELTS"
+        },
+        {
+          "statement": "Air bags inflate very rapidly during a crash",
+          "explanation": "They are designed to deploy in a fraction of a second",
+          "sourceId": "NHTSA_AIRBAGS"
+        },
+        {
+          "statement": "A deployed air bag does not replace wearing a seat belt",
+          "explanation": "NHTSA says seat belts and airbags work together",
+          "sourceId": "NHTSA_AIRBAGS"
+        },
+        {
+          "statement": "Air bags can cause injury if occupants sit too close",
+          "explanation": "Safe seating distance helps reduce deployment risks",
+          "sourceId": "NHTSA_AIRBAGS"
+        },
+        {
+          "statement": "Modern vehicles have gained safety features over time",
+          "explanation": "Vehicle safety has improved through structural and restraint changes",
+          "sourceId": "NHTSA_HISTORY"
+        },
+        {
+          "statement": "Crumple zones are designed to absorb crash energy",
+          "explanation": "The vehicle structure deforms in controlled ways",
+          "sourceId": "NHTSA_HISTORY"
+        },
+        {
+          "statement": "Electronic stability control can help drivers maintain control",
+          "explanation": "The system can help prevent loss of control in some situations",
+          "sourceId": "NHTSA_HISTORY"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "An electric car must burn gasoline to power its motor",
+          "explanation": "A battery electric vehicle uses stored electricity to drive its motor",
+          "sourceId": "CAR_EV_WORK"
+        },
+        {
+          "statement": "Regenerative braking creates energy from nothing",
+          "explanation": "It recovers some motion energy that would otherwise become heat",
+          "sourceId": "CAR_EV_WORK"
+        },
+        {
+          "statement": "A battery electric car has a tailpipe that emits water vapor",
+          "explanation": "It has no tailpipe emissions",
+          "sourceId": "CAR_EV_WORK"
+        },
+        {
+          "statement": "Electric cars never need charging",
+          "explanation": "Their batteries need to be recharged to keep driving",
+          "sourceId": "CAR_EV"
+        },
+        {
+          "statement": "All electric vehicles use exactly the same battery chemistry",
+          "explanation": "Battery designs and chemistries vary",
+          "sourceId": "CAR_EV"
+        },
+        {
+          "statement": "Electric cars have no brakes because their motors stop them",
+          "explanation": "They still have conventional friction brakes",
+          "sourceId": "CAR_EV"
+        },
+        {
+          "statement": "Air bags make seat belts unnecessary",
+          "explanation": "Air bags supplement seat belts rather than replace them",
+          "sourceId": "NHTSA_BELTS"
+        },
+        {
+          "statement": "A seat belt is safest when worn behind the back",
+          "explanation": "It should be properly positioned across shoulder and hips",
+          "sourceId": "NHTSA_BELTS"
+        },
+        {
+          "statement": "Seat belts only help during high speed crashes",
+          "explanation": "They reduce injury risk in crashes across a range of severities",
+          "sourceId": "NHTSA_BELTS"
+        },
+        {
+          "statement": "Air bags inflate slowly over several seconds",
+          "explanation": "They inflate very rapidly during a crash",
+          "sourceId": "NHTSA_AIRBAGS"
+        },
+        {
+          "statement": "A front passenger should sit as close to an air bag as possible",
+          "explanation": "Occupants should maintain safe distance from the deployment area",
+          "sourceId": "NHTSA_AIRBAGS"
+        },
+        {
+          "statement": "Air bags make it safe to transport a child in any front seat",
+          "explanation": "Child safety and air bag guidance depends on the vehicle seat and restraint",
+          "sourceId": "NHTSA_AIRBAGS"
+        },
+        {
+          "statement": "Driving faster always saves enough time to justify the added risk",
+          "explanation": "Speeding increases crash risk and severity",
+          "sourceId": "NHTSA_SPEED"
+        },
+        {
+          "statement": "A larger vehicle can ignore speed limits safely",
+          "explanation": "Speeding is risky regardless of vehicle size",
+          "sourceId": "NHTSA_SPEED"
+        },
+        {
+          "statement": "Most crashes are harmless if the car has modern safety features",
+          "explanation": "Safety features reduce risks but cannot eliminate crash forces",
+          "sourceId": "NHTSA_SPEED"
+        }
+      ]
+    },
+    {
+      "id": "earth",
+      "name": "Earth science and natural disasters",
+      "truths": [
+        {
+          "statement": "Earthquakes happen when rocks suddenly slip along faults",
+          "explanation": "The slip releases stored energy as seismic waves",
+          "sourceId": "USGS_QUAKE"
+        },
+        {
+          "statement": "Earthquakes can occur deep beneath Earths surface",
+          "explanation": "Some occur hundreds of miles below the surface",
+          "sourceId": "USGS_QUAKE"
+        },
+        {
+          "statement": "Magnitude describes an earthquakes size while intensity describes shaking effects at a place",
+          "explanation": "The two measurements describe different things",
+          "sourceId": "USGS_QUAKE"
+        },
+        {
+          "statement": "Scientists cannot reliably predict the exact time place and size of a major earthquake",
+          "explanation": "USGS says short term prediction is not currently possible",
+          "sourceId": "USGS_PREDICT"
+        },
+        {
+          "statement": "USGS can estimate earthquake probabilities for an area over a period of time",
+          "explanation": "A probability forecast is different from an exact prediction",
+          "sourceId": "USGS_PREDICT"
+        },
+        {
+          "statement": "Aftershocks can continue after a large earthquake",
+          "explanation": "The crust adjusts after the main shock",
+          "sourceId": "USGS_PREDICT"
+        },
+        {
+          "statement": "Earths outer shell is divided into moving tectonic plates",
+          "explanation": "The plates move slowly over the mantle",
+          "sourceId": "USGS_PLATES"
+        },
+        {
+          "statement": "The San Andreas Fault is mainly a sideways sliding boundary",
+          "explanation": "The Pacific and North American plates move horizontally past one another there",
+          "sourceId": "USGS_PLATES"
+        },
+        {
+          "statement": "Earthquakes release waves that scientists use to study Earths interior",
+          "explanation": "Seismic waves travel through the planet and reveal its structure",
+          "sourceId": "USGS_PLATES"
+        },
+        {
+          "statement": "Yellowstone is a volcanic system with a large caldera",
+          "explanation": "The caldera formed after past volcanic activity",
+          "sourceId": "USGS_VOLCANO"
+        },
+        {
+          "statement": "A volcanic caldera forms when the ground collapses after magma is withdrawn",
+          "explanation": "Calderas can be created by collapse rather than a simple cone explosion",
+          "sourceId": "USGS_VOLCANO"
+        },
+        {
+          "statement": "Most earthquakes are too small to be felt by people",
+          "explanation": "Instruments record many minor earthquakes that cause no felt shaking",
+          "sourceId": "USGS_VOLCANO"
+        },
+        {
+          "statement": "Earthquake magnitude uses a logarithmic scale",
+          "explanation": "A small magnitude increase corresponds to a much larger energy release",
+          "sourceId": "USGS_QUAKE"
+        },
+        {
+          "statement": "Most earthquakes occur near tectonic plate boundaries",
+          "explanation": "Plate edges are zones of frequent fault movement",
+          "sourceId": "USGS_QUAKE"
+        },
+        {
+          "statement": "Aftershocks are smaller earthquakes that follow a larger mainshock",
+          "explanation": "They occur as the surrounding crust adjusts after the main event",
+          "sourceId": "USGS_QUAKE"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "The ground can split open into a giant canyon during an earthquake",
+          "explanation": "Faults do not gape open as shown in movies",
+          "sourceId": "USGS_QUAKE"
+        },
+        {
+          "statement": "All earthquakes can be felt by people nearby",
+          "explanation": "Many small earthquakes are recorded only by instruments",
+          "sourceId": "USGS_QUAKE"
+        },
+        {
+          "statement": "Earthquake magnitude and shaking intensity mean exactly the same thing",
+          "explanation": "Magnitude measures event size while intensity describes effects at a location",
+          "sourceId": "USGS_QUAKE"
+        },
+        {
+          "statement": "Scientists can predict the exact date and place of the next big earthquake",
+          "explanation": "Exact short term earthquake prediction is not currently possible",
+          "sourceId": "USGS_PREDICT"
+        },
+        {
+          "statement": "Animal behavior can reliably predict earthquakes",
+          "explanation": "Unusual behavior has not shown a reproducible predictive link",
+          "sourceId": "USGS_PREDICT"
+        },
+        {
+          "statement": "An earthquake probability forecast gives the exact day a quake will happen",
+          "explanation": "Forecasts describe likelihood over an area and time period",
+          "sourceId": "USGS_PREDICT"
+        },
+        {
+          "statement": "California will eventually fall into the ocean because of the San Andreas Fault",
+          "explanation": "The fault is mainly horizontal movement and California will not fall into the ocean",
+          "sourceId": "USGS_PLATES"
+        },
+        {
+          "statement": "Tectonic plates move several meters every day",
+          "explanation": "Plate motions are generally only centimeters per year",
+          "sourceId": "USGS_PLATES"
+        },
+        {
+          "statement": "Earthquakes happen because Earths crust is perfectly still",
+          "explanation": "Fault slip happens as stresses build and release",
+          "sourceId": "USGS_PLATES"
+        },
+        {
+          "statement": "Yellowstone is overdue to erupt because it has an eruption schedule",
+          "explanation": "Volcanoes do not follow a predictable timetable",
+          "sourceId": "USGS_VOLCANO"
+        },
+        {
+          "statement": "Every earthquake beneath Yellowstone means a major eruption is imminent",
+          "explanation": "Most seismic activity does not indicate an impending eruption",
+          "sourceId": "USGS_VOLCANO"
+        },
+        {
+          "statement": "A caldera is simply a tall volcanic cone",
+          "explanation": "A caldera is a large collapse feature",
+          "sourceId": "USGS_VOLCANO"
+        },
+        {
+          "statement": "Earthquakes happen only at the surface",
+          "explanation": "They can begin deep within Earths crust or upper mantle",
+          "sourceId": "USGS_QUAKE"
+        },
+        {
+          "statement": "A one point increase in magnitude means only one extra unit of shaking",
+          "explanation": "Magnitude is logarithmic and represents a much larger event",
+          "sourceId": "USGS_QUAKE"
+        },
+        {
+          "statement": "Every earthquake happens at the edge of a tectonic plate",
+          "explanation": "Some earthquakes also occur within plate interiors",
+          "sourceId": "USGS_QUAKE"
+        }
+      ]
+    },
+    {
+      "id": "technology",
+      "name": "Everyday technology",
+      "truths": [
+        {
+          "statement": "GPS satellites broadcast one way signals that receivers use to calculate position and time",
+          "explanation": "The GPS space segment sends signals and user receivers compute their own location",
+          "sourceId": "GPS_OVERVIEW"
+        },
+        {
+          "statement": "GPS positioning uses timing information from several satellites",
+          "explanation": "A receiver compares signal travel times to estimate distances",
+          "sourceId": "GPS_OVERVIEW"
+        },
+        {
+          "statement": "GPS is a US owned global utility with space control and user segments",
+          "explanation": "GPS.gov describes those three system segments",
+          "sourceId": "GPS_OVERVIEW"
+        },
+        {
+          "statement": "GPS estimates location using distances from satellites rather than directions to them",
+          "explanation": "The geometric method is trilateration",
+          "sourceId": "GPS_TRILATERATION"
+        },
+        {
+          "statement": "GPS receivers calculate signal travel time to estimate distance",
+          "explanation": "The signal travels at approximately the speed of light",
+          "sourceId": "GPS_TRILATERATION"
+        },
+        {
+          "statement": "GPS does not need a phone to send its location to each satellite",
+          "explanation": "The satellites broadcast and a receiver calculates its own position",
+          "sourceId": "GPS_TRILATERATION"
+        },
+        {
+          "statement": "A QR code is a two dimensional barcode",
+          "explanation": "It stores data across a grid in two dimensions",
+          "sourceId": "QR_BASICS"
+        },
+        {
+          "statement": "QR codes can be read from different orientations",
+          "explanation": "The finder patterns help scanners locate the symbol",
+          "sourceId": "QR_BASICS"
+        },
+        {
+          "statement": "QR codes include error correction that can preserve readability when partly damaged",
+          "explanation": "Reed Solomon error correction supports recovery of some lost data",
+          "sourceId": "QR_BASICS"
+        },
+        {
+          "statement": "DENSO WAVE developed QR code in 1994",
+          "explanation": "The code was created by a team at the Japanese company",
+          "sourceId": "QR_HISTORY"
+        },
+        {
+          "statement": "QR code was designed to track automotive parts",
+          "explanation": "The original development goal was faster parts management",
+          "sourceId": "QR_HISTORY"
+        },
+        {
+          "statement": "The QR name refers to quick response",
+          "explanation": "The developers chose the name because the code was designed for rapid reading",
+          "sourceId": "QR_HISTORY"
+        },
+        {
+          "statement": "Wi-Fi technology is based on the IEEE 802.11 family of standards",
+          "explanation": "IEEE 802.11 is the basis for Wi-Fi networks",
+          "sourceId": "WIFI_IEEE"
+        },
+        {
+          "statement": "Wi-Fi devices exchange data over radio waves",
+          "explanation": "Wireless networking sends information through radio signals",
+          "sourceId": "WIFI_IEEE"
+        },
+        {
+          "statement": "A Wi-Fi connection can work between nearby devices on a local network",
+          "explanation": "Internet access is a common use but not the only use",
+          "sourceId": "WIFI_IEEE"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "GPS satellites track every phone by receiving its location",
+          "explanation": "GPS satellites broadcast signals and a receiver calculates its position",
+          "sourceId": "GPS_OVERVIEW"
+        },
+        {
+          "statement": "GPS works by sending a navigation request from a phone to a satellite",
+          "explanation": "The basic GPS service broadcasts one way signals",
+          "sourceId": "GPS_OVERVIEW"
+        },
+        {
+          "statement": "GPS is only available in the United States",
+          "explanation": "GPS is a global positioning service available worldwide",
+          "sourceId": "GPS_OVERVIEW"
+        },
+        {
+          "statement": "GPS determines location by pointing a compass toward three satellites",
+          "explanation": "It calculates distances from satellite signal timing",
+          "sourceId": "GPS_TRILATERATION"
+        },
+        {
+          "statement": "A GPS receiver needs only one satellite for an accurate three dimensional fix",
+          "explanation": "Multiple satellite distances are needed to determine a position",
+          "sourceId": "GPS_TRILATERATION"
+        },
+        {
+          "statement": "GPS signals travel faster than light",
+          "explanation": "Radio signals travel at the speed of light in space",
+          "sourceId": "GPS_TRILATERATION"
+        },
+        {
+          "statement": "A QR code is just a regular barcode turned sideways",
+          "explanation": "QR codes encode information in two dimensions",
+          "sourceId": "QR_BASICS"
+        },
+        {
+          "statement": "A QR code cannot be scanned if one small area is damaged",
+          "explanation": "Error correction can recover data from some damage",
+          "sourceId": "QR_BASICS"
+        },
+        {
+          "statement": "A QR code can only be scanned from one exact angle",
+          "explanation": "QR codes can be read from multiple orientations",
+          "sourceId": "QR_BASICS"
+        },
+        {
+          "statement": "QR codes were invented for social media links",
+          "explanation": "They were designed to track automotive parts",
+          "sourceId": "QR_HISTORY"
+        },
+        {
+          "statement": "QR codes were invented in the 1970s",
+          "explanation": "DENSO WAVE developed them in 1994",
+          "sourceId": "QR_HISTORY"
+        },
+        {
+          "statement": "QR means quick reading",
+          "explanation": "The name stands for quick response",
+          "sourceId": "QR_HISTORY"
+        },
+        {
+          "statement": "Wi-Fi moves information through tiny wires inside the air",
+          "explanation": "Wi-Fi exchanges data using radio waves",
+          "sourceId": "WIFI_FCC"
+        },
+        {
+          "statement": "Wi-Fi and internet access are exactly the same thing",
+          "explanation": "Wi-Fi can provide local device connections and internet access is a separate service",
+          "sourceId": "WIFI_FCC"
+        },
+        {
+          "statement": "Wi-Fi is based on the GPS satellite standard",
+          "explanation": "Wi-Fi technology is based on IEEE 802.11 standards",
+          "sourceId": "WIFI_FCC"
+        }
+      ]
+    },
+    {
+      "id": "foodscience",
+      "name": "Food science and safety",
+      "truths": [
+        {
+          "statement": "Washing raw chicken can spread bacteria around a kitchen",
+          "explanation": "Splashing can contaminate nearby surfaces and foods",
+          "sourceId": "USDA_WASH"
+        },
+        {
+          "statement": "Cooking poultry to a safe internal temperature kills harmful bacteria",
+          "explanation": "USDA recommends 165 degrees Fahrenheit for poultry",
+          "sourceId": "USDA_WASH"
+        },
+        {
+          "statement": "A clean thermometer is the reliable way to check cooked poultry temperature",
+          "explanation": "Appearance alone cannot guarantee a safe temperature",
+          "sourceId": "USDA_WASH"
+        },
+        {
+          "statement": "Raw chicken should be kept separate from ready to eat foods",
+          "explanation": "Separation prevents cross contamination",
+          "sourceId": "USDA_CHICKEN"
+        },
+        {
+          "statement": "Chicken can remain safe indefinitely when kept continuously frozen at zero Fahrenheit",
+          "explanation": "Recommended freezer times focus on quality",
+          "sourceId": "USDA_CHICKEN"
+        },
+        {
+          "statement": "Chicken may still look pink after reaching a safe temperature",
+          "explanation": "Color alone does not determine whether poultry is safely cooked",
+          "sourceId": "USDA_CHICKEN"
+        },
+        {
+          "statement": "Freezing food slows microbial growth but does not sterilize it",
+          "explanation": "Food safety still depends on safe storage and handling",
+          "sourceId": "USDA_FREEZE"
+        },
+        {
+          "statement": "Food kept continuously at zero Fahrenheit remains safe indefinitely",
+          "explanation": "Freezer storage recommendations mainly concern quality",
+          "sourceId": "USDA_FREEZE"
+        },
+        {
+          "statement": "Food can be thawed safely in a refrigerator cold water or microwave",
+          "explanation": "Countertop thawing can let surfaces warm unsafely",
+          "sourceId": "USDA_FREEZE"
+        },
+        {
+          "statement": "Food can carry harmful bacteria even when it looks and smells normal",
+          "explanation": "Spoilage signs do not detect every foodborne pathogen",
+          "sourceId": "FDA_MYTHS"
+        },
+        {
+          "statement": "The last food eaten is not always the food that caused illness",
+          "explanation": "Symptoms can start well after the exposure",
+          "sourceId": "FDA_MYTHS"
+        },
+        {
+          "statement": "Refrigeration slows bacterial growth but does not make food safe forever",
+          "explanation": "Cold storage reduces growth but time still matters",
+          "sourceId": "FDA_MYTHS"
+        },
+        {
+          "statement": "Freezer burn is mainly a quality problem caused by air reaching food",
+          "explanation": "It can make food dry or leathery but does not automatically make it unsafe",
+          "sourceId": "USDA_FREEZE"
+        },
+        {
+          "statement": "Some foods such as lettuce and mayonnaise do not freeze well",
+          "explanation": "Food safety and food quality after thawing are different questions",
+          "sourceId": "USDA_FREEZE"
+        },
+        {
+          "statement": "Frozen food can be thawed safely in cold water when handled correctly",
+          "explanation": "Cold water is one of the recommended safe thawing methods",
+          "sourceId": "USDA_FREEZE"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "Rinsing raw chicken under a tap reliably removes all dangerous bacteria",
+          "explanation": "Washing can spread bacteria and does not make chicken safe",
+          "sourceId": "USDA_WASH"
+        },
+        {
+          "statement": "Vinegar washing makes raw poultry safe to eat",
+          "explanation": "Only proper cooking reliably kills harmful bacteria",
+          "sourceId": "USDA_WASH"
+        },
+        {
+          "statement": "A clean looking sink cannot be contaminated by rinsing chicken",
+          "explanation": "Chicken splashes can contaminate surfaces and utensils",
+          "sourceId": "USDA_WASH"
+        },
+        {
+          "statement": "Pink color always means chicken is unsafe",
+          "explanation": "Color is not a reliable safety measure if the proper temperature is reached",
+          "sourceId": "USDA_CHICKEN"
+        },
+        {
+          "statement": "Frozen chicken becomes unsafe automatically after a few months",
+          "explanation": "Continuously frozen chicken remains safe though quality can decline",
+          "sourceId": "USDA_CHICKEN"
+        },
+        {
+          "statement": "Chicken is safe when juices run clear no matter its temperature",
+          "explanation": "A thermometer is the reliable way to confirm safe cooking",
+          "sourceId": "USDA_CHICKEN"
+        },
+        {
+          "statement": "Freezing kills every bacterium in food",
+          "explanation": "Freezing slows growth but is not sterilization",
+          "sourceId": "USDA_FREEZE"
+        },
+        {
+          "statement": "Food stored safely in a freezer must be thrown away after a fixed safety deadline",
+          "explanation": "Continuous freezing keeps food safe while quality can decline",
+          "sourceId": "USDA_FREEZE"
+        },
+        {
+          "statement": "Food should be thawed on the kitchen counter",
+          "explanation": "Safe methods include refrigerator cold water or microwave thawing",
+          "sourceId": "USDA_FREEZE"
+        },
+        {
+          "statement": "If food smells fine it cannot make you sick",
+          "explanation": "Some harmful bacteria do not change smell appearance or taste",
+          "sourceId": "FDA_MYTHS"
+        },
+        {
+          "statement": "The last meal eaten is always the cause of food poisoning",
+          "explanation": "Illness can begin after a delay from an earlier exposure",
+          "sourceId": "FDA_MYTHS"
+        },
+        {
+          "statement": "Refrigerating leftovers kills all foodborne germs",
+          "explanation": "Refrigeration slows growth but does not kill every pathogen",
+          "sourceId": "FDA_MYTHS"
+        },
+        {
+          "statement": "Freezer burn automatically makes food poisonous",
+          "explanation": "Freezer burn mainly harms quality",
+          "sourceId": "USDA_FREEZE"
+        },
+        {
+          "statement": "A microwave can never be used to thaw food safely",
+          "explanation": "Microwave thawing is an approved safe method when food is cooked promptly",
+          "sourceId": "USDA_FREEZE"
+        },
+        {
+          "statement": "Food that was frozen continuously must be unsafe after its best quality date",
+          "explanation": "Freezer storage time recommendations are generally about quality",
+          "sourceId": "USDA_FREEZE"
+        }
+      ]
+    },
+    {
+      "id": "mythology",
+      "name": "Mythology and folklore",
+      "truths": [
+        {
+          "statement": "Ancient Greek myths survive in different versions",
+          "explanation": "Myths changed across places and storytellers",
+          "sourceId": "BM_GREECE"
+        },
+        {
+          "statement": "Greek myths were stories about gods heroes and the world",
+          "explanation": "They helped people explain origins values and the unknown",
+          "sourceId": "BM_GREECE"
+        },
+        {
+          "statement": "Ancient Greeks told myths through oral stories as well as written texts",
+          "explanation": "Stories circulated before and alongside surviving written versions",
+          "sourceId": "BM_GREECE"
+        },
+        {
+          "statement": "Ancient Greek gods were imagined with human feelings and conflicts",
+          "explanation": "Greek stories often portray gods with recognizable emotions",
+          "sourceId": "BM_GODS"
+        },
+        {
+          "statement": "Different Greek cities could favor different gods or local versions",
+          "explanation": "Worship and stories varied across regions",
+          "sourceId": "BM_GODS"
+        },
+        {
+          "statement": "Athena was associated with wisdom and warfare",
+          "explanation": "She had several roles in Greek myth",
+          "sourceId": "BM_GODS"
+        },
+        {
+          "statement": "Narwhal tusks were once sold in Europe as unicorn horns",
+          "explanation": "The tusks helped fuel beliefs in unicorn relics",
+          "sourceId": "AMNH_MYTH"
+        },
+        {
+          "statement": "Dragons have different meanings across cultures",
+          "explanation": "Some Asian traditions associate dragons with wisdom luck or water",
+          "sourceId": "AMNH_MYTH"
+        },
+        {
+          "statement": "Mythical creatures can reveal what a culture feared or valued",
+          "explanation": "Stories carry cultural meaning beyond monsters themselves",
+          "sourceId": "AMNH_MYTH"
+        },
+        {
+          "statement": "The ancient Greek underworld was ruled by Hades",
+          "explanation": "Hades was the god associated with the realm of the dead",
+          "sourceId": "BM_GREECE"
+        },
+        {
+          "statement": "Medusa is one of the best known figures in Greek mythology",
+          "explanation": "She appears in ancient stories and art",
+          "sourceId": "BM_GREECE"
+        },
+        {
+          "statement": "Greek myths include many competing versions rather than one official canon",
+          "explanation": "Ancient myth traditions were not fixed like a single modern book",
+          "sourceId": "BM_GREECE"
+        },
+        {
+          "statement": "Zeus was the king of the Olympian gods in many Greek stories",
+          "explanation": "Zeus was a central ruler figure in Greek mythology",
+          "sourceId": "BM_GODS"
+        },
+        {
+          "statement": "Poseidon was associated with the sea",
+          "explanation": "He was one of the major Greek gods",
+          "sourceId": "BM_GODS"
+        },
+        {
+          "statement": "Athena was said in one famous myth to emerge from Zeus fully grown",
+          "explanation": "The story describes her unusual birth",
+          "sourceId": "BM_GODS"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "There was one official unchanged version of every Greek myth",
+          "explanation": "Greek myths circulated in multiple variants",
+          "sourceId": "BM_GREECE"
+        },
+        {
+          "statement": "Greek myths were written only by one author",
+          "explanation": "Stories developed across many storytellers and texts",
+          "sourceId": "BM_GREECE"
+        },
+        {
+          "statement": "Every ancient Greek myth was intended as a literal history book",
+          "explanation": "Myths served varied cultural and religious storytelling roles",
+          "sourceId": "BM_GREECE"
+        },
+        {
+          "statement": "Every Greek city worshipped all gods in exactly the same way",
+          "explanation": "Local traditions and emphasis varied",
+          "sourceId": "BM_GODS"
+        },
+        {
+          "statement": "Athena was known only as a goddess of the sea",
+          "explanation": "She was associated with wisdom and warfare among other roles",
+          "sourceId": "BM_GODS"
+        },
+        {
+          "statement": "Hades was the Greek god who lived on Mount Olympus",
+          "explanation": "Hades ruled the underworld in Greek mythology",
+          "sourceId": "BM_GODS"
+        },
+        {
+          "statement": "Every culture gives dragons the same meaning",
+          "explanation": "Dragon symbolism differs across cultures",
+          "sourceId": "AMNH_MYTH"
+        },
+        {
+          "statement": "Narwhal tusks were never connected to unicorn stories",
+          "explanation": "They were once marketed as unicorn horns in Europe",
+          "sourceId": "AMNH_MYTH"
+        },
+        {
+          "statement": "Mythical creatures are found only in European stories",
+          "explanation": "Many cultures have their own legendary beings",
+          "sourceId": "AMNH_MYTH"
+        },
+        {
+          "statement": "Medusa was always described as an ordinary human with no mythic powers",
+          "explanation": "Greek stories portray her as a mythic gorgon",
+          "sourceId": "BM_GREECE"
+        },
+        {
+          "statement": "Hades and the underworld were the same concept as the Christian hell",
+          "explanation": "Greek mythology had its own distinct underworld traditions",
+          "sourceId": "BM_GREECE"
+        },
+        {
+          "statement": "Greek heroes never had supernatural help",
+          "explanation": "Many myths describe heroes interacting with gods or magical beings",
+          "sourceId": "BM_GREECE"
+        },
+        {
+          "statement": "Poseidon was the ruler of the Greek underworld",
+          "explanation": "Poseidon was associated with the sea while Hades ruled the underworld",
+          "sourceId": "BM_GODS"
+        },
+        {
+          "statement": "Athena was usually portrayed as a child of Poseidon",
+          "explanation": "Greek mythology describes Athena as a daughter of Zeus",
+          "sourceId": "BM_GODS"
+        },
+        {
+          "statement": "Zeus was the only god worshipped in ancient Greece",
+          "explanation": "Greek religious traditions included many gods and local practices",
+          "sourceId": "BM_GODS"
+        }
+      ]
+    },
+    {
+      "id": "pets",
+      "name": "Pets and animal behavior",
+      "truths": [
+        {
+          "statement": "A wagging dog tail does not always mean the dog is friendly",
+          "explanation": "Tail movement can signal many emotions including anxiety",
+          "sourceId": "AVMA_DOG"
+        },
+        {
+          "statement": "Dogs communicate with posture facial expression and movement",
+          "explanation": "Reading the whole body is more useful than one signal",
+          "sourceId": "AVMA_DOG"
+        },
+        {
+          "statement": "Children should be taught to approach unfamiliar dogs carefully",
+          "explanation": "Safe interactions reduce bite risk",
+          "sourceId": "AVMA_DOG"
+        },
+        {
+          "statement": "A dogs nose can be wet for several ordinary reasons",
+          "explanation": "Moisture can help scent molecules and also comes from licking or the environment",
+          "sourceId": "TAMU_NOSE"
+        },
+        {
+          "statement": "A wet nose alone cannot prove that a dog is healthy",
+          "explanation": "Nose moisture varies and is not a complete health check",
+          "sourceId": "TAMU_NOSE"
+        },
+        {
+          "statement": "Dogs use smell as a major way to explore their environment",
+          "explanation": "Their sense of smell is highly developed",
+          "sourceId": "TAMU_NOSE"
+        },
+        {
+          "statement": "Cats may urinate outside the litter box because of medical or environmental issues",
+          "explanation": "House soiling can have several causes and warrants attention",
+          "sourceId": "CORNELL_CAT"
+        },
+        {
+          "statement": "Cats do not urinate indoors as revenge",
+          "explanation": "The behavior is not explained by spite and may signal a problem",
+          "sourceId": "CORNELL_CAT"
+        },
+        {
+          "statement": "A change in litter box habits can be a sign to contact a veterinarian",
+          "explanation": "Medical causes should be considered",
+          "sourceId": "CORNELL_CAT"
+        },
+        {
+          "statement": "Adult cats commonly meow to communicate with people",
+          "explanation": "Meowing is often directed toward humans",
+          "sourceId": "ASPCA_MEOW"
+        },
+        {
+          "statement": "Cats can vocalize for reasons such as hunger attention or stress",
+          "explanation": "The meaning depends on context",
+          "sourceId": "ASPCA_MEOW"
+        },
+        {
+          "statement": "A sudden major change in a cats vocal behavior can be worth checking",
+          "explanation": "Behavior changes can have medical or environmental causes",
+          "sourceId": "ASPCA_MEOW"
+        },
+        {
+          "statement": "Fear and pain can contribute to aggression in cats",
+          "explanation": "Aggression can have medical or behavioral causes",
+          "sourceId": "CORNELL_AGG"
+        },
+        {
+          "statement": "Punishing an aggressive cat may worsen fear",
+          "explanation": "Humane behavior management focuses on cause and safety",
+          "sourceId": "CORNELL_AGG"
+        },
+        {
+          "statement": "Cats may show warning signals before swatting or biting",
+          "explanation": "Body language can help people notice discomfort",
+          "sourceId": "CORNELL_AGG"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "A wagging tail always proves a dog is happy and safe to pet",
+          "explanation": "Tail wagging can show anxiety or uncertainty too",
+          "sourceId": "AVMA_DOG"
+        },
+        {
+          "statement": "A dog that is quiet cannot bite",
+          "explanation": "Any dog may bite and behavior depends on context",
+          "sourceId": "AVMA_DOG"
+        },
+        {
+          "statement": "Children should hug any dog to show friendship",
+          "explanation": "Dogs may find hugging threatening and children should approach carefully",
+          "sourceId": "AVMA_DOG"
+        },
+        {
+          "statement": "A wet nose always means a dog is healthy",
+          "explanation": "Nose moisture alone cannot diagnose health",
+          "sourceId": "TAMU_NOSE"
+        },
+        {
+          "statement": "A dry nose always means a dog is sick",
+          "explanation": "Nose moisture changes for ordinary reasons",
+          "sourceId": "TAMU_NOSE"
+        },
+        {
+          "statement": "Dogs smell only with their noses and never use other senses",
+          "explanation": "Dogs also use sight hearing and other senses",
+          "sourceId": "TAMU_NOSE"
+        },
+        {
+          "statement": "Cats soil the house to punish owners",
+          "explanation": "House soiling may reflect health or environmental issues",
+          "sourceId": "CORNELL_CAT"
+        },
+        {
+          "statement": "A cat that avoids the litter box is always being spiteful",
+          "explanation": "Medical causes and litter setup should be considered",
+          "sourceId": "CORNELL_CAT"
+        },
+        {
+          "statement": "Cats never develop urinary problems if they use a litter box",
+          "explanation": "Litter habits can change with medical issues",
+          "sourceId": "CORNELL_CAT"
+        },
+        {
+          "statement": "Adult cats never meow at people",
+          "explanation": "Many adult cats use meows to communicate with people",
+          "sourceId": "ASPCA_MEOW"
+        },
+        {
+          "statement": "Every cat meow means the cat is hungry",
+          "explanation": "Vocalizing can have several causes",
+          "sourceId": "ASPCA_MEOW"
+        },
+        {
+          "statement": "A quiet cat is always healthy and a loud cat is always sick",
+          "explanation": "Vocal patterns vary and sudden changes are what matter",
+          "sourceId": "ASPCA_MEOW"
+        },
+        {
+          "statement": "A cat that scratches is always naturally mean",
+          "explanation": "Fear pain stress and other causes can contribute to aggression",
+          "sourceId": "CORNELL_AGG"
+        },
+        {
+          "statement": "Punishment is the best way to stop a frightened cat from biting",
+          "explanation": "Punishment can increase fear and worsen behavior",
+          "sourceId": "CORNELL_AGG"
+        },
+        {
+          "statement": "Cats give no warning before they feel threatened",
+          "explanation": "Many cats show body language signals of discomfort",
+          "sourceId": "CORNELL_AGG"
+        }
+      ]
+    },
+    {
+      "id": "science",
+      "name": "Everyday science",
+      "truths": [
+        {
+          "statement": "A chemical reaction creates one or more new substances",
+          "explanation": "Chemical changes alter the substances present",
+          "sourceId": "ACS_REACTIONS"
+        },
+        {
+          "statement": "Tearing paper changes its shape but does not create a new substance",
+          "explanation": "That is a physical change",
+          "sourceId": "ACS_REACTIONS"
+        },
+        {
+          "statement": "Burning paper creates new substances such as gases and ash",
+          "explanation": "Combustion is a chemical reaction",
+          "sourceId": "ACS_REACTIONS"
+        },
+        {
+          "statement": "Water molecules contain hydrogen and oxygen atoms",
+          "explanation": "The chemical formula for water is H2O",
+          "sourceId": "ACS_WATER"
+        },
+        {
+          "statement": "Water vapor is water in its gas state",
+          "explanation": "The substance remains water through a change of state",
+          "sourceId": "ACS_WATER"
+        },
+        {
+          "statement": "Ice is less dense than liquid water",
+          "explanation": "Water expands as it freezes",
+          "sourceId": "ACS_WATER"
+        },
+        {
+          "statement": "A complete electrical circuit provides a path for current to flow",
+          "explanation": "An open switch interrupts the circuit",
+          "sourceId": "DOE_ELECTRICITY"
+        },
+        {
+          "statement": "Batteries store chemical energy that can be converted into electrical energy",
+          "explanation": "Chemical reactions inside a battery drive current",
+          "sourceId": "DOE_ELECTRICITY"
+        },
+        {
+          "statement": "Lightning is a large electrical discharge",
+          "explanation": "It occurs when charge separates in the atmosphere",
+          "sourceId": "DOE_ELECTRICITY"
+        },
+        {
+          "statement": "Dissolving sugar in water is generally a physical change",
+          "explanation": "The sugar molecules disperse but are not transformed into a new substance",
+          "sourceId": "ACS_REACTIONS"
+        },
+        {
+          "statement": "Rust forms through a chemical reaction involving iron and oxygen",
+          "explanation": "Rust is a new material formed by oxidation",
+          "sourceId": "ACS_REACTIONS"
+        },
+        {
+          "statement": "Condensation changes water vapor into liquid water",
+          "explanation": "It is a physical state change",
+          "sourceId": "ACS_REACTIONS"
+        },
+        {
+          "statement": "Water can boil at temperatures below 100 degrees Celsius at lower air pressure",
+          "explanation": "The boiling point depends on pressure",
+          "sourceId": "ACS_WATER"
+        },
+        {
+          "statement": "A substance can change state without changing its chemical identity",
+          "explanation": "Melting and freezing are physical changes",
+          "sourceId": "ACS_WATER"
+        },
+        {
+          "statement": "Atoms are conserved in ordinary chemical reactions",
+          "explanation": "Reactions rearrange atoms into different substances",
+          "sourceId": "ACS_WATER"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "Boiling water creates a new chemical substance",
+          "explanation": "Boiling changes water state but leaves its molecules intact",
+          "sourceId": "ACS_REACTIONS"
+        },
+        {
+          "statement": "Tearing paper and burning paper are both physical changes",
+          "explanation": "Burning creates new substances while tearing changes shape",
+          "sourceId": "ACS_REACTIONS"
+        },
+        {
+          "statement": "Chemical reactions destroy atoms completely",
+          "explanation": "Ordinary reactions rearrange atoms rather than destroy them",
+          "sourceId": "ACS_REACTIONS"
+        },
+        {
+          "statement": "Ice sinks because it is denser than water",
+          "explanation": "Ice is less dense and floats",
+          "sourceId": "ACS_WATER"
+        },
+        {
+          "statement": "Water vapor is a different chemical from liquid water",
+          "explanation": "It is the same substance in a different state",
+          "sourceId": "ACS_WATER"
+        },
+        {
+          "statement": "Water always boils at exactly 100 degrees Celsius",
+          "explanation": "Boiling temperature changes with pressure",
+          "sourceId": "ACS_WATER"
+        },
+        {
+          "statement": "An electric current can flow through an open circuit",
+          "explanation": "A continuous path is needed for current",
+          "sourceId": "DOE_ELECTRICITY"
+        },
+        {
+          "statement": "A battery creates energy from nothing",
+          "explanation": "It converts stored chemical energy to electrical energy",
+          "sourceId": "DOE_ELECTRICITY"
+        },
+        {
+          "statement": "Lightning is made of fire rather than electricity",
+          "explanation": "Lightning is an electrical discharge",
+          "sourceId": "DOE_ELECTRICITY"
+        },
+        {
+          "statement": "Sugar disappears in water because it is destroyed",
+          "explanation": "The sugar dissolves and remains present in the solution",
+          "sourceId": "ACS_REACTIONS"
+        },
+        {
+          "statement": "Rust is just dirt stuck on iron",
+          "explanation": "Rust is a new substance formed by a chemical reaction",
+          "sourceId": "ACS_REACTIONS"
+        },
+        {
+          "statement": "Condensation is a chemical reaction that creates water",
+          "explanation": "It is a change of state from vapor to liquid",
+          "sourceId": "ACS_REACTIONS"
+        },
+        {
+          "statement": "Water is made from two oxygen atoms and one hydrogen atom",
+          "explanation": "Its formula is H2O with two hydrogen atoms and one oxygen atom",
+          "sourceId": "ACS_WATER"
+        },
+        {
+          "statement": "Melting ice chemically destroys water molecules",
+          "explanation": "Melting is a physical state change",
+          "sourceId": "ACS_WATER"
+        },
+        {
+          "statement": "Adding salt to water turns it into a new chemical compound",
+          "explanation": "Salt dissolves and forms a mixture rather than a new compound",
+          "sourceId": "ACS_WATER"
+        }
+      ]
+    },
+    {
+      "id": "objects",
+      "name": "Everyday objects and inventions",
+      "truths": [
+        {
+          "statement": "Microwave ovens were introduced commercially in 1947",
+          "explanation": "Early machines grew out of radar technology",
+          "sourceId": "SMITH_MICROWAVE"
+        },
+        {
+          "statement": "The first microwave ovens for home use appeared in the 1950s",
+          "explanation": "A home model was introduced in 1955",
+          "sourceId": "SMITH_MICROWAVE"
+        },
+        {
+          "statement": "Microwaves heat food using energy from radio waves",
+          "explanation": "The magnetron technology was adapted from radar",
+          "sourceId": "SMITH_MICROWAVE"
+        },
+        {
+          "statement": "A Hoover vacuum from 1927 is part of the Smithsonian household collection",
+          "explanation": "The museum documents early household appliances",
+          "sourceId": "SMITH_HOUSE"
+        },
+        {
+          "statement": "A Toastmaster toaster from the 1920s is in the Smithsonian household collection",
+          "explanation": "The collection includes an early electric toaster",
+          "sourceId": "SMITH_HOUSE"
+        },
+        {
+          "statement": "The Smithsonian household exhibit includes a transistor radio from 1954",
+          "explanation": "The museum displays the radio as a household technology",
+          "sourceId": "SMITH_HOUSE"
+        },
+        {
+          "statement": "The Smithsonian household collection includes a grocery cart from 1937",
+          "explanation": "The Object Project documents the cart as an everyday innovation",
+          "sourceId": "SMITH_HOUSE"
+        },
+        {
+          "statement": "Air filled bicycle tires appeared in the 1890s",
+          "explanation": "The Smithsonian bicycle collection includes tires from that period",
+          "sourceId": "SMITH_HOUSE"
+        },
+        {
+          "statement": "The Smithsonian collection includes a Tupperware item from 1954",
+          "explanation": "The museum documents early household plastic storage",
+          "sourceId": "SMITH_HOUSE"
+        },
+        {
+          "statement": "A Raytheon Radarange was bought by a Cleveland restaurant in 1947",
+          "explanation": "The early microwave oven was large and costly",
+          "sourceId": "SMITH_MICROWAVE_OBJECT"
+        },
+        {
+          "statement": "The first home microwave model was developed by Tappan with Raytheon",
+          "explanation": "The RL-1 was designed for home use",
+          "sourceId": "SMITH_MICROWAVE_OBJECT"
+        },
+        {
+          "statement": "The microwave oven grew from radar magnetron technology",
+          "explanation": "The magnetron produced microwaves used for heating food",
+          "sourceId": "SMITH_MICROWAVE_OBJECT"
+        },
+        {
+          "statement": "The practical electric light bulb developed through work by multiple inventors",
+          "explanation": "Edison improved earlier designs with collaborators",
+          "sourceId": "DOE_BULB"
+        },
+        {
+          "statement": "LEDs produce light using semiconductor technology",
+          "explanation": "They do not rely on a glowing wire filament",
+          "sourceId": "DOE_BULB"
+        },
+        {
+          "statement": "A vacuum cleaner became a common household convenience as electric appliances spread",
+          "explanation": "The Smithsonian household exhibit documents vacuums as transforming home work",
+          "sourceId": "DOE_BULB"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "The first microwave oven was a small cheap home appliance",
+          "explanation": "Early commercial machines were large and expensive",
+          "sourceId": "SMITH_MICROWAVE"
+        },
+        {
+          "statement": "Microwave ovens were invented before radar technology",
+          "explanation": "The oven grew out of radar research and magnetron technology",
+          "sourceId": "SMITH_MICROWAVE"
+        },
+        {
+          "statement": "Microwaves cook food using visible light",
+          "explanation": "They use microwave radio frequency energy",
+          "sourceId": "SMITH_MICROWAVE"
+        },
+        {
+          "statement": "The Smithsonian household exhibit shows a vacuum from the 1800s",
+          "explanation": "Its Hoover vacuum example dates to 1927",
+          "sourceId": "SMITH_HOUSE"
+        },
+        {
+          "statement": "The Smithsonian toaster example is from the 2000s",
+          "explanation": "The Toastmaster example is from the 1920s",
+          "sourceId": "SMITH_HOUSE"
+        },
+        {
+          "statement": "The Smithsonian household collection has no radios",
+          "explanation": "It includes a 1954 transistor radio",
+          "sourceId": "SMITH_HOUSE"
+        },
+        {
+          "statement": "The Smithsonian collection lists a grocery cart from 1970",
+          "explanation": "Its example is dated 1937",
+          "sourceId": "SMITH_HOUSE"
+        },
+        {
+          "statement": "Air filled bicycle tires appeared only after 1950",
+          "explanation": "The Smithsonian bicycle collection includes 1890s tires",
+          "sourceId": "SMITH_HOUSE"
+        },
+        {
+          "statement": "Tupperware was first made in the 1990s",
+          "explanation": "The museum documents an item from 1954",
+          "sourceId": "SMITH_HOUSE"
+        },
+        {
+          "statement": "The first microwave oven was made for a home kitchen in 1947",
+          "explanation": "The early Radarange was bought by a restaurant and home models came later",
+          "sourceId": "SMITH_MICROWAVE_OBJECT"
+        },
+        {
+          "statement": "Microwaves were first used to cook food without any radar connection",
+          "explanation": "Radar magnetron technology led to the cooking application",
+          "sourceId": "SMITH_MICROWAVE_OBJECT"
+        },
+        {
+          "statement": "The first microwave oven was inexpensive and widely adopted immediately",
+          "explanation": "Early models were large costly and initially confusing to customers",
+          "sourceId": "SMITH_MICROWAVE_OBJECT"
+        },
+        {
+          "statement": "Thomas Edison invented electric lighting without earlier work by anyone else",
+          "explanation": "Many inventors contributed and Edison improved practical designs",
+          "sourceId": "DOE_BULB"
+        },
+        {
+          "statement": "LED bulbs create light by heating a wire until it glows",
+          "explanation": "LEDs use semiconductors",
+          "sourceId": "DOE_BULB"
+        },
+        {
+          "statement": "A vacuum cleaner makes a home clean without any electricity or power source",
+          "explanation": "Modern household vacuums use powered suction",
+          "sourceId": "DOE_BULB"
+        }
+      ]
+    },
+    {
+      "id": "olympics",
+      "name": "Olympic sports and events",
+      "truths": [
+        {
+          "statement": "The ancient Olympic Games were held every four years",
+          "explanation": "The festival followed a four year cycle",
+          "sourceId": "IOC_ANCIENT"
+        },
+        {
+          "statement": "The ancient Games included running wrestling boxing and equestrian events",
+          "explanation": "The event program grew over time",
+          "sourceId": "IOC_ANCIENT"
+        },
+        {
+          "statement": "The ancient Olympics began in Olympia in Greece",
+          "explanation": "The Games were held at the sanctuary of Olympia",
+          "sourceId": "IOC_ANCIENT"
+        },
+        {
+          "statement": "The ancient Olympics included a combat sport called pankration",
+          "explanation": "It combined wrestling and striking techniques",
+          "sourceId": "IOC_SPORTS"
+        },
+        {
+          "statement": "Ancient Olympic long jumpers used hand weights called halteres",
+          "explanation": "The weights were part of the event technique",
+          "sourceId": "IOC_SPORTS"
+        },
+        {
+          "statement": "Four horse chariot racing was part of the ancient Olympic program",
+          "explanation": "The equestrian contest was a major event",
+          "sourceId": "IOC_SPORTS"
+        },
+        {
+          "statement": "The first modern Olympic Games were held in Athens in 1896",
+          "explanation": "Athens hosted the revived Games",
+          "sourceId": "IOC_REVIVAL"
+        },
+        {
+          "statement": "James Connolly won the triple jump at the 1896 Olympics",
+          "explanation": "He is recorded as the first modern Olympic champion",
+          "sourceId": "IOC_REVIVAL"
+        },
+        {
+          "statement": "The marathon was part of the first modern Olympics",
+          "explanation": "The race was included in Athens in 1896",
+          "sourceId": "IOC_REVIVAL"
+        },
+        {
+          "statement": "Olympic fencing uses foil epee and sabre",
+          "explanation": "These are the three fencing weapons",
+          "sourceId": "IOC_FENCING"
+        },
+        {
+          "statement": "Fencing masks protect competitors faces",
+          "explanation": "Masks are essential protective equipment",
+          "sourceId": "IOC_FENCING"
+        },
+        {
+          "statement": "Electric scoring equipment is used in modern fencing",
+          "explanation": "The system helps register valid touches",
+          "sourceId": "IOC_FENCING"
+        },
+        {
+          "statement": "Olympic timekeeping has moved from hand timing toward electronic systems",
+          "explanation": "Technological advances improved timing precision",
+          "sourceId": "IOC_INNOV"
+        },
+        {
+          "statement": "The Olympic Charter sets principles for the Olympic Movement",
+          "explanation": "It defines the structure and fundamental rules",
+          "sourceId": "IOC_INNOV"
+        },
+        {
+          "statement": "In ancient chariot racing the chariot owner could be declared champion",
+          "explanation": "The owner rather than the driver received the victory",
+          "sourceId": "IOC_INNOV"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "The ancient Olympic Games were held every year",
+          "explanation": "They followed a four year cycle",
+          "sourceId": "IOC_ANCIENT"
+        },
+        {
+          "statement": "The ancient Games took place in Rome",
+          "explanation": "They were held at Olympia in Greece",
+          "sourceId": "IOC_ANCIENT"
+        },
+        {
+          "statement": "Every ancient Olympic event was a foot race",
+          "explanation": "The program also included combat and equestrian events",
+          "sourceId": "IOC_ANCIENT"
+        },
+        {
+          "statement": "Pankration was an ancient Olympic swimming race",
+          "explanation": "It was a combat sport",
+          "sourceId": "IOC_SPORTS"
+        },
+        {
+          "statement": "Ancient long jumpers used no equipment at all",
+          "explanation": "Athletes used hand weights called halteres",
+          "sourceId": "IOC_SPORTS"
+        },
+        {
+          "statement": "Chariot drivers always received the Olympic victory wreath",
+          "explanation": "The owner of the winning chariot was declared the champion",
+          "sourceId": "IOC_SPORTS"
+        },
+        {
+          "statement": "The first modern Olympics were held in Paris in 1896",
+          "explanation": "Athens hosted the first modern Games",
+          "sourceId": "IOC_REVIVAL"
+        },
+        {
+          "statement": "The marathon was part of the ancient Olympic program",
+          "explanation": "It was added to the first modern Games in 1896",
+          "sourceId": "IOC_REVIVAL"
+        },
+        {
+          "statement": "The first modern Olympic champion won a swimming event",
+          "explanation": "James Connolly won the triple jump",
+          "sourceId": "IOC_REVIVAL"
+        },
+        {
+          "statement": "Olympic fencing uses only one type of sword",
+          "explanation": "It uses foil epee and sabre",
+          "sourceId": "IOC_FENCING"
+        },
+        {
+          "statement": "Fencers compete without protective masks",
+          "explanation": "Masks protect the face and eyes",
+          "sourceId": "IOC_FENCING"
+        },
+        {
+          "statement": "Modern fencing scores every hit only by a human judge",
+          "explanation": "Electronic scoring equipment is used",
+          "sourceId": "IOC_FENCING"
+        },
+        {
+          "statement": "In ancient chariot racing the driver rather than the owner was declared champion",
+          "explanation": "The owner could receive the victory even when not driving",
+          "sourceId": "IOC_CHARIOT"
+        },
+        {
+          "statement": "Women could never be Olympic champions in any ancient event",
+          "explanation": "Women could claim victory as owners of winning chariots",
+          "sourceId": "IOC_CHARIOT"
+        },
+        {
+          "statement": "The Olympic Charter is a list of equipment brands approved for athletes",
+          "explanation": "It sets principles and rules for the Olympic Movement",
+          "sourceId": "IOC_CHARIOT"
+        }
+      ]
+    },
+    {
+      "id": "roads",
+      "name": "Road signs and driving myths",
+      "truths": [
+        {
+          "statement": "In the United States a stop sign is an octagon",
+          "explanation": "The unique shape helps drivers recognize it",
+          "sourceId": "ROAD_SHAPES"
+        },
+        {
+          "statement": "In the United States a yield sign is an inverted triangle",
+          "explanation": "The sign shape is standardized",
+          "sourceId": "ROAD_SHAPES"
+        },
+        {
+          "statement": "In the United States a warning sign is commonly a diamond",
+          "explanation": "The FHWA guide assigns diamond shapes to warnings",
+          "sourceId": "ROAD_SHAPES"
+        },
+        {
+          "statement": "In the United States a school zone warning sign can be a pentagon",
+          "explanation": "Pentagon signs indicate school areas",
+          "sourceId": "ROAD_SHAPES"
+        },
+        {
+          "statement": "In the United States orange signs are used for work zones",
+          "explanation": "The color warns road users about construction areas",
+          "sourceId": "ROAD_SHAPES"
+        },
+        {
+          "statement": "In the United States green signs commonly guide routes and directions",
+          "explanation": "Green is used for guide information",
+          "sourceId": "ROAD_SHAPES"
+        },
+        {
+          "statement": "The first US Manual on Uniform Traffic Control Devices was published in 1935",
+          "explanation": "The first edition was produced to standardize traffic control",
+          "sourceId": "ROAD_HISTORY"
+        },
+        {
+          "statement": "US traffic signs use both shapes and colors to communicate",
+          "explanation": "The shape can help identify a sign even when its text is hard to read",
+          "sourceId": "ROAD_HISTORY"
+        },
+        {
+          "statement": "The US sign convention reserves the octagon shape for STOP",
+          "explanation": "FHWA notes the distinctive shape is reserved for that message",
+          "sourceId": "ROAD_HISTORY"
+        },
+        {
+          "statement": "Seat belts are designed to protect occupants during a crash",
+          "explanation": "They reduce the risk of death and serious injury",
+          "sourceId": "NHTSA_BELTS"
+        },
+        {
+          "statement": "Air bags are designed to supplement seat belts",
+          "explanation": "They work together as part of a restraint system",
+          "sourceId": "NHTSA_BELTS"
+        },
+        {
+          "statement": "A driver can be injured by an unsecured object during a crash",
+          "explanation": "Loose objects continue moving when a vehicle stops",
+          "sourceId": "NHTSA_BELTS"
+        },
+        {
+          "statement": "Traffic signs and signals are part of formal road rules",
+          "explanation": "International conventions specify how road users should comply",
+          "sourceId": "ROAD_VIENNA"
+        },
+        {
+          "statement": "Traffic lights take precedence over priority signs under the road convention",
+          "explanation": "The convention orders the authority of road controls",
+          "sourceId": "ROAD_VIENNA"
+        },
+        {
+          "statement": "Speeding increases both crash risk and crash severity",
+          "explanation": "NHTSA warns that higher speed makes crashes more dangerous",
+          "sourceId": "ROAD_VIENNA"
+        }
+      ],
+      "misconceptions": [
+        {
+          "statement": "In the United States stop signs are triangular",
+          "explanation": "The standardized stop sign is an octagon",
+          "sourceId": "ROAD_SHAPES"
+        },
+        {
+          "statement": "In the United States diamond signs usually provide directions",
+          "explanation": "Diamond signs indicate warnings",
+          "sourceId": "ROAD_SHAPES"
+        },
+        {
+          "statement": "In the United States school zone signs are always circles",
+          "explanation": "School warning signs can use a pentagon",
+          "sourceId": "ROAD_SHAPES"
+        },
+        {
+          "statement": "US work zone signs are usually blue",
+          "explanation": "Orange is the standard work zone color",
+          "sourceId": "ROAD_SHAPES"
+        },
+        {
+          "statement": "Green US signs warn drivers of road work",
+          "explanation": "Green signs commonly provide guide information",
+          "sourceId": "ROAD_SHAPES"
+        },
+        {
+          "statement": "The US yield sign is a red square",
+          "explanation": "It is an inverted triangle",
+          "sourceId": "ROAD_SHAPES"
+        },
+        {
+          "statement": "US road sign shapes were never standardized",
+          "explanation": "The MUTCD was created to standardize signs signals and markings",
+          "sourceId": "ROAD_HISTORY"
+        },
+        {
+          "statement": "A stop sign shape was chosen only for decoration",
+          "explanation": "The octagon was selected for visibility and recognition",
+          "sourceId": "ROAD_HISTORY"
+        },
+        {
+          "statement": "US traffic signs communicate only through written words",
+          "explanation": "Shape and color also convey information",
+          "sourceId": "ROAD_HISTORY"
+        },
+        {
+          "statement": "Seat belts are unnecessary on short trips",
+          "explanation": "Seat belts reduce injury risk on every trip",
+          "sourceId": "NHTSA_BELTS"
+        },
+        {
+          "statement": "Air bags make it safer to leave a seat belt unfastened",
+          "explanation": "Air bags are supplemental and work with seat belts",
+          "sourceId": "NHTSA_BELTS"
+        },
+        {
+          "statement": "Loose items inside a car cannot hurt anyone during a crash",
+          "explanation": "Unsecured objects can become dangerous projectiles",
+          "sourceId": "NHTSA_BELTS"
+        },
+        {
+          "statement": "Driving above the speed limit is safe if the road looks empty",
+          "explanation": "Speed increases crash risk and severity",
+          "sourceId": "NHTSA_SPEED"
+        },
+        {
+          "statement": "Road sign rules are exactly the same in every country",
+          "explanation": "Sign standards and driving rules vary by jurisdiction",
+          "sourceId": "NHTSA_SPEED"
+        },
+        {
+          "statement": "Speeding always saves enough time to offset its danger",
+          "explanation": "The time saved is often small while risk rises",
+          "sourceId": "NHTSA_SPEED"
+        }
+      ]
+    }
+  ],
+  "sources": {
+    "ACS_REACTIONS": {
+      "title": "American Chemical Society Chemical Reactions",
+      "url": "https://www.acs.org/education/resources/k-8/science-activities/chemicalphysicalchange/chemicalreactions.html"
+    },
+    "ACS_WATER": {
+      "title": "American Chemical Society Water Reactions",
+      "url": "https://www.acs.org/pressroom/reactions/topics/water.html"
+    },
+    "AMNH_ELEPHANT": {
+      "title": "American Museum of Natural History Asian Elephants",
+      "url": "https://www.amnh.org/explore/ology/ology-cards/115-asian-elephant"
+    },
+    "AMNH_MYTH": {
+      "title": "American Museum of Natural History Mythic Creatures",
+      "url": "https://www.amnh.org/explore/ology/anthropology/whats-this-mythic-creatures"
+    },
+    "AMNH_SHARKS": {
+      "title": "American Museum of Natural History Shark Myths",
+      "url": "https://www.amnh.org/explore/news-blogs/sharks-rays-myths"
+    },
+    "ASPCA_MEOW": {
+      "title": "ASPCA Meowing and Yowling",
+      "url": "https://www.aspca.org/pet-care/cat-care/common-cat-behavior-issues/meowing-and-yowling"
+    },
+    "AVMA_DOG": {
+      "title": "American Veterinary Medical Association Dog Bite Prevention",
+      "url": "https://avma.org/resources-tools/pet-owners/dog-bite-prevention"
+    },
+    "BM_GODS": {
+      "title": "British Museum Greek Gods",
+      "url": "https://www.britishmuseum.org/sites/default/files/2019-09/Visit_Greece_Gods_KS2.pdf"
+    },
+    "BM_GREECE": {
+      "title": "British Museum Greek Myths",
+      "url": "https://www.britishmuseum.org/sites/default/files/2019-09/Visit_Greece_Myths_KS2_2017.pdf"
+    },
+    "BRAND_BRICK": {
+      "title": "LEGO Stud and Tube Principle",
+      "url": "https://www.lego.com/en-us/history/articles/d-the-stud-and-tube-principle"
+    },
+    "BRAND_COCA": {
+      "title": "Coca-Cola Company FAQ",
+      "url": "https://www.coca-colacompany.com/about-us/faq/our-company"
+    },
+    "BRAND_LEGO": {
+      "title": "LEGO Group History",
+      "url": "https://www.lego.com/en-us/history/articles/b-the-beginning-of-the-lego-group"
+    },
+    "BRAND_NIKE": {
+      "title": "Smithsonian Nike Swoosh Collection",
+      "url": "https://americanhistory.si.edu/it/collections/object/nmah_881602"
+    },
+    "BRAND_TRADE": {
+      "title": "Smithsonian Trademark History",
+      "url": "https://americanhistory.si.edu/explore/exhibitions/inventing-in-america/trademarks"
+    },
+    "CAR_EV": {
+      "title": "US DOE Alternative Fuels Data Center EV Basics",
+      "url": "https://afdc.energy.gov/vehicles/electric-basics-ev"
+    },
+    "CAR_EV_WORK": {
+      "title": "US DOE How All-Electric Cars Work",
+      "url": "https://afdc.energy.gov/vehicles/how-do-all-electric-cars-work"
+    },
+    "CORNELL_AGG": {
+      "title": "Cornell Feline Health Center Cat Aggression",
+      "url": "https://www.vet.cornell.edu/departments-centers-and-institutes/cornell-feline-health-center/health-information/feline-health-topics/feline-behavior-problems-aggression"
+    },
+    "CORNELL_CAT": {
+      "title": "Cornell Feline Health Center House Soiling",
+      "url": "https://www.vet.cornell.edu/departments-centers-and-institutes/cornell-feline-health-center/health-information/feline-health-topics/feline-behavior-problems-house-soiling"
+    },
+    "DOE_BULB": {
+      "title": "US Department of Energy Light Bulb History",
+      "url": "https://www.energy.gov/articles/history-light-bulb"
+    },
+    "DOE_ELECTRICITY": {
+      "title": "US Department of Energy Electricity 101",
+      "url": "https://www.energy.gov/oe/electricity-101"
+    },
+    "FDA_MYTHS": {
+      "title": "US Food and Drug Administration Food Safety Myths",
+      "url": "https://www.fda.gov/food/people-risk-foodborne-illness/fact-or-fiction-food-safety-moms-be"
+    },
+    "FOOD_CHOCOLATE": {
+      "title": "Smithsonian Chocolate Preparation",
+      "url": "https://americanhistory.si.edu/sites/default/files/Lange_Chocolate%20Preparation.pdf"
+    },
+    "FOOD_PASTA": {
+      "title": "Smithsonian Is Spaghetti and Meatballs Italian",
+      "url": "https://www.smithsonianmag.com/arts-culture/is-spaghetti-and-meatballs-italian-94819690/"
+    },
+    "FOOD_PIZZA": {
+      "title": "Smithsonian Naples Pizza",
+      "url": "https://www.smithsonianmag.com/travel/naples-pizza-original-fast-food-180976992/"
+    },
+    "FOOD_STAPLES": {
+      "title": "Smithsonian History of Foodstuffs",
+      "url": "https://www.smithsonianmag.com/smithsonian-institution/mouthwatering-history-seven-fundamental-foodstuffs-180971473/"
+    },
+    "FOOD_TOMATO": {
+      "title": "Smithsonian History of the Tomato Poison Myth",
+      "url": "https://www.smithsonianmag.com/history/how-the-misrepresentation-of-tomatoes-as-stinking-poison-apples-that-provoked-vomiting-made-people-afraid-of-them-for-more-than-200-years-863735/"
+    },
+    "GEOG_LOC_FLAG": {
+      "title": "Library of Congress US Flag Symbols",
+      "url": "https://www.loc.gov/classroom-materials/symbols-of-the-united-states/"
+    },
+    "GEOG_MAPS": {
+      "title": "National Geographic Map Resource",
+      "url": "https://education.nationalgeographic.org/resource/map/"
+    },
+    "GEOG_MENTAL": {
+      "title": "National Geographic Mental Map of the World",
+      "url": "https://education.nationalgeographic.org/resource/why-your-mental-map-world-probably-wrong/"
+    },
+    "GEOG_PROJ": {
+      "title": "National Geographic Map Projections",
+      "url": "https://education.nationalgeographic.org/resource/investigating-map-projections/"
+    },
+    "GEOG_UN_FLAG": {
+      "title": "United Nations Flag",
+      "url": "https://www.un.org/en/node/126420"
+    },
+    "GPS_OVERVIEW": {
+      "title": "GPS.gov GPS Overview",
+      "url": "https://www.gps.gov/systems/gps/index.php"
+    },
+    "GPS_TRILATERATION": {
+      "title": "GPS.gov Trilateration",
+      "url": "https://www.gps.gov/trilateration"
+    },
+    "IFAB_BALL": {
+      "title": "IFAB Ball In and Out of Play",
+      "url": "https://www.theifab.com/laws/latest/the-ball-in-and-out-of-play/"
+    },
+    "IFAB_DURATION": {
+      "title": "IFAB Duration of the Match",
+      "url": "https://www.theifab.com/laws/latest/the-duration-of-the-match/"
+    },
+    "IFAB_LAWS": {
+      "title": "IFAB Laws of the Game",
+      "url": "https://www.theifab.com/laws/latest/about-the-laws/"
+    },
+    "IFAB_OFFSIDE": {
+      "title": "IFAB Offside",
+      "url": "https://www.theifab.com/laws/latest/offside/"
+    },
+    "IFAB_PENALTY": {
+      "title": "IFAB The Penalty Kick",
+      "url": "https://www.theifab.com/laws/latest/the-penalty-kick/"
+    },
+    "IOC_ANCIENT": {
+      "title": "International Olympic Committee Ancient Olympic Games",
+      "url": "https://www.olympics.com/ioc/ancient-olympic-games"
+    },
+    "IOC_CHARIOT": {
+      "title": "International Olympic Committee Ancient Chariot Racing",
+      "url": "https://www.olympics.com/ioc/ancient-olympic-games/chariot-racing"
+    },
+    "IOC_FENCING": {
+      "title": "International Olympic Committee Fencing",
+      "url": "https://www.olympics.com/ioc/news/fencing-unmasked"
+    },
+    "IOC_INNOV": {
+      "title": "International Olympic Committee Sport Innovations",
+      "url": "https://www.olympics.com/ioc/news/innovations-in-sport"
+    },
+    "IOC_REVIVAL": {
+      "title": "International Olympic Committee Athens 1896 Revival",
+      "url": "https://www.olympics.com/ioc/news/athens-1896-the-revival-of-the-olympic-games"
+    },
+    "IOC_SPORTS": {
+      "title": "International Olympic Committee Ancient Sports",
+      "url": "https://www.olympics.com/ioc/ancient-olympic-games/the-sports-events"
+    },
+    "LOC_BLUES": {
+      "title": "Library of Congress Blues",
+      "url": "https://www.loc.gov/collections/songs-of-america/articles-and-essays/musical-styles/popular-songs-of-the-day/blues/"
+    },
+    "LOC_INSTRUMENTS": {
+      "title": "Library of Congress Instruments",
+      "url": "https://www.loc.gov/nls/services-and-resources/music-service-and-materials/music-appreciation/instruments/"
+    },
+    "LOC_RECORDINGS": {
+      "title": "Library of Congress Recording Timeline",
+      "url": "https://www.loc.gov/programs/national-recording-preservation-plan/tools-and-resources/historical-background/timeline/"
+    },
+    "NASA_EARTH": {
+      "title": "NASA Earth Facts",
+      "url": "https://science.nasa.gov/earth/facts/"
+    },
+    "NASA_ILLUSION": {
+      "title": "NASA Moon Illusion",
+      "url": "https://science.nasa.gov/solar-system/moon/the-moon-illusion-why-does-the-moon-look-so-big-sometimes/"
+    },
+    "NASA_MOON": {
+      "title": "NASA Moon Facts",
+      "url": "https://science.nasa.gov/moon/facts/"
+    },
+    "NASA_MOONS": {
+      "title": "NASA Moons Facts",
+      "url": "https://science.nasa.gov/solar-system/moons/facts/"
+    },
+    "NASA_MOON_QA": {
+      "title": "NASA Top Moon Questions",
+      "url": "https://science.nasa.gov/moon/top-moon-questions/"
+    },
+    "NASA_PLANETS": {
+      "title": "NASA Planets",
+      "url": "https://science.nasa.gov/solar-system/planets/"
+    },
+    "NASA_SOLAR": {
+      "title": "NASA Solar System Facts",
+      "url": "https://science.nasa.gov/solar-system/solar-system-facts/"
+    },
+    "NATGEO_SEASONS": {
+      "title": "National Geographic Reason for the Seasons",
+      "url": "https://education.nationalgeographic.org/resource/the-reason-for-the-seasons/"
+    },
+    "NHTSA_AIRBAGS": {
+      "title": "NHTSA Air Bags",
+      "url": "https://www.nhtsa.gov/vehicle-safety/air-bags"
+    },
+    "NHTSA_BELTS": {
+      "title": "NHTSA Seat Belts",
+      "url": "https://www.nhtsa.gov/vehicle-safety/seat-belts"
+    },
+    "NHTSA_HISTORY": {
+      "title": "NHTSA Vehicle Safety Improvements",
+      "url": "https://www.nhtsa.gov/how-vehicle-safety-has-improved-over-decades"
+    },
+    "NHTSA_SPEED": {
+      "title": "NHTSA Speeding",
+      "url": "https://www.nhtsa.gov/risky-driving/speeding"
+    },
+    "NOAA_DRINK": {
+      "title": "NOAA Why Can't People Drink Seawater",
+      "url": "https://oceanservice.noaa.gov/facts/drinksw.html"
+    },
+    "NOAA_MYTHS": {
+      "title": "NOAA Ocean Myths",
+      "url": "https://oceanservice.noaa.gov/ocean/myths/"
+    },
+    "NOAA_OCEAN": {
+      "title": "NOAA Know Your Ocean",
+      "url": "https://oceantoday.noaa.gov/knowyourocean/"
+    },
+    "NOAA_SALT": {
+      "title": "NOAA Why Is the Ocean Salty",
+      "url": "https://oceanservice.noaa.gov/facts/whysalty.html"
+    },
+    "NOAA_WAVES": {
+      "title": "NOAA How Ocean Waves Work",
+      "url": "https://oceanservice.noaa.gov/facts/wavesinocean.html"
+    },
+    "OCEAN_PENGUINS": {
+      "title": "Smithsonian Ocean Penguins",
+      "url": "https://ocean.si.edu/ocean-life/seabirds/penguins"
+    },
+    "QR_BASICS": {
+      "title": "DENSO WAVE QR Code Fundamentals",
+      "url": "https://www.denso-wave.com/en/system/qr/fundamental/qrcode/qrc/"
+    },
+    "QR_HISTORY": {
+      "title": "DENSO WAVE QR Code History",
+      "url": "https://www.denso-wave.com/en/system/qr/qr30th/"
+    },
+    "ROAD_HISTORY": {
+      "title": "Federal Highway Administration MUTCD History",
+      "url": "https://mutcd.fhwa.dot.gov/kno-history.htm"
+    },
+    "ROAD_SHAPES": {
+      "title": "Federal Highway Administration Road Sign Shapes and Colors",
+      "url": "https://mutcd.fhwa.dot.gov/services/publications/fhwaop02084/us_road_symbol_signs.pdf"
+    },
+    "ROAD_VIENNA": {
+      "title": "UNECE Convention on Road Traffic",
+      "url": "https://unece.org/fileadmin/DAM/trans/conventn/Conv_road_traffic_EN.pdf"
+    },
+    "SI_BATS": {
+      "title": "Smithsonian Bat Facts",
+      "url": "https://www.si.edu/spotlight/bats/batfacts"
+    },
+    "SI_SLOTH": {
+      "title": "Smithsonian Sloth Facts",
+      "url": "https://nationalzoo.si.edu/animals/news/why-are-sloths-so-slow-and-other-sloth-facts"
+    },
+    "SMITH_CATPIANO": {
+      "title": "Smithsonian Cat Piano History",
+      "url": "https://www.smithsonianmag.com/smart-news/music-or-animal-abuse-brief-history-cat-piano-180963056/"
+    },
+    "SMITH_HARMONICA": {
+      "title": "Smithsonian History of the Harmonica",
+      "url": "https://www.smithsonianmag.com/arts-culture/history-harmonica-180977157/"
+    },
+    "SMITH_HOUSE": {
+      "title": "Smithsonian Household Hits",
+      "url": "https://americanhistory.si.edu/explore/exhibitions/object-project/online/household-hits"
+    },
+    "SMITH_MICROWAVE": {
+      "title": "Smithsonian Microwave Oven History",
+      "url": "https://americanhistory.si.edu/explore/exhibitions/food/online/new-and-improved/help-home-cook/cook-today-tomorrows-way"
+    },
+    "SMITH_MICROWAVE_OBJECT": {
+      "title": "Smithsonian Microwave Oven Collection Record",
+      "url": "https://americanhistory.si.edu/de/collections/object-groups/in-pursuit?page=2"
+    },
+    "TAMU_NOSE": {
+      "title": "Texas A&M Veterinary Wet Nose Facts",
+      "url": "https://vetmed.tamu.edu/news/uncategorized/canine-wet-nose/"
+    },
+    "USDA_CHICKEN": {
+      "title": "USDA Chicken from Farm to Table",
+      "url": "https://www.fsis.usda.gov/food-safety/safe-food-handling-and-preparation/poultry/chicken-farm-table"
+    },
+    "USDA_FREEZE": {
+      "title": "USDA Freezing and Food Safety",
+      "url": "https://www.fsis.usda.gov/food-safety/safe-food-handling-and-preparation/food-safety-basics/freezing-and-food-safety"
+    },
+    "USDA_WASH": {
+      "title": "USDA Washing Food and Food Safety",
+      "url": "https://www.fsis.usda.gov/food-safety/safe-food-handling-and-preparation/food-safety-basics/washing-food-does-it-promote-food"
+    },
+    "USGS_PLATES": {
+      "title": "USGS Dynamic Earth Plate Tectonics",
+      "url": "https://pubs.usgs.gov/gip/dynamic/tectonics.html"
+    },
+    "USGS_PREDICT": {
+      "title": "USGS Can You Predict Earthquakes",
+      "url": "https://www.usgs.gov/faqs/can-you-predict-earthquakes"
+    },
+    "USGS_QUAKE": {
+      "title": "USGS Earthquake Facts and Fantasy",
+      "url": "https://www.usgs.gov/programs/earthquake-hazards/earthquake-facts-earthquake-fantasy"
+    },
+    "USGS_VOLCANO": {
+      "title": "USGS Yellowstone Volcano Facts",
+      "url": "https://www.usgs.gov/volcanoes/yellowstone/five-things-most-people-get-wrong-about-yellowstone-volcano-2015"
+    },
+    "WIFI_FCC": {
+      "title": "Federal Communications Commission Wi-Fi Description",
+      "url": "https://docs.fcc.gov/public/attachments/FCC-22-84A1_Rcd.pdf"
+    },
+    "WIFI_IEEE": {
+      "title": "IEEE Wi-Fi Timeline",
+      "url": "https://standards.ieee.org/wp-content/uploads/interactive/web/wi-fi-timeline/"
+    }
+  }
+}
