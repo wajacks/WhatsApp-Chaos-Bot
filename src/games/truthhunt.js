@@ -38,6 +38,15 @@ function safeName(value) {
     return name || 'Player';
 }
 
+function makeAnonymousId(game) {
+    const used = new Set(Array.from(game.players.values()).map(player => player.anonymousId));
+    let candidate;
+    do {
+        candidate = 'TH-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+    } while (used.has(candidate));
+    return candidate;
+}
+
 function validateClaim(claim, sources, topicId) {
     if (!claim || typeof claim.statement !== 'string' || claim.statement.length < 15 || claim.statement.length > 240) {
         throw new Error('Invalid statement in Truth Hunt topic ' + topicId);
@@ -232,6 +241,7 @@ function joinTruthHuntLobby(groupId, playerId, playerName) {
     game.players.set(playerId, {
         id: playerId,
         name: safeName(playerName),
+        anonymousId: makeAnonymousId(game),
         score: 0
     });
     return '✅ *' + safeName(playerName) + '* joined Truth Hunt (' + game.players.size + ' player(s)).';
@@ -435,7 +445,7 @@ async function resolveAnswerRound(game) {
             else if (answer.mode === 'NO_TRUTH' && !game.truthExists) gained = 5;
             player.score += gained;
         }
-        changes.push('*' + player.name + '* — ' + (gained > 0 ? '+' + gained : '0') + ' pts');
+        changes.push('*' + player.anonymousId + '* — ' + (gained > 0 ? '+' + gained : '0') + ' pts');
     }
 
     const statements = game.statements.map((item, index) => {
@@ -457,10 +467,15 @@ async function resolveAnswerRound(game) {
     await finishRound(game, false);
 }
 
-function formatScores(game) {
+function formatScores(game, revealNames) {
     return Array.from(game.players.values())
-        .sort((left, right) => right.score - left.score || left.name.localeCompare(right.name))
-        .map((player, index) => (index + 1) + '. *' + player.name + '* — ' + player.score + ' pts')
+        .sort((left, right) => right.score - left.score || left.anonymousId.localeCompare(right.anonymousId))
+        .map((player, index) => {
+            const identity = revealNames
+                ? '*' + player.name + '* (' + player.anonymousId + ')'
+                : '*' + player.anonymousId + '*';
+            return (index + 1) + '. ' + identity + ' — ' + player.score + ' pts';
+        })
         .join('\n');
 }
 
@@ -479,7 +494,7 @@ async function finishRound(game, voided) {
         const winnerText = winners.length === 1
             ? '🏆 *' + winners[0].name + '* wins Truth Hunt!'
             : '🏆 Truth Hunt is tied between ' + winners.map(player => '*' + player.name + '*').join(', ') + '.';
-        await sendGroup(game, '🏁 *TRUTH HUNT COMPLETE*\n' + winnerText + '\n\n*Final scores*\n' + formatScores(game));
+        await sendGroup(game, '🏁 *TRUTH HUNT COMPLETE*\n' + winnerText + '\n\n*Final scores*\n' + formatScores(game, true));
         endGame(game);
         return;
     }
