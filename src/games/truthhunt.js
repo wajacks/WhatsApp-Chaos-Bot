@@ -121,7 +121,7 @@ function selectClaim(game, topic, listName, isTrue) {
 
 function buildRoundStatements(game) {
     const selectedTopics = shuffle(FACT_BANK.topics).slice(0, 3);
-    const truthExists = crypto.randomInt(0, 3) !== 0;
+    const truthExists = crypto.randomInt(0, 6) !== 0;
     const truthTopic = truthExists ? randomItem(selectedTopics) : null;
     const statements = selectedTopics.map(topic => {
         const isTrue = Boolean(truthTopic && topic.id === truthTopic.id);
