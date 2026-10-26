@@ -40,7 +40,7 @@ const POINTS_ANY_ORDER = 1;
 const POINTS_IN_ORDER = 2;
 const POINTS_CONSECUTIVE = 3;
 const POINTS_ING_CONSECUTIVE = 1;
-const POINTS_ING_SPLIT_GROUP = 4;
+const POINTS_SPLIT_PAIR_WITH_GAP = 4;
 const POINTS_ING_SEPARATED = 2;
 
 const COINS_PER_POINT = 1000;
@@ -72,6 +72,40 @@ function getPlayerName(player) {
     return player.name || 'Player';
 }
 
+function hasOrderedAdjacentPairWithSeparatedThird(word, requiredLetters) {
+    if (requiredLetters.length !== 3) return false;
+
+    const [first, second, third] = requiredLetters;
+    for (let firstIndex = 0; firstIndex < word.length; firstIndex++) {
+        if (word[firstIndex] !== first) continue;
+
+        for (let secondIndex = 0; secondIndex < word.length; secondIndex++) {
+            if (secondIndex === firstIndex || word[secondIndex] !== second) continue;
+
+            for (let thirdIndex = 0; thirdIndex < word.length; thirdIndex++) {
+                if (
+                    thirdIndex === firstIndex ||
+                    thirdIndex === secondIndex ||
+                    word[thirdIndex] !== third
+                ) continue;
+
+                const firstPairTogether =
+                    secondIndex === firstIndex + 1 &&
+                    Math.abs(thirdIndex - firstIndex) > 1 &&
+                    Math.abs(thirdIndex - secondIndex) > 1;
+                const secondPairTogether =
+                    thirdIndex === secondIndex + 1 &&
+                    Math.abs(firstIndex - secondIndex) > 1 &&
+                    Math.abs(firstIndex - thirdIndex) > 1;
+
+                if (firstPairTogether || secondPairTogether) return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 function getWordChainPoints(word, requiredLetters) {
     const normalizedWord = String(word || '').toLowerCase();
     const normalizedRequiredLetters = String(requiredLetters || '').toLowerCase();
@@ -91,56 +125,35 @@ function getWordChainPoints(word, requiredLetters) {
         }
     }
 
+    const hasConsecutiveSequence = normalizedWord.includes(normalizedRequiredLetters);
+    if (normalizedRequiredLetters === 'ing' && hasConsecutiveSequence) {
+        return POINTS_ING_CONSECUTIVE;
+    }
+    if (hasConsecutiveSequence) {
+        return POINTS_CONSECUTIVE;
+    }
+
+    if (hasOrderedAdjacentPairWithSeparatedThird(normalizedWord, normalizedRequiredLetters)) {
+        return POINTS_SPLIT_PAIR_WITH_GAP;
+    }
+
     if (normalizedRequiredLetters === 'ing') {
-        if (normalizedWord.includes('ing')) {
-            return POINTS_ING_CONSECUTIVE;
-        }
-
-        // "ng" together with a separated "i", or "in" together with a separated "g", earns 4 points.
-        for (let nIndex = 0; nIndex < normalizedWord.length - 1; nIndex++) {
-            const gIndex = nIndex + 1;
-            if (normalizedWord[nIndex] !== 'n' || normalizedWord[gIndex] !== 'g') continue;
-
-            for (let iIndex = 0; iIndex < normalizedWord.length; iIndex++) {
-                if (normalizedWord[iIndex] === 'i' &&
-                    Math.abs(iIndex - nIndex) > 1 &&
-                    Math.abs(iIndex - gIndex) > 1) {
-                    return POINTS_ING_SPLIT_GROUP;
-                }
-            }
-        }
-
-        for (let iIndex = 0; iIndex < normalizedWord.length - 1; iIndex++) {
-            const nIndex = iIndex + 1;
-            if (normalizedWord[iIndex] !== 'i' || normalizedWord[nIndex] !== 'n') continue;
-
-            for (let gIndex = 0; gIndex < normalizedWord.length; gIndex++) {
-                if (normalizedWord[gIndex] === 'g' &&
-                    Math.abs(gIndex - iIndex) > 1 &&
-                    Math.abs(gIndex - nIndex) > 1) {
-                    return POINTS_ING_SPLIT_GROUP;
-                }
-            }
-        }
-
-        // Any order earns 2 when i, n, and g are each separated from the others.
+        // ING with all three letters separated keeps its existing 2-point exception, in any order.
         for (let iIndex = 0; iIndex < normalizedWord.length; iIndex++) {
             if (normalizedWord[iIndex] !== 'i') continue;
             for (let nIndex = 0; nIndex < normalizedWord.length; nIndex++) {
                 if (normalizedWord[nIndex] !== 'n' || Math.abs(iIndex - nIndex) <= 1) continue;
                 for (let gIndex = 0; gIndex < normalizedWord.length; gIndex++) {
-                    if (normalizedWord[gIndex] === 'g' &&
+                    if (
+                        normalizedWord[gIndex] === 'g' &&
                         Math.abs(iIndex - gIndex) > 1 &&
-                        Math.abs(nIndex - gIndex) > 1) {
+                        Math.abs(nIndex - gIndex) > 1
+                    ) {
                         return POINTS_ING_SEPARATED;
                     }
                 }
             }
         }
-    }
-
-    if (normalizedWord.includes(normalizedRequiredLetters)) {
-        return POINTS_CONSECUTIVE;
     }
 
     let searchFrom = 0;
@@ -408,10 +421,10 @@ async function startWordChainGame(message, client) {
         '🔗 *WORD CHAIN HAS STARTED!*\n\n' +
         `Starting word: *${startingWord.toUpperCase()}*\n` +
         `Required letters: *${game.requiredLetters.toUpperCase()}*\n\n` +
-        'Use one unused English word containing all 3 letters, in any order.\n' +
-        'Example (T-H-E): ENTHUSIASTIC = 1, THUNDER = 2, THEATER = 3.\n' +
-        'Other triples: 1 any order; 2 in order with gaps; 3 consecutive in order.\n' +
-        'ING exception: consecutive ING = 1; separate I + NG or IN + G = 4; I, N, and G all separated = 2.\n' +
+        'Use one unused English word containing all 3 required letters.\n' +
+        'Scoring: 1 = any order; 2 = required order with gaps; 3 = consecutive in order.\n' +
+        '4 points: either neighboring pair in the required sequence is together, with the third letter separated from both.\n' +
+        'ING exception: consecutive ING = 1; all three letters separated = 2 in any order.\n' +
         'Each player gets 10 turns; the game ends after all 10 are used.\n' +
         'Each turn lasts 30 seconds.\n\n' +
         '⏳ First turn starts in 20 seconds so everyone can read.'
