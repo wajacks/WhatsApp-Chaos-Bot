@@ -105,6 +105,16 @@ const {
     processNumberRunGuess
 } = require('./src/games/numberrun');
 
+const {
+    startTruthHuntLobby,
+    joinTruthHuntLobby,
+    startTruthHuntGame,
+    stopTruthHuntGame,
+    handleTruthHuntGroupMessage,
+    processTruthHuntDmMessage
+} = require('./src/games/truthhunt');
+const { createTruthHuntTriviaGenerator } = require('./src/features/truthHuntTrivia');
+
 const { getGamesList } = require('./src/commands/gameslist');
 const { handleBalanceCommand } = require('./src/commands/balance');
 const { getWeather } = require('./src/tools/weather');
@@ -177,6 +187,7 @@ const azureClient = new AzureOpenAI({
 
 const generateMafiaNarration = createMafiaNarrator({ ai, azureClient });
 const generateNumberRunBanter = createNumberRunBanter({ ai, azureClient });
+const generateTruthHuntTrivia = createTruthHuntTriviaGenerator({ ai });
 const { aiMemory, MAX_AI_MEMORY, aiCooldowns } = require('./src/features/ai/state');
 const imageState = require('./src/features/images/state');
 
@@ -340,6 +351,13 @@ function initializeChaosBot(options) {
         stopNumberRunGame,
         processNumberRunGuess,
         generateNumberRunBanter,
+        startTruthHuntLobby,
+        joinTruthHuntLobby,
+        startTruthHuntGame,
+        stopTruthHuntGame,
+        handleTruthHuntGroupMessage,
+        processTruthHuntDmMessage,
+        generateTruthHuntTrivia,
         getGamesList,
         handleBalanceCommand,
         getWeather,
