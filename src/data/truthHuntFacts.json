@@ -678,8 +678,8 @@
           "sourceId": "FOOD_PIZZA"
         },
         {
-          "statement": "The Margherita story is linked to a late nineteenth century visit by Queen Margherita",
-          "explanation": "The exact legend is debated but the pizza style is associated with Naples",
+          "statement": "The traditional Neapolitan story links Margherita pizza to a visit by Queen Margherita",
+          "explanation": "The story says its red white and green toppings represented the Italian flag",
           "sourceId": "FOOD_PIZZA"
         },
         {
@@ -756,7 +756,7 @@
         },
         {
           "statement": "The Margherita pizza story proves pizza was invented for a queen",
-          "explanation": "The royal visit story is a later association and pizza already existed",
+          "explanation": "Pizza already existed and the queen story is about one named style",
           "sourceId": "FOOD_PIZZA"
         },
         {
@@ -986,7 +986,7 @@
         {
           "statement": "Boiling water is a physical change rather than a chemical reaction",
           "explanation": "Water changes state but remains water molecules",
-          "sourceId": "ACS_WATER"
+          "sourceId": "ACS_BOILING"
         },
         {
           "statement": "Water expands when it freezes",
@@ -1157,19 +1157,19 @@
           "sourceId": "SMITH_HARMONICA"
         },
         {
-          "statement": "Recorded sound existed before digital streaming",
-          "explanation": "Sound recording has a history spanning more than a century",
-          "sourceId": "LOC_RECORDINGS"
+          "statement": "Before 1925 sound recordings used mechanical methods without microphones or electric amplification",
+          "explanation": "The acoustic recording era relied on mechanical recording systems",
+          "sourceId": "LOC_ACOUSTICAL"
         },
         {
-          "statement": "Vinyl records store sound as physical grooves",
-          "explanation": "A stylus follows groove variations to reproduce sound",
-          "sourceId": "LOC_RECORDINGS"
+          "statement": "Early performers sang into a horn that funneled sound toward a diaphragm",
+          "explanation": "The horn concentrated sound waves and set a thin diaphragm vibrating",
+          "sourceId": "LOC_ACOUSTICAL"
         },
         {
-          "statement": "A microphone converts sound vibrations into an electrical signal",
-          "explanation": "Microphones transduce sound into signals for recording",
-          "sourceId": "LOC_RECORDINGS"
+          "statement": "In acoustic recording a vibrating diaphragm moved a stylus to etch a wax cylinder or disc",
+          "explanation": "The stylus physically recorded sound vibrations on the rotating medium",
+          "sourceId": "LOC_ACOUSTICAL"
         },
         {
           "statement": "The cat piano is best known as a satirical imagined instrument",
@@ -1234,19 +1234,19 @@
           "sourceId": "SMITH_HARMONICA"
         },
         {
-          "statement": "The cat piano is a standard historical instrument used in orchestras",
-          "explanation": "The story is a satirical imagined instrument rather than a normal real instrument",
-          "sourceId": "SMITH_CATPIANO"
+          "statement": "All sound recordings before 1925 used microphones",
+          "explanation": "The Library of Congress describes the acoustic era as mechanical and without microphones",
+          "sourceId": "LOC_ACOUSTICAL"
         },
         {
-          "statement": "Every musical instrument belongs to only one simple sound category",
-          "explanation": "Some instruments combine features and classifications vary",
-          "sourceId": "SMITH_CATPIANO"
+          "statement": "Early acoustic recordings could capture every audible frequency",
+          "explanation": "The acoustic process captured a limited range of frequencies",
+          "sourceId": "LOC_ACOUSTICAL"
         },
         {
-          "statement": "A drumhead stays still while the drum makes sound",
-          "explanation": "The membrane vibrates to create sound",
-          "sourceId": "SMITH_CATPIANO"
+          "statement": "A stylus played no role in making early sound recordings",
+          "explanation": "A stylus etched sound vibrations into a wax cylinder or disc",
+          "sourceId": "LOC_ACOUSTICAL"
         },
         {
           "statement": "Recorded sound began with online streaming",
@@ -2378,17 +2378,17 @@
         {
           "statement": "A chemical reaction creates one or more new substances",
           "explanation": "Chemical changes alter the substances present",
-          "sourceId": "ACS_REACTIONS"
+          "sourceId": "ACS_CHEMCHANGE"
         },
         {
           "statement": "Tearing paper changes its shape but does not create a new substance",
           "explanation": "That is a physical change",
-          "sourceId": "ACS_REACTIONS"
+          "sourceId": "ACS_CHEMCHANGE"
         },
         {
           "statement": "Burning paper creates new substances such as gases and ash",
           "explanation": "Combustion is a chemical reaction",
-          "sourceId": "ACS_REACTIONS"
+          "sourceId": "ACS_CHEMCHANGE"
         },
         {
           "statement": "Water molecules contain hydrogen and oxygen atoms",
@@ -2423,12 +2423,12 @@
         {
           "statement": "Dissolving sugar in water is generally a physical change",
           "explanation": "The sugar molecules disperse but are not transformed into a new substance",
-          "sourceId": "ACS_REACTIONS"
+          "sourceId": "ACS_CHEMCHANGE"
         },
         {
           "statement": "Rust forms through a chemical reaction involving iron and oxygen",
           "explanation": "Rust is a new material formed by oxidation",
-          "sourceId": "ACS_REACTIONS"
+          "sourceId": "ACS_CHEMCHANGE"
         },
         {
           "statement": "Condensation changes water vapor into liquid water",
@@ -2455,17 +2455,17 @@
         {
           "statement": "Boiling water creates a new chemical substance",
           "explanation": "Boiling changes water state but leaves its molecules intact",
-          "sourceId": "ACS_REACTIONS"
+          "sourceId": "ACS_CHEMCHANGE"
         },
         {
           "statement": "Tearing paper and burning paper are both physical changes",
           "explanation": "Burning creates new substances while tearing changes shape",
-          "sourceId": "ACS_REACTIONS"
+          "sourceId": "ACS_CHEMCHANGE"
         },
         {
           "statement": "Chemical reactions destroy atoms completely",
           "explanation": "Ordinary reactions rearrange atoms rather than destroy them",
-          "sourceId": "ACS_REACTIONS"
+          "sourceId": "ACS_CHEMCHANGE"
         },
         {
           "statement": "Ice sinks because it is denser than water",
@@ -2475,12 +2475,12 @@
         {
           "statement": "Water vapor is a different chemical from liquid water",
           "explanation": "It is the same substance in a different state",
-          "sourceId": "ACS_WATER"
+          "sourceId": "ACS_BOILING"
         },
         {
           "statement": "Water always boils at exactly 100 degrees Celsius",
           "explanation": "Boiling temperature changes with pressure",
-          "sourceId": "ACS_WATER"
+          "sourceId": "ACS_BOILING"
         },
         {
           "statement": "An electric current can flow through an open circuit",
@@ -2500,12 +2500,12 @@
         {
           "statement": "Sugar disappears in water because it is destroyed",
           "explanation": "The sugar dissolves and remains present in the solution",
-          "sourceId": "ACS_REACTIONS"
+          "sourceId": "ACS_CHEMCHANGE"
         },
         {
           "statement": "Rust is just dirt stuck on iron",
           "explanation": "Rust is a new substance formed by a chemical reaction",
-          "sourceId": "ACS_REACTIONS"
+          "sourceId": "ACS_CHEMCHANGE"
         },
         {
           "statement": "Condensation is a chemical reaction that creates water",
@@ -3352,6 +3352,18 @@
     "WIFI_IEEE": {
       "title": "IEEE Wi-Fi Timeline",
       "url": "https://standards.ieee.org/wp-content/uploads/interactive/web/wi-fi-timeline/"
+    },
+    "ACS_BOILING": {
+      "title": "American Chemical Society on Boiling Water",
+      "url": "https://pubs.acs.org/doi/10.1021/acs.jchemed.4c01146?goto=supporting-info"
+    },
+    "ACS_CHEMCHANGE": {
+      "title": "American Chemical Society on Chemical Reactions",
+      "url": "https://www.acs.org/middleschoolchemistry/lessonplans/chapter6/lesson1.html"
+    },
+    "LOC_ACOUSTICAL": {
+      "title": "Library of Congress on Acoustic Recording",
+      "url": "https://www.loc.gov/collections/national-jukebox/articles-and-essays/acoustical-recording/"
     }
   }
 }
