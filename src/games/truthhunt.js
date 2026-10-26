@@ -232,8 +232,7 @@ function joinTruthHuntLobby(groupId, playerId, playerName) {
     game.players.set(playerId, {
         id: playerId,
         name: safeName(playerName),
-        score: 0,
-        streak: 0
+        score: 0
     });
     return '✅ *' + safeName(playerName) + '* joined Truth Hunt (' + game.players.size + ' player(s)).';
 }
@@ -277,7 +276,7 @@ async function beginRound(game) {
         '🧠 *TRUTH HUNT — ROUND ' + game.roundNumber + '/' + game.totalRounds + '*\n\n' +
         'Some rounds have one true claim. Some have none. Decide what you believe for each statement.\n\n' +
         '🧩 *Read the statements carefully*\n' + display + '\n\n' +
-        'You have 1 minute. Then the bot will DM you to choose Truth, False, or No Truth. Keep your answer private.'
+        'You have 1 minute. Then DM Truth for +3, False for +1, or No Truth for +5 if correct. If you choose Truth or False, the bot will ask for a statement number.'
     );
     if (game.phase !== 'READING') return;
     scheduleTimer(game, 'reading', READING_TIME_MS, () => openAnswerWindow(game));
@@ -310,7 +309,7 @@ async function openAnswerWindow(game) {
         try {
             await game.client.sendMessage(player.id,
                 '🧠 *TRUTH HUNT — ROUND ' + game.roundNumber + '*\n' +
-                'Choose your answer type. Reply 1 for Truth, 2 for False, or 3 for No Truth.'
+                'Choose your answer type. Reply 1 for Truth (+3), 2 for False (+1), or 3 for No Truth (+5 if correct). If you choose 1 or 2, I will ask for the statement number. You have 15 seconds for both replies.'
             );
             answer.promptedAt = Date.now();
             answer.deadline = answer.promptedAt + ANSWER_TIME_MS;
