@@ -46,6 +46,12 @@ function createCommandRouter(dependencies) {
             stopWordForgeGame,
             processWordForgeDmMessage,
             handleWordForgeStealCommand,
+            startNumberRunLobby,
+            joinNumberRunLobby,
+            startNumberRunGame,
+            stopNumberRunGame,
+            processNumberRunGuess,
+            generateNumberRunBanter,
             getGamesList,
             handleBalanceCommand,
             getWeather,
@@ -469,6 +475,30 @@ function createCommandRouter(dependencies) {
                 }
         
                 // ====================================================
+                // NUMBER RUN
+                // ====================================================
+
+                if (lowerText === '!numberrun') {
+                    await message.reply(startNumberRunLobby(chatId, senderId, userName));
+                    return true;
+                }
+
+                if (lowerText === '!joinnumberrun') {
+                    await message.reply(joinNumberRunLobby(chatId, senderId, userName));
+                    return true;
+                }
+
+                if (lowerText === '!startnumberrun') {
+                    await message.reply(await startNumberRunGame(chatId, senderId, generateNumberRunBanter));
+                    return true;
+                }
+
+                if (lowerText === '!stopnumberrun') {
+                    await message.reply(stopNumberRunGame(chatId, senderId));
+                    return true;
+                }
+
+                // ====================================================
                 // WORD CHAIN
                 // ====================================================
         
@@ -601,6 +631,18 @@ function createCommandRouter(dependencies) {
                 const wordChainHandled = await processWordChain(message, client);
                 if (wordChainHandled) return true;
         
+                // ====================================================
+                // NUMBER RUN BARE-NUMBER GUESS
+                // ====================================================
+
+                const numberRunResponse = await processNumberRunGuess(
+                    chatId, senderId, text, generateNumberRunBanter
+                );
+                if (numberRunResponse) {
+                    await message.reply(numberRunResponse);
+                    return true;
+                }
+
                 // ====================================================
                 // WORDLE GUESS
                 // ====================================================

@@ -17,6 +17,7 @@ const qrcode = require('qrcode-terminal');
 
 const { buildWeatherResponse } = require('./src/tools/weatherFormatter');
 const { createMafiaNarrator } = require('./src/features/mafia/narrator');
+const { createNumberRunBanter } = require('./src/features/numberrunNarrator');
 const { registerClientEvents } = require('./src/handlers/clientEvents');
 const { registerMessageHandler } = require('./src/handlers/messageHandler');
 const { reactToCommand } = require('./src/commands/commandReactions');
@@ -96,6 +97,14 @@ const {
     restoreWordForgeGames
 } = require('./src/games/wordforge');
 
+const {
+    startNumberRunLobby,
+    joinNumberRunLobby,
+    startNumberRunGame,
+    stopNumberRunGame,
+    processNumberRunGuess
+} = require('./src/games/numberrun');
+
 const { getGamesList } = require('./src/commands/gameslist');
 const { handleBalanceCommand } = require('./src/commands/balance');
 const { getWeather } = require('./src/tools/weather');
@@ -167,6 +176,7 @@ const azureClient = new AzureOpenAI({
 });
 
 const generateMafiaNarration = createMafiaNarrator({ ai, azureClient });
+const generateNumberRunBanter = createNumberRunBanter({ ai, azureClient });
 const { aiMemory, MAX_AI_MEMORY, aiCooldowns } = require('./src/features/ai/state');
 const imageState = require('./src/features/images/state');
 
@@ -324,6 +334,12 @@ function initializeChaosBot(options) {
         stopWordForgeGame,
         processWordForgeDmMessage,
         handleWordForgeStealCommand,
+        startNumberRunLobby,
+        joinNumberRunLobby,
+        startNumberRunGame,
+        stopNumberRunGame,
+        processNumberRunGuess,
+        generateNumberRunBanter,
         getGamesList,
         handleBalanceCommand,
         getWeather,
