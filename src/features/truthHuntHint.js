@@ -1,6 +1,6 @@
 const { GEMINI_MODEL } = require('./geminiConfig');
 
-const BLOCKED_HINT_PATTERN = /\b(?:truth|true|false|fact|answer|correct|misconception|statement|number|option|first|second|third|one|two|three)\b|\d|https?:\/\/|www\.|@/i;
+const BLOCKED_HINT_PATTERN = /\b(?:truth|true|false|fact|answer|correct|misconception|statement|number|option|first|second|third|one|two|three|none|zero|nothing|all|either)\b|\d|https?:\/\/|www\.|@/i;
 const COMMON_WORDS = new Set([
     'about', 'after', 'again', 'among', 'because', 'before', 'being', 'could',
     'every', 'from', 'have', 'into', 'most', 'other', 'over', 'same', 'some',
@@ -16,7 +16,7 @@ function validateHint(value, statements) {
         .replace(/\s+/g, ' ')
         .trim();
 
-    if (hint.length < 8 || hint.length > 110 || BLOCKED_HINT_PATTERN.test(hint)) return null;
+    if (hint.length < 8 || hint.length > 110 || hint.split(/\\s+/).length > 9 || BLOCKED_HINT_PATTERN.test(hint)) return null;
 
     const claimWords = new Set(
         statements.flatMap(statement => String(statement || '').toLowerCase().match(/[a-z]{6,}/g) || [])
