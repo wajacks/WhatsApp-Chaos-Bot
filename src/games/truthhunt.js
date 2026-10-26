@@ -141,7 +141,7 @@ async function startTruthHuntGame(groupId, senderId, client, generateTrivia) {
     if (senderId !== game.hostId) return '❌ Only the host can start Truth Hunt.';
     if (!game.players.has(senderId)) return '❌ The host must join with !jointruth before starting.';
     if (game.players.size < MIN_PLAYERS) return '❌ Truth Hunt needs at least 2 registered players.';
-    if (typeof generateTrivia !== 'function') return '❌ Search-grounded trivia is unavailable right now.';
+    if (typeof generateTrivia !== 'function' || generateTrivia.available === false) return '❌ Gemini search-grounded trivia is unavailable. Check GEMINI_API_KEY and try again.';
 
     game.client = client;
     game.generateTrivia = generateTrivia;
