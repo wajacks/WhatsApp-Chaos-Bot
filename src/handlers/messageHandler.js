@@ -1198,6 +1198,13 @@ function registerMessageHandler(client, dependencies) {
                     );
 
                     const projectDir = process.cwd();
+                    let localChangesStash = null;
+                    const stashRecoveryNote = () => {
+                        if (!localChangesStash) return '';
+                        return '\n\nLocal changes remain saved in Git stash ' + localChangesStash +
+                            ' and are not reapplied automatically. Inspect with git stash show -p ' + localChangesStash +
+                            ' and restore with git stash apply --index ' + localChangesStash + '.';
+                    };
 
                     // ------------------------------------------------
                     // STEP 1 - FETCH FROM GITHUB
@@ -1264,19 +1271,92 @@ function registerMessageHandler(client, dependencies) {
 
                     if (statusResult.stdout.trim()) {
 
-                        console.warn(
-                            '[OWNER UPDATE] Local changes detected:',
-                            statusResult.stdout
-                        );
+                        const stashLabel =
+                            'chaos-bot-owner-update-' +
+                            new Date().toISOString().replace(/[:.]/g, '-');
+                        let previousStashRef = '';
 
-                        await message.reply(
-                            '*UPDATE STOPPED*\n\n' +
-                            'Local uncommitted changes were detected on the VPS.\n\n' +
-                            'I will not overwrite them automatically.\n\n' +
-                            'Use SSH to inspect the changes before updating.'
-                        );
+                        try {
+                            const previousStash = await runCommand(
+                                'git',
+                                ['rev-parse', '-q', '--verify', 'refs/stash'],
+                                { cwd: projectDir, maxBuffer: 1024 * 1024 }
+                            );
+                            previousStashRef = previousStash.stdout.trim();
+                        } catch {
+                            // An empty stash list is normal on a new VPS.
+                        }
 
-                        return;
+                        try {
+                            await runCommand(
+                                'git',
+                                [
+                                    'stash',
+                                    'push',
+                                    '--include-untracked',
+                                    '-m',
+                                    stashLabel,
+                                    '--',
+                                    '.',
+                                    ':(exclude).env'
+                                ],
+                                { cwd: projectDir, maxBuffer: 5 * 1024 * 1024 }
+                            );
+
+                            const currentStash = await runCommand(
+                                'git',
+                                ['rev-parse', '-q', '--verify', 'refs/stash'],
+                                { cwd: projectDir, maxBuffer: 1024 * 1024 }
+                            );
+                            localChangesStash = currentStash.stdout.trim();
+
+                            if (!localChangesStash || localChangesStash === previousStashRef) {
+                                localChangesStash = null;
+                                throw new Error('Git did not create a new recovery stash.');
+                            }
+
+                            const remainingChanges = await runCommand(
+                                'git',
+                                ['status', '--porcelain'],
+                                { cwd: projectDir, maxBuffer: 1024 * 1024 }
+                            );
+
+                            if (remainingChanges.stdout.trim()) {
+                                console.warn(
+                                    '[OWNER UPDATE] Changes remain after stashing:',
+                                    remainingChanges.stdout
+                                );
+                                await message.reply(
+                                    '*UPDATE STOPPED*\n\n' +
+                                    'I saved recoverable local changes, but some files could not be stashed. Nothing was pulled or restarted.' +
+                                    stashRecoveryNote() +
+                                    '\n\nInspect the remaining files with git status --short. The .env file is excluded from the stash.'
+                                );
+                                return;
+                            }
+
+                            console.log(
+                                '[OWNER UPDATE] Saved local changes in stash:',
+                                localChangesStash
+                            );
+                            await message.reply(
+                                '*LOCAL CHANGES PRESERVED*\n\n' +
+                                'I saved the VPS changes to a recoverable Git stash before updating. Ignored files, including .env, stay in place.' +
+                                stashRecoveryNote()
+                            );
+                        } catch (error) {
+                            console.error(
+                                '[OWNER UPDATE] Could not safely stash local changes:',
+                                error
+                            );
+                            await message.reply(
+                                '*UPDATE STOPPED*\n\n' +
+                                'I did not pull or restart. Any recovery stash is preserved, and changes not stashed remain on disk.' +
+                                stashRecoveryNote() +
+                                '\n\nInspect them with git status --short and try again after resolving the issue.'
+                            );
+                            return;
+                        }
                     }
 
                     // ------------------------------------------------
@@ -1516,7 +1596,8 @@ function registerMessageHandler(client, dependencies) {
                         ) +
                         'Latest code pulled from GitHub.\n' +
                         'Chaos Bot is restarting now.\n\n' +
-                        '*Updated by*: `Chriss`'
+                        '*Updated by*: `Chriss`' +
+                        stashRecoveryNote()
                     );
 
                     // ------------------------------------------------
