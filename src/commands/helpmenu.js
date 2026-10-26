@@ -100,6 +100,9 @@
 │🔢 \`!numberrun\`
 │     ☞『_*Open a Number Run lobby; answer with a number*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🧠 \`!truthhunt\`
+│     ☞『_*AI fact trivia with private answers*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🕵️ \`!mafia\`
 │     ☞『_*Open a Mafia lobby*_』
 │
