@@ -97,6 +97,9 @@
 │⚒️ \`!wordforge\`
 │     ☞『_*Open a Word Forge lobby*_』
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+│🔢 \`!numberrun\`
+│     ☞『_*Open a Number Run lobby*_』
+➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🕵️ \`!mafia\`
 │     ☞『_*Open a Mafia lobby*_』
 │
