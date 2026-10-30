@@ -126,7 +126,8 @@ nano .env
 | `AZURE_OPENAI_CHAT_DEPLOYMENT` | Recommended | Azure deployment for AI chat, Mafia narration, and Truth Hunt web-grounded trivia; defaults to `gpt-4o-mini`. |
 | `AZURE_OPENAI_IMAGE_DEPLOYMENT` | Optional | Azure deployment offered as choice 1 in `!draw`; defaults to `gpt-image-2`. |
 | `AZURE_OPENAI_IMAGE_TIMEOUT_MS` | Optional | Azure image request timeout in milliseconds; defaults to 300000 (5 minutes). |
-| `OWNER_NUMBER` | Recommended | Owner controls. Use the full international number with digits only, such as `254712345678`. |
+| `OWNER_NUMBER` | Recommended | Owner controls. Use the full international number with digits only, such as `254712345678`. Also receives Class Portal applications. |
+| `CLASS_APPROVER_NUMBERS` | Optional | Comma-separated additional phone numbers that can review Class Portal applications; the owner is always included. Applications expire after 14 days. Use `!class approvals` in a DM to see the pending queue. |
 | `GEMINI_API_KEY` | Optional | Enables Gemini fallback for AI chat, Mafia narration, Number Run, and Truth Hunt when Azure is unavailable. |
 | `GEMINI_MODEL` | Optional | Model used for every Gemini fallback; defaults to `gemini-3.8-flash`. |
 | `OPENWEATHERMAP_API_KEY` | Optional | Enables live weather lookups. |
