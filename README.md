@@ -19,6 +19,15 @@
 
 Open `!menu` for the command center or `!games` for the current game list.
 
+## 🤖 Text AI assistant
+
+- In a private chat, send a normal text message to talk to the AI. In a group, mention the bot or reply to one of its messages. The explicit `!ai <question>` command remains available.
+- Existing commands and active interactions run first. Poll choices, game moves, and Class Portal replies therefore continue through their current handlers.
+- For questions about recent facts or a public URL, Gemini web grounding can search the web or read the supplied page, then summarize it. The reply shows brief source names; it only includes URLs when the user asks for sources. Research is limited to 20 requests per sender per running process by default; set `AI_WEB_RESEARCH_DAILY_LIMIT` to change the limit or `0` to disable web research. Google search can add Gemini API charges.
+- Natural language can invoke a small allow-list of existing features through their normal command router: video search, random song, profile/balance/store, daily reward, and creating/joining/starting supported games. Existing permission checks still apply. It cannot transfer money, buy items, change Class Portal data, run owner controls, or stop a game.
+- The AI can answer from the current user’s authorized Class Portal data. It does not process voice notes or provide a voice-note tutor.
+
+
 ## 🎮 Game lineup
 
 | Game | How to start |
@@ -127,8 +136,9 @@ nano .env
 | `AZURE_OPENAI_IMAGE_DEPLOYMENT` | Optional | Azure deployment offered as choice 1 in `!draw`; defaults to `gpt-image-2`. |
 | `AZURE_OPENAI_IMAGE_TIMEOUT_MS` | Optional | Azure image request timeout in milliseconds; defaults to 300000 (5 minutes). |
 | `OWNER_NUMBER` | Recommended | Owner controls. Use the full international number with digits only, such as `254712345678`. |
-| `GEMINI_API_KEY` | Optional | Enables Gemini fallback for AI chat, Mafia narration, Number Run, and Truth Hunt when Azure is unavailable. |
-| `GEMINI_MODEL` | Optional | Model used for every Gemini fallback; defaults to `gemini-3.8-flash`. |
+| `GEMINI_API_KEY` | Optional | Enables Gemini fallback and on-demand web research for AI chat, plus Mafia narration, Number Run, and Truth Hunt fallbacks. |
+| `GEMINI_MODEL` | Optional | Model used for Gemini fallback and web research; defaults to `gemini-3.8-flash`. |
+| `AI_WEB_RESEARCH_DAILY_LIMIT` | Optional | Per-sender research limit per day while the process is running; defaults to 20. Set to 0 to disable web research. |
 | `OPENWEATHERMAP_API_KEY` | Optional | Enables live weather lookups. |
 | `PAIRING_NUMBER` | Optional | Request a WhatsApp pairing code. Leave blank to use a QR code. |
 
@@ -233,6 +243,9 @@ The WhatsApp login is saved under `data/session`. User economy data and game sta
 - Stop the old instance before moving the WhatsApp session to another server. Do not run two bot instances with the same WhatsApp session at once.
 - The setup script restricts `data/`, `data/session/`, and `downloads/` to the bot account. Treat backups of `data/` as private: they contain authentication state and player identifiers.
 - The Class Portal also writes a scheduled backup to `data/classdb_backup.json`; continue backing up the full `data/` directory.
+
+For an additional off-site Class Portal backup, create a **private Azure Blob container** and set `AZURE_CLASS_BACKUP_CONTAINER_SAS_URL` to a container SAS URL with HTTPS plus read/create/write permissions. Generate a separate encryption key with `openssl rand -base64 32` and place it in `CLASS_BACKUP_ENCRYPTION_KEY`. Keep both values only in the server's private `.env`. Every scheduled three-day backup is gzipped, encrypted with AES-256-GCM, uploaded, then downloaded and decrypted again to verify its integrity and database shape. This is a verification check; it does not automatically restore the live database. If the variables are unset, the existing local backup continues unchanged.
+
 
 ## 🧰 Troubleshooting
 

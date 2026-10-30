@@ -2,6 +2,7 @@ const activeClassSessions = new Map();
 const SESSION_TIMEOUT_MS = 600 * 1000; // 10 minutes
 const cron = require('node-cron');
 const { readClassDB, writeClassDB, createClassDBBackup } = require('../database/classdb');
+const { createVerifiedOffsiteClassDBBackup } = require('../database/offsiteBackup');
 
 function getEATParts(date = new Date()) {
     const values = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
@@ -38,19 +39,55 @@ function normalizeRollCallDate(activeRollCall) {
     return activeRollCall.startedAt ? getEATDateKey(new Date(activeRollCall.startedAt)) : null;
 }
 
+function snapshotClassRoster(classData) {
+    return Object.entries(classData?.members || {}).map(([memberKey, member]) => ({
+        memberKey,
+        name: member?.name || 'Unknown student',
+        admission: member?.admission || ''
+    }));
+}
+
 function closeActiveRollCall(classData) {
     const active = classData?.activeRollCall;
     if (!active) return null;
 
+    const closedAt = Date.now();
     const attendees = active.attendees && typeof active.attendees === 'object' ? active.attendees : {};
+    const rosterSnapshot = Array.isArray(active.rosterSnapshot)
+        ? active.rosterSnapshot
+        : snapshotClassRoster(classData);
+    const attendance = rosterSnapshot.map(student => {
+        const checkIn = attendees[student.memberKey];
+        return {
+            ...student,
+            status: checkIn ? 'PRESENT' : 'ABSENT',
+            checkedInAt: Number(checkIn?.checkedInAt) || null,
+            checkInTime: checkIn?.timestamp || null
+        };
+    });
+    const record = {
+        id: `rollcall_${active.startedAt || closedAt}_${String(active.unit || 'class').replace(/[^a-z0-9]+/gi, '_').toLowerCase()}`,
+        unit: active.unit || 'Unknown unit',
+        dateKey: normalizeRollCallDate(active) || getEATDateKey(new Date(closedAt)),
+        startedAt: Number(active.startedAt) || null,
+        closedAt,
+        source: active.source || 'legacy',
+        presentCount: Object.keys(attendees).length,
+        rosterCount: rosterSnapshot.length,
+        attendees,
+        attendance
+    };
+
+    if (!Array.isArray(classData.attendanceHistory)) classData.attendanceHistory = [];
+    classData.attendanceHistory.push(record);
     classData.totalRollCalls = (Number(classData.totalRollCalls) || 0) + 1;
     if (!Array.isArray(classData.logs)) classData.logs = [];
     classData.logs.push({
-        text: `Roll Call Completed: ${active.unit || 'Unknown unit'} (${Object.keys(attendees).length} present)`,
-        timestamp: Date.now()
+        text: `Roll Call Completed: ${record.unit} (${record.presentCount} present)`,
+        timestamp: closedAt
     });
     delete classData.activeRollCall;
-    return { ...active, attendees, closedAt: Date.now() };
+    return { ...active, attendees, closedAt, attendanceRecord: record };
 }
 
 function openActiveRollCall(classData, unit, dateKey) {
@@ -66,6 +103,7 @@ function openActiveRollCall(classData, unit, dateKey) {
         dateKey,
         startedAt: Date.now(),
         source: 'scheduled',
+        rosterSnapshot: snapshotClassRoster(classData),
         attendees: {}
     };
     return true;
@@ -420,51 +458,115 @@ function startTimetableMonitor(client) {
     }, { scheduled: true, timezone: "Africa/Nairobi" });
 }
 
+function getEATWeekStartTimestamp(timestamp = Date.now()) {
+    const { dateKey } = getEATParts(new Date(timestamp));
+    const [year, month, day] = dateKey.split('-').map(Number);
+    const utcWeekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+    const daysSinceMonday = (utcWeekday + 6) % 7;
+    return Date.UTC(year, month - 1, day - daysSinceMonday) - (3 * 60 * 60 * 1000);
+}
+
+function formatWrapDate(timestamp) {
+    return new Intl.DateTimeFormat('en-KE', {
+        timeZone: 'Africa/Nairobi',
+        day: 'numeric',
+        month: 'short'
+    }).format(new Date(timestamp));
+}
+
+function buildWeeklyWrapUp(className, classData, now = Date.now()) {
+    const weekStart = getEATWeekStartTimestamp(now);
+    const weekRange = formatWrapDate(weekStart) + ' – ' + formatWrapDate(now) + ' (EAT)';
+    const history = Array.isArray(classData.attendanceHistory) ? classData.attendanceHistory : [];
+    const weeklyRollCalls = history.filter(record =>
+        Number(record.closedAt) >= weekStart && Number(record.closedAt) <= now
+    );
+    const logs = Array.isArray(classData.logs) ? classData.logs : [];
+    const legacyRollCalls = logs.filter(log =>
+        Number(log.timestamp) >= weekStart &&
+        Number(log.timestamp) <= now &&
+        typeof log.text === 'string' &&
+        log.text.startsWith('Roll Call Completed:')
+    );
+    const checkIns = weeklyRollCalls.length
+        ? weeklyRollCalls.reduce((total, record) => total + (Number(record.presentCount) || 0), 0)
+        : legacyRollCalls.reduce((total, log) => {
+            const match = log.text.match(/\((\d+)\s+present\)/i);
+            return total + (match ? Number(match[1]) : 0);
+        }, 0);
+
+    const weeklyUpdates = (Array.isArray(classData.updates) ? classData.updates : [])
+        .filter(update => Number(update.timestamp) >= weekStart && Number(update.timestamp) <= now).length;
+    const weeklyPolls = (Array.isArray(classData.polls) ? classData.polls : [])
+        .filter(poll => poll.status === 'CLOSED' &&
+            Number(poll.expiresAt) >= weekStart &&
+            Number(poll.expiresAt) <= now);
+    const pollVotes = weeklyPolls.reduce((total, poll) =>
+        total + Object.keys(poll.votes || {}).length, 0);
+
+    const nextWeekEnd = now + (7 * 24 * 60 * 60 * 1000);
+    const upcomingDeadlines = (Array.isArray(classData.assessments) ? classData.assessments : [])
+        .filter(item => Number(item.timestamp) > now && Number(item.timestamp) <= nextWeekEnd)
+        .sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
+    const activityTotal = weeklyRollCalls.length + legacyRollCalls.length + weeklyUpdates + weeklyPolls.length;
+    const activityLines = [
+        '• Roll calls completed: *' + (weeklyRollCalls.length || legacyRollCalls.length) + '*',
+        '• Student check-ins recorded: *' + checkIns + '*',
+        '• Class updates posted: *' + weeklyUpdates + '*',
+        '• Polls closed: *' + weeklyPolls.length + '* (' + pollVotes + ' votes)'
+    ];
+    const deadlineLines = upcomingDeadlines.slice(0, 3).map(item =>
+        '• *' + (item.unit || item.type || 'Class deadline') + '* — ' +
+        (item.type || 'deadline').toLowerCase() + ', ' + formatWrapDate(Number(item.timestamp))
+    );
+    if (upcomingDeadlines.length > 3) {
+        deadlineLines.push('• Plus ' + (upcomingDeadlines.length - 3) + ' more. Type !class to view all.');
+    }
+
+    return [
+        '📚 *WEEKLY CLASS WRAP-UP*',
+        '🏫 *' + className + '*',
+        '🗓️ ' + weekRange,
+        '━━━━━━━━━━━━━━━━━━',
+        '',
+        '✨ *This week*',
+        activityTotal > 0 ? activityLines.join('\n') : 'A quieter week in the portal—no roll calls, updates, or polls were recorded.',
+        '',
+        '⏭️ *Coming up in the next 7 days*',
+        deadlineLines.length ? deadlineLines.join('\n') : '• No upcoming deadlines recorded.',
+        '',
+        'Have a restful weekend! Type !class to check your timetable and class updates.'
+    ].join('\n');
+}
+
 function startClassWeekendBroadcast(client) {
     // Runs every Friday at 5:00 PM (17:00) East Africa Time
     cron.schedule('0 17 * * 5', async () => {
-        console.log("[CLASS PORTAL] 🥳 Broadcasting Friday Weekend Wish to class members...");
+        console.log("[CLASS PORTAL] 📚 Broadcasting weekly class wrap-up...");
         const db = readClassDB();
         const classes = db.classes || {};
 
-        const weekendMessage = 
-            `🎉 *HAPPY WEEKEND, SCHOLARS!* 🎉\n` +
-            `━━━━━━━━━━━━━━━━━━\n\n` +
-            `The week's academic hustle is finally wrapped up! Whether you're resting up, catching up on assignments, or stepping away from your laptop—make it count.\n\n` +
-            `Have a safe, restful weekend, and let's bring the energy back next week! 🚀\n\n` +
-            `_— Automated Class Portal Weekend Wish_`;
-
         for (const className in classes) {
             const classData = classes[className];
+            const wrapUpMessage = buildWeeklyWrapUp(className, classData);
             const recipients = new Set();
 
-            // 1. Collect Class Rep
             if (classData.repId) recipients.add(classData.repId);
-            
-            // 2. Collect Assistant Reps
-            if (classData.assistantReps) {
-                classData.assistantReps.forEach(id => recipients.add(id));
-            }
-            
-            // 3. Collect all registered Students
-            const members = classData.members || {};
-            for (const mKey in members) {
-                if (members[mKey].phoneId) {
-                    recipients.add(members[mKey].phoneId);
-                }
+            for (const id of classData.assistantReps || []) recipients.add(id);
+            for (const member of Object.values(classData.members || {})) {
+                if (member.phoneId) recipients.add(member.phoneId);
             }
 
-            // 4. Blast with a safe 1-second delay between DMs to prevent spam flagging
             for (const recipientId of recipients) {
                 try {
                     await new Promise(resolve => setTimeout(resolve, 1000));
-                    await client.sendMessage(recipientId, weekendMessage);
+                    await client.sendMessage(recipientId, wrapUpMessage);
                 } catch (e) {
-                    console.warn(`[CLASS PORTAL] Failed to send weekend wish to ${recipientId}`);
+                    console.warn(`[CLASS PORTAL] Failed to send weekly wrap-up to ${recipientId}`);
                 }
             }
         }
-        console.log("[CLASS PORTAL] ✅ Weekend broadcast completed.");
+        console.log("[CLASS PORTAL] ✅ Weekly wrap-up broadcast completed.");
     }, {
         scheduled: true,
         timezone: "Africa/Nairobi"
@@ -590,8 +692,24 @@ function startSystemMaintenance(client) {
     cron.schedule('0 3 */3 * *', async () => {
         try {
             const backupPath = await createClassDBBackup();
-            console.log(`[SYSTEM] Durable database backup created: ${backupPath}`);
+            console.log(`[SYSTEM] Durable local database backup created: ${backupPath}`);
 
+            const offsiteBackupConfigured = Boolean(process.env.AZURE_CLASS_BACKUP_CONTAINER_SAS_URL && process.env.CLASS_BACKUP_ENCRYPTION_KEY);
+            let offsiteBackup = { configured: offsiteBackupConfigured, verified: false };
+            try {
+                offsiteBackup = await createVerifiedOffsiteClassDBBackup(backupPath);
+                if (offsiteBackup.verified) {
+                    console.log(`[SYSTEM] Encrypted Azure class backup uploaded and verified: ${offsiteBackup.blobName}`);
+                }
+            } catch (backupError) {
+                console.error('[SYSTEM] Encrypted off-site class backup failed:', backupError.message);
+            }
+
+            const backupNotice = offsiteBackup.verified
+                ? 'The local backup and encrypted Azure copy were both verified.'
+                : offsiteBackup.configured
+                    ? 'The local backup completed, but the encrypted Azure copy could not be verified. The system administrator has been notified in the logs.'
+                    : 'The local backup completed. Encrypted Azure off-site backup is not configured.';
             const db = readClassDB();
             for (const className in db.classes) {
                 const classData = db.classes[className];
@@ -599,8 +717,8 @@ function startSystemMaintenance(client) {
                     try {
                         await new Promise(resolve => setTimeout(resolve, 5000));
                         await client.sendMessage(
-                            classData.repId, 
-                            `💾 *SYSTEM MAINTENANCE*\n\nThe scheduled 3-day database backup was completed successfully. All class data for *${className}* is secure.`
+                            classData.repId,
+                            `💾 *SYSTEM MAINTENANCE*\n\n${backupNotice}\nClass data: *${className}*.`
                         );
                     } catch (e) {}
                 }

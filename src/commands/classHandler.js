@@ -136,6 +136,144 @@ function trackClassNavigation(message, userId, input = null) {
     };
 }
 
+function getAttendanceHistoryChoices(classData, filter = null) {
+    const history = Array.isArray(classData?.attendanceHistory) ? classData.attendanceHistory : [];
+    let records = history.map((record, index) => ({
+        record,
+        index,
+        id: record.id || ('legacy_' + (record.closedAt || record.dateKey || index) + '_' + String(record.unit || 'class'))
+    }));
+
+    if (filter?.type === 'unit') {
+        const query = filter.value.toLowerCase();
+        records = records.filter(({ record }) => String(record.unit || '').toLowerCase().includes(query));
+    } else if (filter?.type === 'date') {
+        records = records.filter(({ record }) => record.dateKey === filter.value);
+    } else if (filter?.type === 'student') {
+        const query = filter.value.toLowerCase();
+        records = records.filter(({ record }) => (record.attendance || []).some(student =>
+            [student.name, student.admission, student.memberKey].some(value =>
+                String(value || '').toLowerCase().includes(query)
+            )
+        ));
+    }
+
+    return records.slice(-10).reverse();
+}
+
+function buildAttendanceHistoryView(classData, filter = null) {
+    const choices = getAttendanceHistoryChoices(classData, filter);
+    const filterLabel = filter
+        ? '🔎 Filter: ' + filter.type + ' — ' + filter.value + '\n\n'
+        : '';
+    if (choices.length === 0) {
+        return {
+            choices,
+            text: '📭 No attendance records match this view.\n\nType filter unit <text>, filter date YYYY-MM-DD, filter student <name>, or clear.\n(Type *0* to return to Class Members)'
+        };
+    }
+
+    const rows = choices.map(({ record }, index) => {
+        const total = Number(record.rosterCount) || (Array.isArray(record.attendance) ? record.attendance.length : 0);
+        const present = Number.isFinite(Number(record.presentCount))
+            ? Number(record.presentCount)
+            : (record.attendance || []).filter(item => ['PRESENT', 'LATE'].includes(item.status)).length;
+        return (index + 1) + '. *' + (record.unit || 'Class') + '* — ' + (record.dateKey || 'Date unavailable')
+            + '\n   🟢 ' + present + ' present / ' + total + ' on roster';
+    });
+
+    return {
+        choices,
+        text: '📖 *RECENT ATTENDANCE HISTORY*\n━━━━━━━━━━━━━━━━━━\n' + filterLabel + rows.join('\n')
+            + '\n\nReply with a number to inspect and correct a register.'
+            + '\nFilters: filter unit <text> | filter date YYYY-MM-DD | filter student <name/admission>'
+            + '\nType clear to remove the filter. (Type *0* to return to Class Members)'
+    };
+}
+
+function buildAttendanceDetailView(record) {
+    const attendance = Array.isArray(record?.attendance) ? record.attendance : [];
+    if (!attendance.length) {
+        return '📭 This archived record has no per-student roster.\n(Type *0* to return to attendance history)';
+    }
+
+    const rows = attendance.map((student, index) => {
+        const status = String(student.status || 'ABSENT').toUpperCase();
+        const reason = student.correctionReason ? ' — ' + student.correctionReason : '';
+        return (index + 1) + '. *' + (student.name || 'Unknown student') + '* (' + (student.admission || 'no admission') + ') — ' + status + reason;
+    });
+
+    return '🧾 *' + (record.unit || 'CLASS') + ' — ' + (record.dateKey || 'date unavailable') + '*\n'
+        + 'Present/late: ' + (Number(record.presentCount) || 0) + '/' + (Number(record.rosterCount) || attendance.length)
+        + '\n━━━━━━━━━━━━━━━━━━\n' + rows.join('\n')
+        + '\n\nCorrections (include a reason):'
+        + '\nlate <number> <reason> | excused <number> <reason>'
+        + '\ncorrect <number> present|absent|late|excused <reason>'
+        + '\n(Type *0* to return to history)';
+}
+
+function normalizeAttendanceFilterInput(input) {
+    if (input.toLowerCase() === 'clear') return { clear: true };
+    const match = input.match(/^filter\s+(unit|date|student)\s+(.+)$/i);
+    if (!match) return null;
+    const type = match[1].toLowerCase();
+    const value = match[2].trim();
+    if (!value || value.length > 80) return null;
+    if (type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    return { type, value };
+}
+
+function updateAttendanceCorrection(classData, record, memberIndex, nextStatus, reason, correctedBy) {
+    const attendance = Array.isArray(record.attendance) ? record.attendance : [];
+    const student = attendance[memberIndex];
+    if (!student) return { error: 'That roster number is not in this record.' };
+
+    const previousStatus = String(student.status || 'ABSENT').toUpperCase();
+    const previousAttended = ['PRESENT', 'LATE'].includes(previousStatus);
+    const nextAttended = ['PRESENT', 'LATE'].includes(nextStatus);
+    const member = classData.members?.[student.memberKey];
+    if (member && previousAttended !== nextAttended) {
+        const current = Math.max(0, Number(member.attendedClasses) || 0);
+        member.attendedClasses = Math.max(0, current + (nextAttended ? 1 : -1));
+    }
+
+    student.status = nextStatus;
+    student.correctionReason = reason;
+    student.correctedAt = Date.now();
+    if (nextAttended && !student.checkedInAt && nextStatus === 'LATE') {
+        student.checkedInAt = student.correctedAt;
+        student.checkInTime = new Date(student.correctedAt).toLocaleTimeString('en-US', { timeZone: 'Africa/Nairobi' });
+    }
+
+    if (!record.attendees || typeof record.attendees !== 'object') record.attendees = {};
+    if (nextAttended) {
+        record.attendees[student.memberKey] = {
+            name: student.name || 'Unknown student',
+            regNo: student.admission || '',
+            timestamp: student.checkInTime || 'Corrected by Class Rep',
+            checkedInAt: Number(student.checkedInAt) || null,
+            status: nextStatus,
+            correctionReason: reason
+        };
+    } else {
+        delete record.attendees[student.memberKey];
+    }
+
+    record.presentCount = attendance.filter(item => ['PRESENT', 'LATE'].includes(String(item.status || '').toUpperCase())).length;
+    record.rosterCount = attendance.length;
+    if (!Array.isArray(record.corrections)) record.corrections = [];
+    record.corrections.push({
+        memberKey: student.memberKey,
+        name: student.name || 'Unknown student',
+        from: previousStatus,
+        to: nextStatus,
+        reason,
+        correctedAt: student.correctedAt,
+        correctedBy
+    });
+    return { student, previousStatus };
+}
+
 function createSyndicateProjects(syndicates) {
     return (Array.isArray(syndicates) ? syndicates : []).map((group, index) => ({
         groupNumber: index + 1,
@@ -174,8 +312,10 @@ function buildRepMembersMenu(isMainRep) {
         ? '3. 🎖️ Promote to Assistant Rep\n4. 🔻 Revoke Assistant Rep\n'
         : '';
     const ghostOption = isMainRep ? 5 : 3;
+    const historyOption = isMainRep ? 6 : 4;
     return '👥 *CLASS MEMBERS*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View All Members\n2. 🗑️ Remove a Member\n'
-        + roleOptions + ghostOption + '. 👻 View Ghost List (Attendance)\n\n0. 🔙 Back to Dashboard';
+        + roleOptions + ghostOption + '. 👻 View Attendance Summary\n'
+        + historyOption + '. 📖 Recent Attendance History\n\n0. 🔙 Back to Dashboard';
 }
 
 async function sendRepMembersMenu(message, isMainRep) {
@@ -987,6 +1127,11 @@ async function handleInput(client, message, userId, text, userName) {
                     dateKey: getEATDateKey(),
                     startedAt: Date.now(),
                     source: 'manual',
+                    rosterSnapshot: Object.entries(db.classes[session.data.loggedInClass].members || {}).map(([memberKey, member]) => ({
+                        memberKey,
+                        name: member.name || 'Unknown student',
+                        admission: member.admission || ''
+                    })),
                     attendees: {}
                 };
                 writeClassDB(db);
@@ -1611,6 +1756,7 @@ async function handleInput(client, message, userId, text, userName) {
                 const members = getAllClassParticipants(classData);
                 const mIds = getSortedMemberIds(classData);
                 const ghostListOption = session.data.isMainRep ? '5' : '3';
+                const historyOption = session.data.isMainRep ? '6' : '4';
 
                 if (input === '1') {
                     if (mIds.length === 0) {
@@ -1669,7 +1815,7 @@ async function handleInput(client, message, userId, text, userName) {
                     mList += `\n*Reply with the number to REVOKE them:*\n(Type *0* to cancel)`;
                     updateSessionState(userId, 'REP_MEMBERS_REVOKE', { ...session.data, asstIds });
                     await message.reply(mList);
-                } else if (input === ghostListOption || input === '5') {
+                } else if (input === ghostListOption) {
                     // 👻 THE GHOST TRACKER
                     if (mIds.length === 0) {
                         await message.reply(`📭 No students to track.\n(Type *0* to go back)`);
@@ -1696,9 +1842,145 @@ async function handleInput(client, message, userId, text, userName) {
                     });
 
                     await message.reply(ghostStr + `\n(Type *0* to go back)`);
+                } else if (input === historyOption) {
+                    const view = buildAttendanceHistoryView(classData, null);
+                    updateSessionState(userId, 'REP_ATTENDANCE_HISTORY', {
+                        ...session.data,
+                        attendanceHistoryRecordIds: view.choices.map(choice => choice.id),
+                        attendanceHistoryFilter: null
+                    });
+                    await message.reply(view.text);
                 }
                 break;
             }
+
+          case 'REP_ATTENDANCE_HISTORY': {
+              const className = session.data.loggedInClass;
+              const classData = db.classes?.[className];
+              if (!classData) {
+                  await message.reply('❌ The selected class could not be found. Type !class to reopen the portal.');
+                  endSession(userId);
+                  return;
+              }
+
+              if (input === '0') {
+                  updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
+                  await sendRepMembersMenu(message, session.data.isMainRep);
+                  return;
+              }
+
+              const filterInput = normalizeAttendanceFilterInput(input);
+              if (filterInput) {
+                  const filter = filterInput.clear ? null : { type: filterInput.type, value: filterInput.value };
+                  const view = buildAttendanceHistoryView(classData, filter);
+                  updateSessionState(userId, 'REP_ATTENDANCE_HISTORY', {
+                      ...session.data,
+                      attendanceHistoryFilter: filter,
+                      attendanceHistoryRecordIds: view.choices.map(choice => choice.id)
+                  });
+                  await message.reply(view.text);
+                  return;
+              }
+              if (/^filter\b/i.test(input) || input.toLowerCase() === 'clear') {
+                  await message.reply('❌ Use filter unit <text>, filter date YYYY-MM-DD, filter student <name>, or clear.');
+                  return;
+              }
+
+              const selected = Number(input);
+              const recordIds = session.data.attendanceHistoryRecordIds || [];
+              if (!Number.isInteger(selected) || selected < 1 || selected > recordIds.length) {
+                  await message.reply('❌ Choose a number from the attendance history list, or use a filter command.');
+                  return;
+              }
+              const view = buildAttendanceHistoryView(classData, session.data.attendanceHistoryFilter || null);
+              const choice = view.choices[selected - 1];
+              if (!choice || choice.id !== recordIds[selected - 1]) {
+                  updateSessionState(userId, 'REP_ATTENDANCE_HISTORY', {
+                      ...session.data,
+                      attendanceHistoryRecordIds: view.choices.map(item => item.id)
+                  });
+                  await message.reply(view.text + '\n\nThe history changed; choose a number from this refreshed list.');
+                  return;
+              }
+
+              updateSessionState(userId, 'REP_ATTENDANCE_DETAIL', {
+                  ...session.data,
+                  attendanceRecordId: choice.id
+              });
+              await message.reply(buildAttendanceDetailView(choice.record));
+              return;
+          }
+
+          case 'REP_ATTENDANCE_DETAIL': {
+              const className = session.data.loggedInClass;
+              const classData = db.classes?.[className];
+              if (!classData) {
+                  await message.reply('❌ The selected class could not be found. Type !class to reopen the portal.');
+                  endSession(userId);
+                  return;
+              }
+              const history = Array.isArray(classData.attendanceHistory) ? classData.attendanceHistory : [];
+              const record = history.find((item, index) =>
+                  (item.id || ('legacy_' + (item.closedAt || item.dateKey || index) + '_' + String(item.unit || 'class'))) === session.data.attendanceRecordId
+              );
+              if (!record) {
+                  updateSessionState(userId, 'REP_ATTENDANCE_HISTORY', session.data);
+                  await message.reply('📭 That archived register is no longer available.');
+                  return;
+              }
+
+              if (input === '0') {
+                  const view = buildAttendanceHistoryView(classData, session.data.attendanceHistoryFilter || null);
+                  updateSessionState(userId, 'REP_ATTENDANCE_HISTORY', {
+                      ...session.data,
+                      attendanceHistoryRecordIds: view.choices.map(choice => choice.id)
+                  });
+                  await message.reply(view.text);
+                  return;
+              }
+
+              let nextStatus;
+              let memberNumber;
+              let reason;
+              const statusCorrection = input.match(/^correct\s+(\d+)\s+(present|absent|late|excused)\s+(.+)$/i);
+              const markCorrection = input.match(/^(late|excused)\s+(\d+)\s+(.+)$/i);
+              if (statusCorrection) {
+                  memberNumber = Number(statusCorrection[1]);
+                  nextStatus = statusCorrection[2].toUpperCase();
+                  reason = statusCorrection[3].trim();
+              } else if (markCorrection) {
+                  memberNumber = Number(markCorrection[2]);
+                  nextStatus = markCorrection[1].toUpperCase();
+                  reason = markCorrection[3].trim();
+              } else {
+                  await message.reply('❌ Use late <number> <reason>, excused <number> <reason>, or correct <number> present|absent|late|excused <reason>.');
+                  return;
+              }
+
+              if (reason.length < 3 || reason.length > 240) {
+                  await message.reply('❌ Add a clear reason of 3–240 characters.');
+                  return;
+              }
+
+              const result = updateAttendanceCorrection(
+                  classData,
+                  record,
+                  memberNumber - 1,
+                  nextStatus,
+                  reason,
+                  session.data.repName || session.data.currentUserName || userId
+              );
+              if (result.error) {
+                  await message.reply('❌ ' + result.error);
+                  return;
+              }
+              writeClassDB(db);
+              await message.reply(
+                  '✅ Updated ' + result.student.name + ': ' + result.previousStatus + ' → ' + nextStatus
+                  + '. Reason recorded for audit.\n\n' + buildAttendanceDetailView(record)
+              );
+              return;
+          }
 
           case 'REP_MEMBERS_REMOVE': {
               if (input === '0') {
@@ -3290,19 +3572,18 @@ async function handleInput(client, message, userId, text, userName) {
                     // View Updates
                     const ONE_DAY = 24 * 60 * 60 * 1000;
                     const now = Date.now();
-                    sDb.updates = sDb.updates.filter(u => now - u.timestamp < ONE_DAY);
-                    writeClassDB(db);
+                    const recentUpdates = (sDb.updates || []).filter(u => now - u.timestamp < ONE_DAY);
 
-                    if (sDb.updates.length === 0) {
+                    if (recentUpdates.length === 0) {
                         await message.reply(`📭 No active updates from the Class Rep in the last 24 hours.\n(Type *0* to go back)`);
                         return;
                     }
                     
                     let upStr = `📢 *24H CLASS UPDATES*\n━━━━━━━━━━━━━━━━━━\n\n`;
-                    sDb.updates.forEach((u, i) => {
+                    recentUpdates.forEach((u, i) => {
                         const dObj = new Date(u.timestamp);
                         const tStr = dObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' });
-                        if (i === sDb.updates.length - 1) upStr += `🚨 *LATEST [${tStr}]*\n*${u.text}*\n\n`;
+                        if (i === recentUpdates.length - 1) upStr += `🚨 *LATEST [${tStr}]*\n*${u.text}*\n\n`;
                         else upStr += `▪️ [${tStr}]\n${u.text}\n\n`;
                     });
                     await message.reply(upStr + `(Type *0* to go back)`);
@@ -3398,7 +3679,9 @@ async function handleInput(client, message, userId, text, userName) {
                     sDb.activeRollCall.attendees[mId] = {
                         name: studentData.name,
                         regNo: studentData.admission,
-                        timestamp: new Date().toLocaleTimeString("en-US", {timeZone: "Africa/Nairobi"})
+                        timestamp: new Date().toLocaleTimeString("en-US", {timeZone: "Africa/Nairobi"}),
+                        checkedInAt: Date.now(),
+                        status: 'PRESENT'
                     };
                     writeClassDB(db);
 
@@ -3424,8 +3707,67 @@ async function handleInput(client, message, userId, text, userName) {
                         resStr += `\n━━━━━━━━━━━━━━━━━━\n\n`;
                     });
                     await message.reply(resStr + `(Type *0* to go back)`);
+                } else if (input === '11') {
+                    const now = Date.now();
+                    const dayMs = 24 * 60 * 60 * 1000;
+                    const weekEnd = now + (7 * dayMs);
+                    let weekText = `🗓️ *MY WEEK — ${sClass}*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    for (let offset = 0; offset < 7; offset++) {
+                        const dayDate = new Date(now + (offset * dayMs));
+                        const parts = new Intl.DateTimeFormat('en-US', {
+                            timeZone: 'Africa/Nairobi',
+                            weekday: 'long',
+                            day: 'numeric',
+                            month: 'short'
+                        }).formatToParts(dayDate);
+                        const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+                        const dayName = values.weekday.toLowerCase();
+                        const classes = sDb.timetable?.[dayName] || [];
+                        weekText += `* ${values.weekday} ${values.day} ${values.month}*\n`;
+                        weekText += classes.length
+                            ? classes.slice(0, 5).map(item => `  • ${item.unit} @ ${item.time}`).join('\n') + '\n'
+                            : '  • No classes scheduled\n';
+                    }
+                    const deadlines = (sDb.assessments || [])
+                        .filter(item => Number(item.timestamp) > now && Number(item.timestamp) <= weekEnd)
+                        .sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
+                        .slice(0, 4);
+                    weekText += '\n⏳ *Deadlines (next 7 days)*\n';
+                    weekText += deadlines.length
+                        ? deadlines.map(item => {
+                            const due = new Intl.DateTimeFormat('en-KE', {
+                                timeZone: 'Africa/Nairobi',
+                                day: 'numeric',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            }).format(new Date(item.timestamp));
+                            return `• ${item.unit || item.type}: ${due}`;
+                        }).join('\n')
+                        : '• None recorded\n';
+                    const activePolls = (sDb.polls || []).filter(poll => poll.status === 'ACTIVE').slice(0, 3);
+                    weekText += '\n📊 *Active polls*\n';
+                    weekText += activePolls.length
+                        ? activePolls.map(poll => `• ${poll.question}`).join('\n')
+                        : '• None\n';
+                    const updates = (sDb.updates || []).filter(update => Number(update.timestamp) >= now - (7 * dayMs)).slice(-3);
+                    weekText += '\n📢 *Recent updates*\n';
+                    weekText += updates.length
+                        ? updates.map(update => `• ${String(update.text).slice(0, 180)}`).join('\n')
+                        : '• No recent updates\n';
+                    const studentKey = session.data.currentStudentId;
+                    const attendanceRecords = (Array.isArray(sDb.attendanceHistory) ? sDb.attendanceHistory : [])
+                        .filter(record => Number(record.closedAt) >= now - (7 * dayMs));
+                    const studentSessions = attendanceRecords.filter(record =>
+                        record.attendance?.some(item => item.memberKey === studentKey && ['PRESENT', 'LATE'].includes(item.status))
+                    ).length;
+                    if (attendanceRecords.length) {
+                        weekText += `\n👻 *My attendance (last 7 days)*: ${studentSessions}/${attendanceRecords.length} sessions`;
+                    }
+                    updateSessionState(userId, 'STUDENT_VIEW_ONLY', session.data);
+                    await message.reply(weekText + '\n\n(Type *0* to go back)');
                  } else {
-                    await message.reply(`❌ Invalid choice. Type 1-9, 0 to go back, or 99 to exit.`);
+                    await message.reply(`❌ Invalid choice. Type 1-11, 0 to go back, or 99 to exit.`);
                 }
                 break;
             }
@@ -3629,6 +3971,7 @@ async function sendStudentDashboard(message, className, studentName) {
   │👻 \`8\` ☞『_*Sign Attendance (Ghost Tracker)*_』
   │🛒 \`9\` ☞『_*Hustle Board (${marketCount} Active)*_』
   │📊 \`10\` ☞『_*View Polls (${activePollsCount} Active)*_』
+  │🗓️ \`11\` ☞『_*My Week*_』
   │🔙 \`0\` ☞『_*Main Menu*_』
   │🚪 \`99\` ☞『_*Logout*_』
   │
@@ -3714,7 +4057,9 @@ async function handleAttendance(message, userId, client) {
     activeRC.attendees[memberId] = {
         name: studentData.name,
         regNo: studentData.admission,
-        timestamp: new Date().toLocaleTimeString("en-US", {timeZone: "Africa/Nairobi"})
+        timestamp: new Date().toLocaleTimeString("en-US", {timeZone: "Africa/Nairobi"}),
+        checkedInAt: Date.now(),
+        status: 'PRESENT'
     };
 
     // Update their Ghost Tracker tally
