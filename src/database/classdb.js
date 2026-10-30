@@ -15,7 +15,7 @@ let flushPromise = null;
 let flushTimer = null;
 
 function makeEmptyDB() {
-    return { classes: {}, repCodes: [] };
+    return { classes: {}, repCodes: [], applications: [] };
 }
 
 function validateDB(value, sourcePath) {
@@ -25,6 +25,7 @@ function validateDB(value, sourcePath) {
     }
 
     if (!Array.isArray(value.repCodes)) value.repCodes = [];
+    if (!Array.isArray(value.applications)) value.applications = [];
     return value;
 }
 
