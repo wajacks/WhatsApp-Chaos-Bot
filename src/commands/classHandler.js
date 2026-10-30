@@ -307,6 +307,23 @@ function buildSyndicateProjectMenu(project) {
     return `📈 *GROUP ${project.groupNumber} PROJECT TRACKER*\n━━━━━━━━━━━━━━━━━━\nStatus: *${status}*\n\n*Members*\n${members || '• No members listed'}\n\n1. ✍️ Add progress update\n2. 🧾 View update history\n3. ${project.status === 'COMPLETED' ? '🔄 Reopen group' : '✅ Mark completed'}\n\n0. 🔙 Back to group list`;
 }
 
+function getClassApproverNumbers() {
+    const configured = [
+        process.env.OWNER_NUMBER || '254111659469',
+        ...(process.env.CLASS_APPROVER_NUMBERS || '').split(',')
+    ];
+    return [...new Set(configured.map(value => String(value || '').replace(/\D/g, '')).filter(Boolean))];
+}
+
+function getClassApproverJids() {
+    return getClassApproverNumbers().map(number => `${number}@c.us`);
+}
+
+function isClassApproverId(userId) {
+    const number = String(userId || '').split('@')[0].replace(/\D/g, '');
+    return getClassApproverNumbers().includes(number);
+}
+
 function buildRepMembersMenu(isMainRep) {
     const roleOptions = isMainRep
         ? '3. 🎖️ Promote to Assistant Rep\n4. 🔻 Revoke Assistant Rep\n'
@@ -504,8 +521,9 @@ async function handleInput(client, message, userId, text, userName) {
                 
                 // Persist each application independently so replies always target
                 // the quoted applicant, even after restarts or overlapping submissions.
-                const ownerJid = '254111659469@c.us'; // Your Master Owner Number
-                const applicationId = `app_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+                const submittedAt = Date.now();
+                const expiresAt = submittedAt + (14 * 24 * 60 * 60 * 1000);
+                const applicationId = `app_${submittedAt}_${crypto.randomBytes(4).toString('hex')}`;
                 const application = {
                     id: applicationId,
                     applicantId: userId,
@@ -513,7 +531,8 @@ async function handleInput(client, message, userId, text, userName) {
                     className: session.data.appClass,
                     inviteLink: input.trim(),
                     status: 'PENDING',
-                    submittedAt: Date.now()
+                    submittedAt,
+                    expiresAt
                 };
                 if (!Array.isArray(db.applications)) db.applications = [];
                 db.applications.push(application);
@@ -528,15 +547,21 @@ async function handleInput(client, message, userId, text, userName) {
                                    `🏫 *Class:* ${session.data.appClass}\n` +
                                    `🔗 *Link:* ${input}\n\n` +
                                    `🆔 *Application ID:* \`${applicationId}\`\n` +
-                                   `📱 *User ID:* \`${userId}\`\n━━━━━━━━━━━━━━━━━━\n` +
-                                   `👉 *Swipe right to reply to this message with:*\n` +
+                                   `📱 *User ID:* \`${userId}\`\n` +
+                                   `⏳ *Review by:* ${new Date(expiresAt).toLocaleDateString('en-KE', { timeZone: 'Africa/Nairobi' })}\n━━━━━━━━━━━━━━━━━━\n` +
+                                   `👉 *A class approver can reply to this card with:*\n` +
                                    `*accept* (to approve & send code)\n` +
                                    `*reject <reason>* (to deny)`;
                 
                 try {
-                    await client.sendMessage(ownerJid, appSummary);
+                    const deliveries = await Promise.allSettled(
+                        getClassApproverJids().map(approverJid => client.sendMessage(approverJid, appSummary))
+                    );
+                    if (!deliveries.some(result => result.status === 'fulfilled')) {
+                        throw new Error('No configured class approver could be reached.');
+                    }
                 } catch (e) {
-                    console.warn("[CLASS PORTAL] Could not send application to owner.", e);
+                    console.warn("[CLASS PORTAL] Could not send application to any configured approver.", e);
                     db.applications = db.applications.filter(item => item.id !== applicationId);
                     writeClassDB(db);
                     await flushClassDB();
@@ -548,7 +573,7 @@ async function handleInput(client, message, userId, text, userName) {
 
                 // 2. Wrap up with the Applicant
                 updateSessionState(userId, 'MAIN_MENU');
-                await message.reply(`🎉 *APPLICATION SUBMITTED!*\n\nYour application has been safely transmitted to the system administrators.\n\n⏳ *NEXT STEPS:*\n1. An admin will use your link to verify you in the group.\n2. You will receive a direct message with your Authorization Code once approved!\n\n*(Returning to Main Menu...)*`);
+                await message.reply(`🎉 *APPLICATION SUBMITTED!*\n\nYour application has been safely transmitted to the system administrators.\n\n⏳ *NEXT STEPS:*\n1. A class administrator will verify your link and review the request within 14 days.\n2. You will receive a direct message with your Authorization Code if approved.\n3. If the request expires, you can submit a fresh application.\n\n*(Returning to Main Menu...)*`);
                 await sendMainMenu(message);
                 break;
             }
@@ -4097,8 +4122,37 @@ async function processOwnerApplicationReply(client, message, text, applicationId
         await message.reply('⚠️ I could not find that application. Ask the applicant to submit it again.');
         return true;
     }
-    if (application.status === 'APPROVED' || application.status === 'REJECTED') {
+    const isExpired = Number.isFinite(Number(application.expiresAt)) &&
+        Number(application.expiresAt) > 0 &&
+        Number(application.expiresAt) <= Date.now();
+    if (isExpired && ['PENDING', 'APPROVING'].includes(application.status)) {
+        if (application.authorizationCodeHash) {
+            db.repCodes = (db.repCodes || []).filter(hash => hash !== application.authorizationCodeHash);
+            delete application.authorizationCodeHash;
+            delete application.reviewStartedAt;
+        }
+        application.status = 'EXPIRED';
+        application.expiredAt = Date.now();
+        writeClassDB(db);
+        await flushClassDB();
+        try {
+            await client.sendMessage(
+                application.applicantId,
+                '⌛ Your Class Representative application expired before it was reviewed. You may submit a new application with !class.'
+            );
+        } catch (_) {}
+        await message.reply(`⌛ Application ${applicationId} expired. The applicant may submit a new request.`);
+        return true;
+    }
+    if (application.status === 'APPROVED' || application.status === 'REJECTED' || application.status === 'EXPIRED') {
         await message.reply(`ℹ️ Application ${applicationId} was already ${application.status.toLowerCase()}.`);
+        return true;
+    }
+
+    let reason = String(text || '').trim().replace(/^reject\b/i, '').trim();
+    if (reason.startsWith(applicationId)) reason = reason.slice(applicationId.length).trim();
+    if (action === 'reject' && !reason) {
+        await message.reply('Please include a rejection reason, for example: reject The class link could not be verified.');
         return true;
     }
 
@@ -4115,6 +4169,7 @@ async function processOwnerApplicationReply(client, message, text, applicationId
         application.status = 'APPROVING';
         application.authorizationCodeHash = codeHash;
         application.reviewStartedAt = Date.now();
+        application.reviewedBy = message.from || null;
         writeClassDB(db);
         await flushClassDB();
 
@@ -4128,6 +4183,7 @@ async function processOwnerApplicationReply(client, message, text, applicationId
             application.status = 'PENDING';
             delete application.authorizationCodeHash;
             delete application.reviewStartedAt;
+            delete application.reviewedBy;
             writeClassDB(db);
             await flushClassDB();
             console.warn('[CLASS PORTAL] Could not send authorization code to applicant:', error.message);
@@ -4137,6 +4193,7 @@ async function processOwnerApplicationReply(client, message, text, applicationId
 
         application.status = 'APPROVED';
         application.reviewedAt = Date.now();
+        application.reviewedBy = message.from || application.reviewedBy || null;
         delete application.authorizationCodeHash;
         delete application.reviewStartedAt;
         writeClassDB(db);
@@ -4154,9 +4211,6 @@ async function processOwnerApplicationReply(client, message, text, applicationId
         await flushClassDB();
     }
 
-    let reasonText = String(text || '').trim().replace(/^reject\b/i, '').trim();
-    if (reasonText.startsWith(applicationId)) reasonText = reasonText.slice(applicationId.length).trim();
-    const reason = reasonText || 'Failed security verification checks.';
     try {
         await client.sendMessage(
             application.applicantId,
@@ -4171,6 +4225,7 @@ async function processOwnerApplicationReply(client, message, text, applicationId
     application.status = 'REJECTED';
     application.rejectionReason = reason;
     application.reviewedAt = Date.now();
+    application.reviewedBy = message.from || null;
     writeClassDB(db);
     await flushClassDB();
     await message.reply(`✅ Application ${applicationId} rejected. The applicant was notified.`);
@@ -4191,10 +4246,46 @@ async function handleOwnerPlaintextResponse(client, message, text, lowerText) {
     return handleOwnerApplicationReply(client, message, `${action} ${details}`.trim(), applicationId);
 }
 
+async function handleClassApprovalsCommand(message, userId) {
+    if (!isClassApproverId(userId)) {
+        await message.reply('❌ This approvals queue is limited to configured Class Portal approvers.');
+        return true;
+    }
+
+    const db = readClassDB();
+    const now = Date.now();
+    const pending = (Array.isArray(db.applications) ? db.applications : [])
+        .filter(application =>
+            ['PENDING', 'APPROVING'].includes(application.status) &&
+            (!Number.isFinite(Number(application.expiresAt)) || Number(application.expiresAt) > now)
+        )
+        .sort((a, b) => Number(a.submittedAt || 0) - Number(b.submittedAt || 0));
+
+    if (!pending.length) {
+        await message.reply('📭 There are no pending Class Representative applications.');
+        return true;
+    }
+
+    const rows = pending.slice(0, 15).map((application, index) => {
+        const expires = Number(application.expiresAt) > 0
+            ? new Date(Number(application.expiresAt)).toLocaleDateString('en-KE', { timeZone: 'Africa/Nairobi' })
+            : 'no expiry';
+        return `${index + 1}. *${application.className || 'Class'}* — ${application.applicantName || 'Applicant'}\n   ID: ${application.id}\n   Expires: ${expires}`;
+    });
+
+    await message.reply(
+        `📋 *PENDING CLASS APPLICATIONS*\n━━━━━━━━━━━━━━━━━━\n${rows.join('\n\n')}\n\nReview by replying to each application card with *accept* or *reject <reason>*.\n` +
+        (pending.length > 15 ? `Showing 15 of ${pending.length}.\n` : '') +
+        'Use !class approvals again to refresh.'
+    );
+    return true;
+}
+
 module.exports = {
     handleClassCommand,
     handleInput,
     handleAttendance,
     handleOwnerPlaintextResponse,
-    handleOwnerApplicationReply
+    handleOwnerApplicationReply,
+    handleClassApprovalsCommand
 };

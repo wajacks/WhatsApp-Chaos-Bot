@@ -3,6 +3,7 @@ const SESSION_TIMEOUT_MS = 600 * 1000; // 10 minutes
 const cron = require('node-cron');
 const { readClassDB, writeClassDB, createClassDBBackup } = require('../database/classdb');
 const { createVerifiedOffsiteClassDBBackup } = require('../database/offsiteBackup');
+const { flushClassDB } = require('../database/classdb');
 
 function getEATParts(date = new Date()) {
     const values = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
@@ -688,7 +689,59 @@ function startSystemMaintenance(client) {
         console.log("[SYSTEM] Midnight Sweep complete. All active roll calls closed.");
     }, { scheduled: true, timezone: "Africa/Nairobi" });
 
-    // 2. 3-DAY BACKUP: Overwrites the backup file at 3:00 AM and notifies Reps
+    // 2. EXPIRE CLASS REP APPLICATIONS: Pending applications remain reviewable for 14 days.
+    cron.schedule('0 4 * * *', async () => {
+        const db = readClassDB();
+        const now = Date.now();
+        const expired = [];
+        let changed = false;
+
+        for (const application of db.applications || []) {
+            const isPending = application.status === 'PENDING';
+            const staleApproval = application.status === 'APPROVING' &&
+                Number(application.reviewStartedAt) <= now - (10 * 60 * 1000);
+            const hasExpired = Number.isFinite(Number(application.expiresAt)) &&
+                Number(application.expiresAt) > 0 &&
+                Number(application.expiresAt) <= now;
+            if (!hasExpired || (!isPending && !staleApproval)) continue;
+
+            if (application.authorizationCodeHash) {
+                db.repCodes = (db.repCodes || []).filter(hash => hash !== application.authorizationCodeHash);
+                delete application.authorizationCodeHash;
+                delete application.reviewStartedAt;
+                delete application.reviewedBy;
+            }
+            application.status = 'EXPIRED';
+            application.expiredAt = now;
+            expired.push(application);
+            changed = true;
+        }
+
+        if (changed) {
+            writeClassDB(db);
+            await flushClassDB();
+        }
+
+        let notified = false;
+        for (const application of expired) {
+            try {
+                await client.sendMessage(
+                    application.applicantId,
+                    '⌛ Your Class Representative application expired before it was reviewed. You may submit a new application with !class.'
+                );
+                application.expiryNoticeSentAt = Date.now();
+                notified = true;
+            } catch (error) {
+                console.warn('[CLASS PORTAL] Could not send application expiry notice:', error.message);
+            }
+        }
+        if (notified) {
+            writeClassDB(db);
+            await flushClassDB();
+        }
+    }, { scheduled: true, timezone: "Africa/Nairobi" });
+
+    // 3. 3-DAY BACKUP: Overwrites the backup file at 3:00 AM and notifies Reps
     cron.schedule('0 3 */3 * *', async () => {
         try {
             const backupPath = await createClassDBBackup();

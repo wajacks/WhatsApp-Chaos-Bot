@@ -133,6 +133,16 @@ function registerMessageHandler(client, dependencies) {
     } = dependencies;
 
     const routeCommands = createCommandRouter(dependencies);
+    const classApproverNumbers = new Set([
+        OWNER_NUMBER || '254111659469',
+        ...(process.env.CLASS_APPROVER_NUMBERS || '').split(',')
+    ].map(value => String(value || '').replace(/\D/g, '')).filter(Boolean));
+    const isClassApprover = senderId => {
+        if (isOwner(senderId)) return true;
+        const canonicalId = getCanonicalJid(senderId) || senderId;
+        const number = String(canonicalId || '').split('@')[0].replace(/\D/g, '');
+        return classApproverNumbers.has(number);
+    };
 
     client.on('message', async message => {
     if (message.from === 'status@broadcast') return;
@@ -159,7 +169,7 @@ function registerMessageHandler(client, dependencies) {
 
         // Handle owner application decisions before interactive games or portal
         // sessions can consume the reply text.
-        if (isOwner(senderId) && !isGroup && message.hasQuotedMsg && /^(accept|reject)(?:\s|$)/i.test(text)) {
+        if (isClassApprover(senderId) && !isGroup && message.hasQuotedMsg && /^(accept|reject)(?:\s|$)/i.test(text)) {
             try {
                 const quotedMsg = await message.getQuotedMessage();
                 if (quotedMsg?.fromMe && quotedMsg.body?.includes('📩 *NEW CLASS REP APPLICATION*')) {
@@ -175,7 +185,7 @@ function registerMessageHandler(client, dependencies) {
                 console.error('[OWNER APP REPLY ERROR]', error);
             }
         }
-        if (isOwner(senderId) && !isGroup && !message.hasQuotedMsg) {
+        if (isClassApprover(senderId) && !isGroup && !message.hasQuotedMsg) {
             const handled = await classHandler.handleOwnerPlaintextResponse(client, message, text, lowerText);
             if (handled) return;
         }
@@ -484,6 +494,15 @@ function registerMessageHandler(client, dependencies) {
         // ====================================================
         // CLASS PORTAL (DM REDIRECTION FOR SECURITY)
         // ====================================================
+        if (lowerText === '!class approvals') {
+            if (isGroup) {
+                await message.reply('🔒 Open a private chat with me and send *!class approvals* to view the application queue.');
+                return;
+            }
+            await classHandler.handleClassApprovalsCommand(message, getCanonicalJid(senderId) || senderId);
+            return;
+        }
+
         if (lowerText === '!class' || lowerText === '!classes') {
             if (isGroup) {
                 // 1. Gently notify the group without cluttering it
