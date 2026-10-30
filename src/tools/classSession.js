@@ -593,7 +593,7 @@ function startSystemMaintenance(client) {
             const backupPath = await createClassDBBackup();
             console.log(`[SYSTEM] Durable local database backup created: ${backupPath}`);
 
-            let offsiteBackup = { configured: false, verified: false };
+            const offsiteBackupConfigured = Boolean(process.env.AZURE_CLASS_BACKUP_CONTAINER_SAS_URL && process.env.CLASS_BACKUP_ENCRYPTION_KEY);\n            let offsiteBackup = { configured: offsiteBackupConfigured, verified: false };
             try {
                 offsiteBackup = await createVerifiedOffsiteClassDBBackup(backupPath);
                 if (offsiteBackup.verified) {
