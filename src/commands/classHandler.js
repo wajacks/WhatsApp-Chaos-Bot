@@ -274,6 +274,39 @@ function updateAttendanceCorrection(classData, record, memberIndex, nextStatus, 
     return { student, previousStatus };
 }
 
+function createSyndicateProjects(syndicates) {
+    return (Array.isArray(syndicates) ? syndicates : []).map((group, index) => ({
+        groupNumber: index + 1,
+        status: 'ACTIVE',
+        createdAt: Date.now(),
+        completedAt: null,
+        members: (Array.isArray(group) ? group : []).map(member => ({
+            id: member.id || null,
+            name: member.name || 'Student',
+            admission: member.admission || ''
+        })),
+        updates: []
+    }));
+}
+
+function buildSyndicateGroupList(syndicates, projects) {
+    const groups = Array.isArray(syndicates) ? syndicates : [];
+    return '📈 *SYNDICATE PROJECT TRACKER*\n━━━━━━━━━━━━━━━━━━\n' +
+        groups.map((group, index) => {
+            const project = projects[index] || {};
+            const status = project.status === 'COMPLETED' ? '✅ DONE' : '🟡 IN PROGRESS';
+            const names = (Array.isArray(group) ? group : []).map(member => member.name).join(', ');
+            return `${index + 1}. *Group ${index + 1}* — ${status}\n   ${names}`;
+        }).join('\n') +
+        '\n\nReply with a group number.\n0. 🔙 Back to Syndicate Menu';
+}
+
+function buildSyndicateProjectMenu(project) {
+    const status = project.status === 'COMPLETED' ? '✅ COMPLETED' : '🟡 IN PROGRESS';
+    const members = (project.members || []).map(member => `• ${member.name} (${member.admission || 'No admission'})`).join('\n');
+    return `📈 *GROUP ${project.groupNumber} PROJECT TRACKER*\n━━━━━━━━━━━━━━━━━━\nStatus: *${status}*\n\n*Members*\n${members || '• No members listed'}\n\n1. ✍️ Add progress update\n2. 🧾 View update history\n3. ${project.status === 'COMPLETED' ? '🔄 Reopen group' : '✅ Mark completed'}\n\n0. 🔙 Back to group list`;
+}
+
 function buildRepMembersMenu(isMainRep) {
     const roleOptions = isMainRep
         ? '3. 🎖️ Promote to Assistant Rep\n4. 🔻 Revoke Assistant Rep\n'
@@ -873,11 +906,117 @@ async function handleInput(client, message, userId, text, userName) {
 
                 } else if (input === '4') {
                     db.classes[session.data.loggedInClass].syndicates = [];
+                    db.classes[session.data.loggedInClass].syndicateProjects = [];
                     writeClassDB(db);
-                    await message.reply(`🗑️ All groups have been cleared and deleted from the database.\n\n(Type *0* to go back)`);
+                    await message.reply(`🗑️ All groups and their progress history have been cleared.\n\n(Type *0* to go back)`);
+                } else if (input === '5') {
+                    const classData = db.classes[session.data.loggedInClass];
+                    if (!syndicates.length) {
+                        await message.reply('📭 Generate groups before using the project tracker.\n(Type *0* to go back)');
+                        return;
+                    }
+                    if (!Array.isArray(classData.syndicateProjects) ||
+                        classData.syndicateProjects.length !== syndicates.length) {
+                        classData.syndicateProjects = createSyndicateProjects(syndicates);
+                        writeClassDB(db);
+                    }
+                    updateSessionState(userId, 'REP_SYNDICATE_PROGRESS_GROUP', session.data);
+                    await message.reply(buildSyndicateGroupList(syndicates, classData.syndicateProjects));
                 } else {
                     await message.reply(`❌ Invalid choice.`);
                 }
+                break;
+            }
+
+            case 'REP_SYNDICATE_PROGRESS_GROUP': {
+                const classData = db.classes[session.data.loggedInClass];
+                const syndicates = classData?.syndicates || [];
+                const projects = Array.isArray(classData?.syndicateProjects)
+                    ? classData.syndicateProjects
+                    : [];
+
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_SYNDICATE_MENU', session.data);
+                    await message.reply('🎲 *SYNDICATE MAKER*\n━━━━━━━━━━━━━━━━━━\n1. 🎲 Generate New Groups\n2. 👁️ View Active Groups\n3. 🚀 Broadcast Groups to Class\n4. 🗑️ Clear All Groups\n5. 📈 Project Progress Tracker\n\n0. 🔙 Back to Dashboard');
+                    return;
+                }
+
+                const groupNumber = Number.parseInt(input, 10);
+                const project = projects[groupNumber - 1];
+                if (!Number.isInteger(groupNumber) || groupNumber < 1 ||
+                    groupNumber > syndicates.length || !project) {
+                    await message.reply('❌ Choose a listed group number, or type 0 to go back.');
+                    return;
+                }
+
+                updateSessionState(userId, 'REP_SYNDICATE_PROGRESS_MENU', {
+                    ...session.data,
+                    selectedSyndicateIndex: groupNumber - 1
+                });
+                await message.reply(buildSyndicateProjectMenu(project));
+                break;
+            }
+
+            case 'REP_SYNDICATE_PROGRESS_MENU': {
+                const classData = db.classes[session.data.loggedInClass];
+                const project = classData?.syndicateProjects?.[session.data.selectedSyndicateIndex];
+                if (!project) {
+                    updateSessionState(userId, 'REP_SYNDICATE_MENU', session.data);
+                    await message.reply('⚠️ This group is no longer available. Generate or view groups again.');
+                    return;
+                }
+
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_SYNDICATE_PROGRESS_GROUP', session.data);
+                    await message.reply(buildSyndicateGroupList(classData.syndicates, classData.syndicateProjects));
+                } else if (input === '1') {
+                    updateSessionState(userId, 'REP_SYNDICATE_PROGRESS_ADD', session.data);
+                    await message.reply('✍️ Send the progress update for this group. Include the milestone or blocker.\n\n0. 🔙 Cancel');
+                } else if (input === '2') {
+                    const updates = (project.updates || []).slice(-10).reverse();
+                    const history = updates.length
+                        ? updates.map((entry, index) => {
+                            const when = new Date(entry.timestamp).toLocaleString('en-KE', { timeZone: 'Africa/Nairobi' });
+                            return `${index + 1}. [${when}] ${entry.author || 'Class Rep'}:\n   ${entry.text}`;
+                        }).join('\n\n')
+                        : 'No progress updates have been recorded yet.';
+                    await message.reply(`🧾 *GROUP ${project.groupNumber} PROGRESS HISTORY*\n━━━━━━━━━━━━━━━━━━\n${history}\n\n0. 🔙 Back to group list`);
+                } else if (input === '3') {
+                    project.status = project.status === 'COMPLETED' ? 'ACTIVE' : 'COMPLETED';
+                    project.completedAt = project.status === 'COMPLETED' ? Date.now() : null;
+                    writeClassDB(db);
+                    await message.reply(buildSyndicateProjectMenu(project));
+                } else {
+                    await message.reply('❌ Invalid choice. Choose 1, 2, 3, or 0 to go back.');
+                }
+                break;
+            }
+
+            case 'REP_SYNDICATE_PROGRESS_ADD': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_SYNDICATE_PROGRESS_MENU', session.data);
+                    const project = db.classes[session.data.loggedInClass]?.syndicateProjects?.[session.data.selectedSyndicateIndex];
+                    if (project) await message.reply(buildSyndicateProjectMenu(project));
+                    else await message.reply('Cancelled. Type 0 to return to the group list.');
+                    return;
+                }
+
+                const classData = db.classes[session.data.loggedInClass];
+                const project = classData?.syndicateProjects?.[session.data.selectedSyndicateIndex];
+                if (!project) {
+                    updateSessionState(userId, 'REP_SYNDICATE_PROGRESS_GROUP', session.data);
+                    await message.reply('⚠️ This group is no longer available.');
+                    return;
+                }
+                if (!Array.isArray(project.updates)) project.updates = [];
+                project.updates.push({
+                    text: input.slice(0, 1000),
+                    author: userName,
+                    timestamp: Date.now()
+                });
+                writeClassDB(db);
+                updateSessionState(userId, 'REP_SYNDICATE_PROGRESS_MENU', session.data);
+                await message.reply(`✅ Progress update saved for Group ${project.groupNumber}.\n\n${buildSyndicateProjectMenu(project)}`);
                 break;
             }
 
@@ -935,9 +1074,10 @@ async function handleInput(client, message, userId, text, userName) {
                     newSyndicates.push(mappedGroup);
                 }
 
-                // 3. Save to database
+                // 3. Save the new groups and start a fresh tracker for this grouping.
                 db.classes[session.data.loggedInClass].syndicates = newSyndicates;
-                
+                db.classes[session.data.loggedInClass].syndicateProjects = createSyndicateProjects(newSyndicates);
+
                 db.classes[session.data.loggedInClass].logs.push({
                     text: `Generated ${newSyndicates.length} random groups (Size: ${groupSize})`,
                     timestamp: Date.now()
