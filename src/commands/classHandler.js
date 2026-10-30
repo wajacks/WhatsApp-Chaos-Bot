@@ -1,10 +1,12 @@
-const { readClassDB, writeClassDB, classExists, isUserAlreadyRep } = require('../database/classdb');
+const crypto = require('crypto');
+const { readClassDB, writeClassDB, flushClassDB, classExists, isUserAlreadyRep } = require('../database/classdb');
 const { createSession, updateSessionState, getSession, endSession, getPortalMetrics, closeActiveRollCall, getEATDateKey } = require('../tools/classSession');
 const { timeToMinutes, minutesToTime, checkCollision } = require('../tools/timeHelper');
 const { hashSecret, verifySecret, generateAuthorizationCode, generateNumericOtp } = require('../utils/credentials');
 
 // --- NEW: MARKETPLACE LIVE CHAT REGISTRY ---
 const activeMarketChats = new Map();
+const activeApplicationReviews = new Set();
 
 // Helper to combine registered students and ensure the Main Class Rep is always included
 function getAllClassParticipants(classData) {
@@ -74,8 +76,6 @@ function getMarketNotifs(className, userId) {
     });
     return count;
 }
-
-let lastApplicantUserId = null;
 
 // Entry point triggered by !class
 async function handleClassCommand(client, message, userId, userName) {
@@ -244,14 +244,32 @@ async function handleInput(client, message, userId, text, userName) {
                     return; 
                 }
                 
-                // 1. Send Application to Owner
+                // Persist each application independently so replies always target
+                // the quoted applicant, even after restarts or overlapping submissions.
                 const ownerJid = '254111659469@c.us'; // Your Master Owner Number
-                
-                // Formatted specifically so the bot can extract the ID when you reply to it
+                const applicationId = `app_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+                const application = {
+                    id: applicationId,
+                    applicantId: userId,
+                    applicantName: userName,
+                    className: session.data.appClass,
+                    inviteLink: input.trim(),
+                    status: 'PENDING',
+                    submittedAt: Date.now()
+                };
+                if (!Array.isArray(db.applications)) db.applications = [];
+                db.applications.push(application);
+                const pendingApplications = db.applications.filter(item => item.status === 'PENDING' || item.status === 'APPROVING');
+                const resolvedApplications = db.applications.filter(item => item.status !== 'PENDING' && item.status !== 'APPROVING').slice(-200);
+                db.applications = [...resolvedApplications, ...pendingApplications];
+                writeClassDB(db);
+                await flushClassDB();
+
                 const appSummary = `📩 *NEW CLASS REP APPLICATION*\n━━━━━━━━━━━━━━━━━━\n` +
                                    `👤 *WA Profile:* ${userName}\n` +
                                    `🏫 *Class:* ${session.data.appClass}\n` +
                                    `🔗 *Link:* ${input}\n\n` +
+                                   `🆔 *Application ID:* \`${applicationId}\`\n` +
                                    `📱 *User ID:* \`${userId}\`\n━━━━━━━━━━━━━━━━━━\n` +
                                    `👉 *Swipe right to reply to this message with:*\n` +
                                    `*accept* (to approve & send code)\n` +
@@ -259,9 +277,15 @@ async function handleInput(client, message, userId, text, userName) {
                 
                 try {
                     await client.sendMessage(ownerJid, appSummary);
-                    lastApplicantUserId = userId;
                 } catch (e) {
                     console.warn("[CLASS PORTAL] Could not send application to owner.", e);
+                    db.applications = db.applications.filter(item => item.id !== applicationId);
+                    writeClassDB(db);
+                    await flushClassDB();
+                    updateSessionState(userId, 'MAIN_MENU');
+                    await message.reply('❌ I could not deliver your application to the administrators. Please try again later.');
+                    await sendMainMenu(message);
+                    return;
                 }
 
                 // 2. Wrap up with the Applicant
@@ -2165,7 +2189,7 @@ async function handleInput(client, message, userId, text, userName) {
                 }
 
                 const newPoll = {
-                    id: 'poll_' + Date.now(),
+                    id: `poll_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`,
                     question: session.data.pollQuestion,
                     options: session.data.pollOptions,
                     votes: {},
@@ -2182,7 +2206,8 @@ async function handleInput(client, message, userId, text, userName) {
                 newPoll.options.forEach((opt, idx) => {
                     blastMsg += `${idx + 1}️⃣ ${opt}\n`;
                 });
-                blastMsg += `\n👉 *Reply directly to this message with a single number (e.g., 1 or 2) to cast your anonymous vote.*`;
+                blastMsg += `\n👉 *Reply to this exact poll message with a single number (e.g., 1 or 2) to cast your anonymous vote.*`;
+                blastMsg += `\n_Poll ID: ${newPoll.id}_`;
 
                 await message.reply(`🚀 *LAUNCHING POLL*\n\nBroadcasting to ${memberIds.length} students...`);
 
@@ -3478,63 +3503,129 @@ async function handleAttendance(message, userId, client) {
     return true;
 }
 
-/**
- * Allows the owner to type "accept" or "reject <reason>" directly in DMs
- */
-async function handleOwnerPlaintextResponse(client, message, text, lowerText) {
-    if (lowerText === 'accept' || lowerText.startsWith('reject')) {
-        if (!lastApplicantUserId) {
-            await message.reply('⚠️ No recent class rep application found in memory to process.');
-            return true; // Handled (prevents bot from treating it as an AI prompt or normal command)
-        }
-
-        const action = lowerText.split(/\s+/)[0];
-        const targetJid = lastApplicantUserId;
-        const db = readClassDB();
-
-        if (action === 'accept') {
-            const code = generateAuthorizationCode();
-            
-            if (!db.repCodes) db.repCodes = [];
-            db.repCodes.push(hashSecret(code));
-            writeClassDB(db);
-
-            try {
-                await client.sendMessage(
-                    targetJid, 
-                    `🎉 *APPLICATION APPROVED!*\n━━━━━━━━━━━━━━━━━━\n\nYour request to become a Class Representative has been verified and accepted.\n\n🎟️ *Your Authorization Code:* \`${code}\`\n\nTo setup your class:\n1. Type \`!class\`\n2. Select *Create a New Class*\n3. Enter your code when prompted.`
-                );
-            } catch (e) {
-                console.warn('[CLASS PORTAL] Could not send code to applicant DMs:', e);
-            }
-            
-            await message.reply(`✅ *APPLICATION ACCEPTED*\n\nThe auth code \`${code}\` has been generated and delivered automatically to the applicant.`);
-            lastApplicantUserId = null; // Clear memory after processing
-            return true;
-            
-        } else if (action === 'reject') {
-            const reason = text.slice(6).trim() || 'Failed security verification checks.';
-            
-            try {
-                await client.sendMessage(
-                    targetJid, 
-                    `❌ *APPLICATION REJECTED*\n━━━━━━━━━━━━━━━━━━\n\nYour request to create a Class Portal was denied by the administrators.\n\n*Reason:* ${reason}`
-                );
-            } catch (e) {
-                console.warn('[CLASS PORTAL] Could not send rejection to applicant DMs:', e);
-            }
-            
-            await message.reply(`✅ *APPLICATION REJECTED*\n\nThe rejection notice has been delivered to the applicant.`);
-            lastApplicantUserId = null; // Clear memory after processing
-            return true;
-        }
+async function handleOwnerApplicationReply(client, message, text, applicationId) {
+    if (activeApplicationReviews.has(applicationId)) {
+        await message.reply('⏳ This application is already being processed.');
+        return true;
     }
-    return false;
+
+    activeApplicationReviews.add(applicationId);
+    try {
+        return await processOwnerApplicationReply(client, message, text, applicationId);
+    } finally {
+        activeApplicationReviews.delete(applicationId);
+    }
+}
+
+async function processOwnerApplicationReply(client, message, text, applicationId) {
+    const action = String(text || '').trim().split(/\s+/)[0].toLowerCase();
+    if (!['accept', 'reject'].includes(action)) return false;
+
+    const db = readClassDB();
+    if (!Array.isArray(db.applications)) db.applications = [];
+    const application = db.applications.find(item => item.id === applicationId);
+    if (!application) {
+        await message.reply('⚠️ I could not find that application. Ask the applicant to submit it again.');
+        return true;
+    }
+    if (application.status === 'APPROVED' || application.status === 'REJECTED') {
+        await message.reply(`ℹ️ Application ${applicationId} was already ${application.status.toLowerCase()}.`);
+        return true;
+    }
+
+    if (action === 'accept') {
+        // Revoke a hash left by an interrupted approval before issuing a replacement.
+        if (application.authorizationCodeHash) {
+            db.repCodes = (db.repCodes || []).filter(hash => hash !== application.authorizationCodeHash);
+        }
+
+        const code = generateAuthorizationCode();
+        const codeHash = hashSecret(code);
+        if (!Array.isArray(db.repCodes)) db.repCodes = [];
+        db.repCodes.push(codeHash);
+        application.status = 'APPROVING';
+        application.authorizationCodeHash = codeHash;
+        application.reviewStartedAt = Date.now();
+        writeClassDB(db);
+        await flushClassDB();
+
+        try {
+            await client.sendMessage(
+                application.applicantId,
+                `🎉 *APPLICATION APPROVED!*\n━━━━━━━━━━━━━━━━━━\n\nYour request to become a Class Representative has been verified and accepted.\n\n🎟️ *Your Authorization Code:* \`${code}\`\n\nTo setup your class:\n1. Type \`!class\`\n2. Select *Create a New Class*\n3. Enter your code when prompted.`
+            );
+        } catch (error) {
+            db.repCodes = db.repCodes.filter(hash => hash !== codeHash);
+            application.status = 'PENDING';
+            delete application.authorizationCodeHash;
+            delete application.reviewStartedAt;
+            writeClassDB(db);
+            await flushClassDB();
+            console.warn('[CLASS PORTAL] Could not send authorization code to applicant:', error.message);
+            await message.reply('❌ The code could not be delivered, so this application remains pending. You can retry by replying accept to its application card.');
+            return true;
+        }
+
+        application.status = 'APPROVED';
+        application.reviewedAt = Date.now();
+        delete application.authorizationCodeHash;
+        delete application.reviewStartedAt;
+        writeClassDB(db);
+        await flushClassDB();
+        await message.reply(`✅ Application ${applicationId} approved. The authorization code was delivered to the applicant.`);
+        return true;
+    }
+
+    if (application.authorizationCodeHash) {
+        db.repCodes = (db.repCodes || []).filter(hash => hash !== application.authorizationCodeHash);
+        delete application.authorizationCodeHash;
+        delete application.reviewStartedAt;
+        application.status = 'PENDING';
+        writeClassDB(db);
+        await flushClassDB();
+    }
+
+    let reasonText = String(text || '').trim().replace(/^reject\b/i, '').trim();
+    if (reasonText.startsWith(applicationId)) reasonText = reasonText.slice(applicationId.length).trim();
+    const reason = reasonText || 'Failed security verification checks.';
+    try {
+        await client.sendMessage(
+            application.applicantId,
+            `❌ *APPLICATION REJECTED*\n━━━━━━━━━━━━━━━━━━\n\nYour request to create a Class Portal was denied by the administrators.\n\n*Reason:* ${reason}`
+        );
+    } catch (error) {
+        console.warn('[CLASS PORTAL] Could not send rejection notice to applicant:', error.message);
+        await message.reply('❌ The rejection notice could not be delivered. The application remains pending.');
+        return true;
+    }
+
+    application.status = 'REJECTED';
+    application.rejectionReason = reason;
+    application.reviewedAt = Date.now();
+    writeClassDB(db);
+    await flushClassDB();
+    await message.reply(`✅ Application ${applicationId} rejected. The applicant was notified.`);
+    return true;
+}
+
+async function handleOwnerPlaintextResponse(client, message, text, lowerText) {
+    if (!/^(accept|reject)(?:\s|$)/i.test(String(text || '').trim())) return false;
+    const match = String(text || '').trim().match(/^(accept|reject)\s+(app_[A-Za-z0-9_-]+)(?:\s+([\s\S]*))?$/i);
+    if (!match) {
+        await message.reply('Reply to the specific application card with `accept` or `reject <reason>`. You can also use `accept <Application ID>` or `reject <Application ID> <reason>`.');
+        return true;
+    }
+
+    const action = match[1].toLowerCase();
+    const applicationId = match[2];
+    const details = match[3] || '';
+    return handleOwnerApplicationReply(client, message, `${action} ${details}`.trim(), applicationId);
 }
 
 module.exports = {
     handleClassCommand,
     handleInput,
     handleAttendance,
-    handleOwnerPlaintextResponse
+    handleOwnerPlaintextResponse,
+    handleOwnerApplicationReply
 };
