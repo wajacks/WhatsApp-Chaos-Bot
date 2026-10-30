@@ -141,8 +141,10 @@ function buildRepMembersMenu(isMainRep) {
         ? '3. 🎖️ Promote to Assistant Rep\n4. 🔻 Revoke Assistant Rep\n'
         : '';
     const ghostOption = isMainRep ? 5 : 3;
+    const historyOption = isMainRep ? 6 : 4;
     return '👥 *CLASS MEMBERS*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View All Members\n2. 🗑️ Remove a Member\n'
-        + roleOptions + ghostOption + '. 👻 View Ghost List (Attendance)\n\n0. 🔙 Back to Dashboard';
+        + roleOptions + ghostOption + '. 👻 View Attendance Summary\n'
+        + historyOption + '. 📖 Recent Attendance History\n\n0. 🔙 Back to Dashboard';
 }
 
 async function sendRepMembersMenu(message, isMainRep) {
@@ -847,6 +849,11 @@ async function handleInput(client, message, userId, text, userName) {
                     dateKey: getEATDateKey(),
                     startedAt: Date.now(),
                     source: 'manual',
+                    rosterSnapshot: Object.entries(db.classes[session.data.loggedInClass].members || {}).map(([memberKey, member]) => ({
+                        memberKey,
+                        name: member.name || 'Unknown student',
+                        admission: member.admission || ''
+                    })),
                     attendees: {}
                 };
                 writeClassDB(db);
@@ -1471,6 +1478,7 @@ async function handleInput(client, message, userId, text, userName) {
                 const members = getAllClassParticipants(classData);
                 const mIds = getSortedMemberIds(classData);
                 const ghostListOption = session.data.isMainRep ? '5' : '3';
+                const historyOption = session.data.isMainRep ? '6' : '4';
 
                 if (input === '1') {
                     if (mIds.length === 0) {
@@ -1529,7 +1537,7 @@ async function handleInput(client, message, userId, text, userName) {
                     mList += `\n*Reply with the number to REVOKE them:*\n(Type *0* to cancel)`;
                     updateSessionState(userId, 'REP_MEMBERS_REVOKE', { ...session.data, asstIds });
                     await message.reply(mList);
-                } else if (input === ghostListOption || input === '5') {
+                } else if (input === ghostListOption) {
                     // 👻 THE GHOST TRACKER
                     if (mIds.length === 0) {
                         await message.reply(`📭 No students to track.\n(Type *0* to go back)`);
@@ -1556,6 +1564,19 @@ async function handleInput(client, message, userId, text, userName) {
                     });
 
                     await message.reply(ghostStr + `\n(Type *0* to go back)`);
+                } else if (input === historyOption) {
+                    const history = Array.isArray(classData.attendanceHistory) ? classData.attendanceHistory : [];
+                    if (history.length === 0) {
+                        await message.reply('📭 No archived roll calls yet. New attendance history is saved when a register closes.\n(Type *0* to go back)');
+                        return;
+                    }
+                    const rows = history.slice(-10).reverse().map((record, index) => {
+                        const date = record.dateKey || 'Date unavailable';
+                        const total = Number(record.rosterCount) || (Array.isArray(record.attendance) ? record.attendance.length : 0);
+                        const present = Number(record.presentCount) || Object.keys(record.attendees || {}).length;
+                        return `${index + 1}. *${record.unit || 'Class'}* — ${date}\n   🟢 ${present} present / ${total} on roster`;
+                    });
+                    await message.reply(`📖 *RECENT ATTENDANCE HISTORY*\n━━━━━━━━━━━━━━━━━━\n${rows.join('\n')}\n\n(Type *0* to go back)`);
                 }
                 break;
             }
@@ -3150,16 +3171,15 @@ async function handleInput(client, message, userId, text, userName) {
                     // View Updates
                     const ONE_DAY = 24 * 60 * 60 * 1000;
                     const now = Date.now();
-                    sDb.updates = sDb.updates.filter(u => now - u.timestamp < ONE_DAY);
-                    writeClassDB(db);
+                    const recentUpdates = (sDb.updates || []).filter(u => now - u.timestamp < ONE_DAY);
 
-                    if (sDb.updates.length === 0) {
+                    if (recentUpdates.length === 0) {
                         await message.reply(`📭 No active updates from the Class Rep in the last 24 hours.\n(Type *0* to go back)`);
                         return;
                     }
                     
                     let upStr = `📢 *24H CLASS UPDATES*\n━━━━━━━━━━━━━━━━━━\n\n`;
-                    sDb.updates.forEach((u, i) => {
+                    recentUpdates.forEach((u, i) => {
                         const dObj = new Date(u.timestamp);
                         const tStr = dObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' });
                         if (i === sDb.updates.length - 1) upStr += `🚨 *LATEST [${tStr}]*\n*${u.text}*\n\n`;
@@ -3258,7 +3278,9 @@ async function handleInput(client, message, userId, text, userName) {
                     sDb.activeRollCall.attendees[mId] = {
                         name: studentData.name,
                         regNo: studentData.admission,
-                        timestamp: new Date().toLocaleTimeString("en-US", {timeZone: "Africa/Nairobi"})
+                        timestamp: new Date().toLocaleTimeString("en-US", {timeZone: "Africa/Nairobi"}),
+                        checkedInAt: Date.now(),
+                        status: 'PRESENT'
                     };
                     writeClassDB(db);
 
@@ -3284,8 +3306,67 @@ async function handleInput(client, message, userId, text, userName) {
                         resStr += `\n━━━━━━━━━━━━━━━━━━\n\n`;
                     });
                     await message.reply(resStr + `(Type *0* to go back)`);
+                } else if (input === '11') {
+                    const now = Date.now();
+                    const dayMs = 24 * 60 * 60 * 1000;
+                    const weekEnd = now + (7 * dayMs);
+                    let weekText = `🗓️ *MY WEEK — ${sClass}*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    for (let offset = 0; offset < 7; offset++) {
+                        const dayDate = new Date(now + (offset * dayMs));
+                        const parts = new Intl.DateTimeFormat('en-US', {
+                            timeZone: 'Africa/Nairobi',
+                            weekday: 'long',
+                            day: 'numeric',
+                            month: 'short'
+                        }).formatToParts(dayDate);
+                        const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+                        const dayName = values.weekday.toLowerCase();
+                        const classes = sDb.timetable?.[dayName] || [];
+                        weekText += `* ${values.weekday} ${values.day} ${values.month}*\n`;
+                        weekText += classes.length
+                            ? classes.slice(0, 5).map(item => `  • ${item.unit} @ ${item.time}`).join('\n') + '\n'
+                            : '  • No classes scheduled\n';
+                    }
+                    const deadlines = (sDb.assessments || [])
+                        .filter(item => Number(item.timestamp) > now && Number(item.timestamp) <= weekEnd)
+                        .sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
+                        .slice(0, 4);
+                    weekText += '\n⏳ *Deadlines (next 7 days)*\n';
+                    weekText += deadlines.length
+                        ? deadlines.map(item => {
+                            const due = new Intl.DateTimeFormat('en-KE', {
+                                timeZone: 'Africa/Nairobi',
+                                day: 'numeric',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            }).format(new Date(item.timestamp));
+                            return `• ${item.unit || item.type}: ${due}`;
+                        }).join('\n')
+                        : '• None recorded\n';
+                    const activePolls = (sDb.polls || []).filter(poll => poll.status === 'ACTIVE').slice(0, 3);
+                    weekText += '\n📊 *Active polls*\n';
+                    weekText += activePolls.length
+                        ? activePolls.map(poll => `• ${poll.question}`).join('\n')
+                        : '• None\n';
+                    const updates = (sDb.updates || []).filter(update => Number(update.timestamp) >= now - (7 * dayMs)).slice(-3);
+                    weekText += '\n📢 *Recent updates*\n';
+                    weekText += updates.length
+                        ? updates.map(update => `• ${String(update.text).slice(0, 180)}`).join('\n')
+                        : '• No recent updates\n';
+                    const studentKey = session.data.currentStudentId;
+                    const attendanceRecords = (Array.isArray(sDb.attendanceHistory) ? sDb.attendanceHistory : [])
+                        .filter(record => Number(record.closedAt) >= now - (7 * dayMs));
+                    const studentSessions = attendanceRecords.filter(record =>
+                        record.attendance?.some(item => item.memberKey === studentKey && item.status === 'PRESENT')
+                    ).length;
+                    if (attendanceRecords.length) {
+                        weekText += `\n👻 *My attendance (last 7 days)*: ${studentSessions}/${attendanceRecords.length} sessions`;
+                    }
+                    updateSessionState(userId, 'STUDENT_VIEW_ONLY', session.data);
+                    await message.reply(weekText + '\n\n(Type *0* to go back)');
                  } else {
-                    await message.reply(`❌ Invalid choice. Type 1-9, 0 to go back, or 99 to exit.`);
+                    await message.reply(`❌ Invalid choice. Type 1-11, 0 to go back, or 99 to exit.`);
                 }
                 break;
             }
@@ -3489,6 +3570,7 @@ async function sendStudentDashboard(message, className, studentName) {
   │👻 \`8\` ☞『_*Sign Attendance (Ghost Tracker)*_』
   │🛒 \`9\` ☞『_*Hustle Board (${marketCount} Active)*_』
   │📊 \`10\` ☞『_*View Polls (${activePollsCount} Active)*_』
+  │🗓️ \`11\` ☞『_*My Week*_』
   │🔙 \`0\` ☞『_*Main Menu*_』
   │🚪 \`99\` ☞『_*Logout*_』
   │
@@ -3574,7 +3656,9 @@ async function handleAttendance(message, userId, client) {
     activeRC.attendees[memberId] = {
         name: studentData.name,
         regNo: studentData.admission,
-        timestamp: new Date().toLocaleTimeString("en-US", {timeZone: "Africa/Nairobi"})
+        timestamp: new Date().toLocaleTimeString("en-US", {timeZone: "Africa/Nairobi"}),
+        checkedInAt: Date.now(),
+        status: 'PRESENT'
     };
 
     // Update their Ghost Tracker tally
