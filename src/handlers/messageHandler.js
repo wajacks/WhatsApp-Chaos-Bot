@@ -7,8 +7,6 @@ const { handleHymnalCommand } = require('../features/hymnal/handler');
 const { handleChatSummaryCommand } = require('../features/ai/chatSummary');
 const { handleWeatherCommand } = require('../features/weather/command');
 const { handleCoinPurchaseCommand } = require('../features/economy/purchaseHandler');
-const { hashSecret, generateAuthorizationCode } = require('../utils/credentials');
-
 const { createCommandRouter } = require('../commands/router');
 
 function registerMessageHandler(client, dependencies) {
@@ -159,6 +157,29 @@ function registerMessageHandler(client, dependencies) {
         const text = message.body ? message.body.trim() : '';
         const lowerText = text.toLowerCase();
 
+        // Handle owner application decisions before interactive games or portal
+        // sessions can consume the reply text.
+        if (isOwner(senderId) && !isGroup && message.hasQuotedMsg && /^(accept|reject)(?:\s|$)/i.test(text)) {
+            try {
+                const quotedMsg = await message.getQuotedMessage();
+                if (quotedMsg?.fromMe && quotedMsg.body?.includes('📩 *NEW CLASS REP APPLICATION*')) {
+                    const appMatch = quotedMsg.body.match(/🆔 \*Application ID:\* \`(app_[^`]+)\`/);
+                    if (appMatch) {
+                        await classHandler.handleOwnerApplicationReply(client, message, text, appMatch[1]);
+                        return;
+                    }
+                    await message.reply('⚠️ This is an older application card without a persistent ID. Ask the applicant to submit it again so I can route the decision safely.');
+                    return;
+                }
+            } catch (error) {
+                console.error('[OWNER APP REPLY ERROR]', error);
+            }
+        }
+        if (isOwner(senderId) && !isGroup && !message.hasQuotedMsg) {
+            const handled = await classHandler.handleOwnerPlaintextResponse(client, message, text, lowerText);
+            if (handled) return;
+        }
+
         const purchaseHandled = await handleCoinPurchaseCommand({
             message,
             text,
@@ -201,12 +222,14 @@ function registerMessageHandler(client, dependencies) {
             }
         }
 
-        // ====================================================
-        // 👑 OWNER: DIRECT PLAIN-TEXT APPLICATION INTERCEPT
-        // ====================================================
-        if (isOwner(senderId) && !isGroup) {
-            const handled = await classHandler.handleOwnerPlaintextResponse(client, message, text, lowerText);
-            if (handled) return; // Stops normal bot commands or AI from triggering
+        let quotedPollIdForSession = null;
+        if (!isGroup && /^\d+$/.test(lowerText) && message.hasQuotedMsg) {
+            try {
+                const quotedMessage = await message.getQuotedMessage();
+                quotedPollIdForSession = quotedMessage?.body?.match(/Poll ID:\s*(poll_[A-Za-z0-9_-]+)/i)?.[1] || null;
+            } catch (error) {
+                console.warn('[POLL] Could not inspect quoted message:', error.message);
+            }
         }
 
         // ============================================================
@@ -227,7 +250,7 @@ function registerMessageHandler(client, dependencies) {
             if (text.startsWith('!')) {
                 endSession(senderId);
                 // Falls through smoothly to execute your command
-            } else {
+            } else if (!quotedPollIdForSession) {
                 // Attendance confirmations must remain available while the
                 // student is inside a Class Portal menu session.
                 if (lowerText === 'present') {
@@ -296,48 +319,88 @@ function registerMessageHandler(client, dependencies) {
         // ====================================================
         // 📊 CLASS POLL DIRECT MESSAGE INTERCEPTOR
         // ====================================================
-        if (!isGroup && /^\d+$/.test(lowerText) && !isUserInClassSession(senderId)) {
+        if (!isGroup && /^\d+$/.test(lowerText) && (!isUserInClassSession(senderId) || quotedPollIdForSession)) {
             const db = readClassDB();
-            let studentClass = null;
-            let studentId = null;
+            const canonicalSender = getCanonicalJid(senderId) || senderId;
+            const memberships = [];
 
-            // Find if sender is a registered student
-            for (const className in db.classes) {
-                if (db.classes[className].members) {
-                    const memberId = Object.keys(db.classes[className].members).find(
-                        key => db.classes[className].members[key].phoneId === senderId
-                    );
-                    if (memberId) {
-                        studentClass = className;
-                        studentId = memberId;
-                        break;
+            for (const [className, classData] of Object.entries(db.classes || {})) {
+                for (const [memberId, member] of Object.entries(classData.members || {})) {
+                    const canonicalMember = getCanonicalJid(member.phoneId) || member.phoneId;
+                    if ((member.phoneId === senderId || canonicalMember === canonicalSender) &&
+                        !memberships.some(item => item.className === className)) {
+                        memberships.push({ className, classData, memberId });
                     }
                 }
             }
 
-            if (studentClass && db.classes[studentClass].polls) {
-                const activePoll = db.classes[studentClass].polls.find(p => p.status === 'ACTIVE');
-                if (activePoll) {
-                    const voteIdx = parseInt(lowerText) - 1;
-                    
-                    if (activePoll.votes[studentId] !== undefined) {
-                        await message.reply("❌ You have already voted on this poll.");
-                        return; // Stop execution
+            if (memberships.length) {
+                let quotedPollId = quotedPollIdForSession;
+                if (message.hasQuotedMsg) {
+                    try {
+                        const quotedMessage = await message.getQuotedMessage();
+                        quotedPollId = quotedPollId || quotedMessage?.body?.match(/Poll ID:\s*(poll_[A-Za-z0-9_-]+)/i)?.[1] || null;
+                    } catch (error) {
+                        console.warn('[POLL] Could not inspect quoted message:', error.message);
+                    }
+                }
+
+                const polls = memberships.flatMap(membership =>
+                    (membership.classData.polls || []).map(poll => ({ ...membership, poll }))
+                );
+                const isExpired = poll => !Number.isFinite(Number(poll.expiresAt)) || Number(poll.expiresAt) <= Date.now();
+                let selected = null;
+
+                if (quotedPollId) {
+                    selected = polls.find(item => item.poll.id === quotedPollId);
+                    if (!selected) {
+                        await message.reply('❌ I could not match that poll to one of your registered classes.');
+                        return;
+                    }
+                    if (selected.poll.status !== 'ACTIVE' || isExpired(selected.poll)) {
+                        await message.reply('🛑 This poll has closed. Its results will be sent shortly.');
+                        return;
+                    }
+                } else {
+                    const openPolls = polls.filter(({ poll }) =>
+                        poll.status === 'ACTIVE' && !isExpired(poll)
+                    );
+                    if (openPolls.length > 1) {
+                        await message.reply('📊 You have more than one active class poll. Reply to the specific poll message you want to vote on, then send your option number.');
+                        return;
+                    }
+                    if (openPolls.length === 1) {
+                        selected = openPolls[0];
+                    } else if (polls.some(({ poll }) => poll.status === 'ACTIVE' && isExpired(poll))) {
+                        await message.reply('🛑 This poll has closed. Its results will be sent shortly.');
+                        return;
+                    }
+                }
+
+                if (selected) {
+                    const { memberId, poll } = selected;
+                    const voteIdx = Number(lowerText) - 1;
+                    if (!poll.votes || typeof poll.votes !== 'object') poll.votes = {};
+
+                    if (poll.votes[memberId] !== undefined) {
+                        await message.reply('❌ You have already voted on this poll.');
+                        return;
+                    }
+                    if (voteIdx < 0 || voteIdx >= poll.options.length) {
+                        await message.reply(`❌ Invalid option. Please reply with a number between 1 and ${poll.options.length}.`);
+                        return;
+                    }
+                    if (isExpired(poll)) {
+                        await message.reply('🛑 This poll has closed. Its results will be sent shortly.');
+                        return;
                     }
 
-                    if (voteIdx >= 0 && voteIdx < activePoll.options.length) {
-                        activePoll.votes[studentId] = voteIdx;
-                        writeClassDB(db);
-                        
-                        const dateObj = new Date(activePoll.expiresAt);
-                        const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' });
-                        
-                        await message.reply(`✅ *Vote locked in anonymously.*\n\nThe final results will be available in your Student Hub today at *${timeStr}*.`);
-                        return; // Stop execution
-                    } else {
-                        await message.reply(`❌ Invalid option. Please reply with a number between 1 and ${activePoll.options.length}.`);
-                        return; // Stop execution
-                    }
+                    poll.votes[memberId] = voteIdx;
+                    writeClassDB(db);
+                    const dateObj = new Date(poll.expiresAt);
+                    const timeStr = dateObj.toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Nairobi' });
+                    await message.reply(`✅ *Vote locked in anonymously.*\n\nThe final results will be available in your Student Hub when the poll closes at *${timeStr}*.`);
+                    return;
                 }
             }
         }
@@ -503,66 +566,6 @@ function registerMessageHandler(client, dependencies) {
             return;
         }
 
-        // ====================================================
-        // 👑 OWNER: QUICK-REPLY APPLICATION HANDLING
-        // ====================================================
-        if (isOwner(senderId) && message.hasQuotedMsg && !isGroup) {
-            try {
-                const quotedMsg = await message.getQuotedMessage();
-                
-                // Check if you are replying to an Application generated by the bot
-                if (quotedMsg && quotedMsg.fromMe && quotedMsg.body.includes('📩 *NEW CLASS REP APPLICATION*')) {
-                    
-                    // Magically extract the User ID from the quoted text
-                    const match = quotedMsg.body.match(/📱 \*User ID:\* \`(.+?)\`/);
-                    
-                    if (match && match[1]) {
-                        const targetJid = match[1];
-                        const action = lowerText.split(/\s+/)[0]; // Gets the first word (accept or reject)
-
-                        if (action === 'accept') {
-                            const { readClassDB, writeClassDB } = require('../database/classdb');
-                            const db = readClassDB();
-                            
-                            // Generate OTP
-                            const code = generateAuthorizationCode();
-                            
-                            // Save code
-                            if (!db.repCodes) db.repCodes = [];
-                            db.repCodes.push(hashSecret(code));
-                            writeClassDB(db);
-
-                            // Auto-DM applicant
-                            await client.sendMessage(
-                                targetJid, 
-                                `🎉 *APPLICATION APPROVED!*\n━━━━━━━━━━━━━━━━━━\n\nYour request to become a Class Representative has been verified and accepted.\n\n🎟️ *Your Authorization Code:* \`${code}\`\n\nTo setup your class:\n1. Type \`!class\`\n2. Select *Create a New Class*\n3. Enter your code when prompted.`
-                            );
-                            
-                            // Confirm to you
-                            await message.reply(`✅ *APPLICATION ACCEPTED*\n\nThe auth code \`${code}\` has been generated and delivered automatically to the applicant.`);
-                            return; // Stop processing the message
-                            
-                        } else if (action === 'reject') {
-                            // Grabs everything you typed after the word "reject"
-                            const reason = text.slice(6).trim() || 'Failed security verification checks.';
-                            
-                            // Auto-DM applicant
-                            await client.sendMessage(
-                                targetJid, 
-                                `❌ *APPLICATION REJECTED*\n━━━━━━━━━━━━━━━━━━\n\nYour request to create a Class Portal was denied by the administrators.\n\n*Reason:* ${reason}`
-                            );
-                            
-                            // Confirm to you
-                            await message.reply(`✅ *APPLICATION REJECTED*\n\nThe rejection notice has been delivered to the applicant.`);
-                            return; // Stop processing the message
-                        }
-                    }
-                }
-            } catch (err) {
-                console.error('[OWNER APP REPLY ERROR]', err);
-            }
-        }
-        
         // ====================================================
         // 👑 OWNER CONTROL PANEL
         // ====================================================
