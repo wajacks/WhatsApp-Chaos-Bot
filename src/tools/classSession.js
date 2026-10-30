@@ -420,22 +420,102 @@ function startTimetableMonitor(client) {
     }, { scheduled: true, timezone: "Africa/Nairobi" });
 }
 
+function getEATWeekStartTimestamp(timestamp = Date.now()) {
+    const { dateKey } = getEATParts(new Date(timestamp));
+    const [year, month, day] = dateKey.split('-').map(Number);
+    const utcWeekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+    const daysSinceMonday = (utcWeekday + 6) % 7;
+    return Date.UTC(year, month - 1, day - daysSinceMonday) - (3 * 60 * 60 * 1000);
+}
+
+function formatWrapDate(timestamp) {
+    return new Intl.DateTimeFormat('en-KE', {
+        timeZone: 'Africa/Nairobi',
+        day: 'numeric',
+        month: 'short'
+    }).format(new Date(timestamp));
+}
+
+function buildWeeklyWrapUp(className, classData, now = Date.now()) {
+    const weekStart = getEATWeekStartTimestamp(now);
+    const weekEnd = weekStart + (7 * 24 * 60 * 60 * 1000) - 1;
+    const weekRange = formatWrapDate(weekStart) + ' – ' + formatWrapDate(Math.min(now, weekEnd)) + ' (EAT)';
+    const logs = Array.isArray(classData.logs) ? classData.logs : [];
+    const weeklyRollCalls = logs.filter(log =>
+        Number(log.timestamp) >= weekStart &&
+        Number(log.timestamp) <= now &&
+        typeof log.text === 'string' &&
+        log.text.startsWith('Roll Call Completed:')
+    );
+    const checkIns = weeklyRollCalls.reduce((total, log) => {
+        const match = log.text.match(/\((\d+)\s+present\)/i);
+        return total + (match ? Number(match[1]) : 0);
+    }, 0);
+
+    const weeklyUpdates = (Array.isArray(classData.updates) ? classData.updates : [])
+        .filter(update => Number(update.timestamp) >= weekStart && Number(update.timestamp) <= now).length;
+
+    const weeklyPolls = (Array.isArray(classData.polls) ? classData.polls : [])
+        .filter(poll => poll.status === 'CLOSED' &&
+            Number(poll.expiresAt) >= weekStart &&
+            Number(poll.expiresAt) <= now);
+    const pollVotes = weeklyPolls.reduce((total, poll) =>
+        total + Object.keys(poll.votes || {}).length, 0);
+
+    const nextWeekEnd = now + (7 * 24 * 60 * 60 * 1000);
+    const upcomingDeadlines = (Array.isArray(classData.assessments) ? classData.assessments : [])
+        .filter(item => Number(item.timestamp) > now && Number(item.timestamp) <= nextWeekEnd)
+        .sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
+
+    const activityLines = [
+        '• Roll calls completed: *' + weeklyRollCalls.length + '*',
+        '• Student check-ins recorded: *' + checkIns + '*',
+        '• Recent updates available: *' + weeklyUpdates + '*',
+        '• Polls closed: *' + weeklyPolls.length + '* (' + pollVotes + ' votes)'
+    ];
+
+    const deadlineLines = upcomingDeadlines.slice(0, 3).map(item => {
+        const type = item.type === 'CAT' ? 'CAT / exam'
+            : item.type === 'ASSIGNMENT' ? 'assignment'
+            : item.type === 'PROJECT' ? 'project'
+            : 'deadline';
+        return '• *' + (item.unit || type) + '* — ' + type + ', ' + formatWrapDate(Number(item.timestamp));
+    });
+    if (upcomingDeadlines.length > 3) {
+        deadlineLines.push('• Plus ' + (upcomingDeadlines.length - 3) + ' more. Type !class to view them.');
+    }
+
+    const activityTotal = weeklyRollCalls.length + weeklyUpdates + weeklyPolls.length;
+    const activitySummary = activityTotal > 0
+        ? activityLines.join('\n')
+        : 'A quieter week in the portal—no roll calls, updates, or polls were recorded.';
+
+    return [
+        '📚 *WEEKLY CLASS WRAP-UP*',
+        '🏫 *' + className + '*',
+        '🗓️ ' + weekRange,
+        '━━━━━━━━━━━━━━━━━━',
+        '',
+        '✨ *This week*',
+        activitySummary,
+        '',
+        '⏭️ *Coming up in the next 7 days*',
+        deadlineLines.length ? deadlineLines.join('\n') : '• No upcoming deadlines recorded.',
+        '',
+        'Have a restful weekend! Type !class to check your timetable and class updates.'
+    ].join('\n');
+}
+
 function startClassWeekendBroadcast(client) {
     // Runs every Friday at 5:00 PM (17:00) East Africa Time
     cron.schedule('0 17 * * 5', async () => {
-        console.log("[CLASS PORTAL] 🥳 Broadcasting Friday Weekend Wish to class members...");
+        console.log("[CLASS PORTAL] 📚 Broadcasting weekly class wrap-up...");
         const db = readClassDB();
         const classes = db.classes || {};
 
-        const weekendMessage = 
-            `🎉 *HAPPY WEEKEND, SCHOLARS!* 🎉\n` +
-            `━━━━━━━━━━━━━━━━━━\n\n` +
-            `The week's academic hustle is finally wrapped up! Whether you're resting up, catching up on assignments, or stepping away from your laptop—make it count.\n\n` +
-            `Have a safe, restful weekend, and let's bring the energy back next week! 🚀\n\n` +
-            `_— Automated Class Portal Weekend Wish_`;
-
         for (const className in classes) {
             const classData = classes[className];
+            const weekendMessage = buildWeeklyWrapUp(className, classData);
             const recipients = new Set();
 
             // 1. Collect Class Rep
@@ -460,11 +540,11 @@ function startClassWeekendBroadcast(client) {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                     await client.sendMessage(recipientId, weekendMessage);
                 } catch (e) {
-                    console.warn(`[CLASS PORTAL] Failed to send weekend wish to ${recipientId}`);
+                    console.warn(`[CLASS PORTAL] Failed to send weekly wrap-up to ${recipientId}`);
                 }
             }
         }
-        console.log("[CLASS PORTAL] ✅ Weekend broadcast completed.");
+        console.log("[CLASS PORTAL] ✅ Weekly wrap-up broadcast completed.");
     }, {
         scheduled: true,
         timezone: "Africa/Nairobi"
