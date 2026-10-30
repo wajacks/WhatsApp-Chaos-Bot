@@ -77,9 +77,82 @@ function getMarketNotifs(className, userId) {
     return count;
 }
 
+// Keep a copy of each numbered Class Portal menu so 0 can return one screen at a time.
+function trackClassNavigation(message, userId, input = null) {
+    const session = getSession(userId);
+    if (!session || !message || typeof message.reply !== 'function' || message.__classNavigationTracked) return;
+
+    const originalReply = message.reply.bind(message);
+    const stateAtInput = session.state;
+    let returnedToParentMenu = false;
+
+    const getReplyText = (args) => {
+        const content = args[0];
+        if (typeof content === 'string') return content;
+        if (content && typeof content === 'object') {
+            return typeof content.body === 'string' ? content.body : (typeof content.caption === 'string' ? content.caption : '');
+        }
+        return '';
+    };
+
+    const isNumberedMenu = (body) => {
+        if (!body) return false;
+        const hasFirstOption = /(?:^|\n)\s*(?:│[^\n]*?)?1[.)]\s/m.test(body)
+            || /(?:^|\n)\s*│[^\n]*\x601\x60/m.test(body);
+        const hasBackOption = /(?:^|\n)\s*(?:│[^\n]*?)?0[.)]\s*(?:🔙\s*)?(?:back|main menu|dashboard|return)/im.test(body)
+            || /(?:^|\n)\s*│[^\n]*\x600\x60[^\n]*(?:back|main menu|dashboard|return)/im.test(body);
+        const hasGatewayExit = /(?:^|\n)\s*(?:│[^\n]*?)?99[.)]\s*.*exit/im.test(body)
+            || /(?:^|\n)\s*│[^\n]*\x6099\x60[^\n]*exit/im.test(body);
+        return hasFirstOption && (hasBackOption || hasGatewayExit);
+    };
+
+    message.__classNavigationTracked = true;
+    message.reply = async (...args) => {
+        const result = await originalReply(...args);
+        const currentSession = getSession(userId);
+        if (!currentSession) return result;
+
+        if (!currentSession.navigationMenus) currentSession.navigationMenus = Object.create(null);
+        const body = getReplyText(args);
+        const currentState = currentSession.state;
+
+        if (isNumberedMenu(body)) {
+            currentSession.navigationMenus[currentState] = body;
+            currentSession.pendingBackState = null;
+            if (input === '0' && currentState !== stateAtInput) returnedToParentMenu = true;
+            return result;
+        }
+
+        const parentMenu = currentSession.navigationMenus[currentState];
+        if (input === '0' && !returnedToParentMenu && currentState !== stateAtInput && parentMenu) {
+            returnedToParentMenu = true;
+            await originalReply(parentMenu);
+            currentSession.pendingBackState = null;
+            return result;
+        }
+
+        currentSession.pendingBackState = parentMenu ? currentState : null;
+        return result;
+    };
+}
+
+function buildRepMembersMenu(isMainRep) {
+    const roleOptions = isMainRep
+        ? '3. 🎖️ Promote to Assistant Rep\n4. 🔻 Revoke Assistant Rep\n'
+        : '';
+    const ghostOption = isMainRep ? 5 : 3;
+    return '👥 *CLASS MEMBERS*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View All Members\n2. 🗑️ Remove a Member\n'
+        + roleOptions + ghostOption + '. 👻 View Ghost List (Attendance)\n\n0. 🔙 Back to Dashboard';
+}
+
+async function sendRepMembersMenu(message, isMainRep) {
+    await message.reply(buildRepMembersMenu(isMainRep));
+}
+
 // Entry point triggered by !class
 async function handleClassCommand(client, message, userId, userName) {
     createSession(userId, 'MAIN_MENU');
+    trackClassNavigation(message, userId);
     await sendMainMenu(message);
 }
 
@@ -127,6 +200,18 @@ async function handleInput(client, message, userId, text, userName) {
     if (!session) return;
 
     const input = text.trim();
+    trackClassNavigation(message, userId, input);
+
+    if (input === '0' && session.pendingBackState === session.state) {
+        const currentMenu = session.navigationMenus?.[session.state];
+        session.pendingBackState = null;
+        if (currentMenu) {
+            await message.reply(currentMenu);
+            return;
+        }
+    } else if (input !== '0') {
+        session.pendingBackState = null;
+    }
 
     // ========================================================
     // 🛒 MARKETPLACE LIVE NEGOTIATION INTERCEPTOR
@@ -343,8 +428,8 @@ async function handleInput(client, message, userId, text, userName) {
 
             case 'CREATE_CLASS_PASS': {
                 if (input === '0') {
-                    updateSessionState(userId, 'MAIN_MENU');
-                    await sendMainMenu(message);
+                    updateSessionState(userId, 'CREATE_CLASS_NAME', session.data);
+                    await message.reply(`📝 *CLASS NAME*\n\nCurrent name: *${session.data.pendingClassName}*\nEnter the class name (e.g., BSIT/2024), or type *0* to return to authorization.`);
                     return;
                 }
 
@@ -460,12 +545,7 @@ async function handleInput(client, message, userId, text, userName) {
                     await message.reply(`📢 *UPDATES MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n4. 🔔 Remind Update\n\n0. 🔙 Back to Dashboard`);
                 } else if (input === '3') {
                     updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
-                    let menuTxt = `👥 *CLASS MEMBERS*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View All Members\n2. 🗑️ Remove a Member\n`;
-                    if (session.data.isMainRep) {
-                        menuTxt += `3. 🎖️ Promote to Assistant Rep\n4. 🔻 Revoke Assistant Rep\n`;
-                    }
-                    menuTxt += `5. 👻 View Ghost List (Attendance)\n\n0. 🔙 Back to Dashboard`;
-                    await message.reply(menuTxt);
+                    await sendRepMembersMenu(message, session.data.isMainRep);
                 } else if (input === '4') {
                     updateSessionState(userId, 'REP_ISSUES_MENU', session.data);
                     await message.reply(`🚨 *ISSUES DESK*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Locked Accounts\n2. 🔓 Resolve / Unlock an Account\n\n0. 🔙 Back to Dashboard`);
@@ -1374,7 +1454,7 @@ async function handleInput(client, message, userId, text, userName) {
                 }
                 
                 updateSessionState(userId, 'REP_UPDATES_MENU', session.data);
-                await message.reply(`✅ *Update Posted & Saved!*\n\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n\n0. 🔙 Back`);
+                await message.reply(`✅ *Update Posted & Saved!*\n\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n4. 🔔 Remind Update\n\n0. 🔙 Back`);
                 break;
             }
 
@@ -1390,6 +1470,7 @@ async function handleInput(client, message, userId, text, userName) {
                 const classData = db.classes[session.data.loggedInClass];
                 const members = getAllClassParticipants(classData);
                 const mIds = getSortedMemberIds(classData);
+                const ghostListOption = session.data.isMainRep ? '5' : '3';
 
                 if (input === '1') {
                     if (mIds.length === 0) {
@@ -1448,7 +1529,7 @@ async function handleInput(client, message, userId, text, userName) {
                     mList += `\n*Reply with the number to REVOKE them:*\n(Type *0* to cancel)`;
                     updateSessionState(userId, 'REP_MEMBERS_REVOKE', { ...session.data, asstIds });
                     await message.reply(mList);
-                } else if (input === '5') {
+                } else if (input === ghostListOption || input === '5') {
                     // 👻 THE GHOST TRACKER
                     if (mIds.length === 0) {
                         await message.reply(`📭 No students to track.\n(Type *0* to go back)`);
@@ -1482,7 +1563,7 @@ async function handleInput(client, message, userId, text, userName) {
           case 'REP_MEMBERS_REMOVE': {
               if (input === '0') {
                   updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
-                  await message.reply(`👥 *CLASS MEMBERS*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View All Members\n2. 🗑️ Remove a Member (Intruder)\n\n0. 🔙 Back`);
+                  await sendRepMembersMenu(message, session.data.isMainRep);
                   return;
               }
               const selectedIdx = parseInt(input) - 1;
@@ -1506,14 +1587,15 @@ async function handleInput(client, message, userId, text, userName) {
               writeClassDB(db);
 
               updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
-              await message.reply(`✅ *${targetName}* has been removed from the class.\n\n1. 👁️ View All Members\n2. 🗑️ Remove a Member\n\n0. 🔙 Back`);
+              await message.reply(`✅ *${targetName}* has been removed from the class.`);
+              await sendRepMembersMenu(message, session.data.isMainRep);
               break;
           }
 
           case 'REP_MEMBERS_PROMOTE': {
             if (input === '0') {
                 updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
-                await message.reply(`👥 *CLASS MEMBERS*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View All Members\n2. 🗑️ Remove a Member\n3. 🎖️ Promote to Assistant Rep\n4. 🔻 Revoke Assistant Rep\n\n0. 🔙 Back`);
+                await sendRepMembersMenu(message, session.data.isMainRep);
                 return;
             }
             const selectedIdx = parseInt(input) - 1;
@@ -1544,14 +1626,15 @@ async function handleInput(client, message, userId, text, userName) {
             writeClassDB(db);
 
             updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
-            await message.reply(`✅ *${targetStudent.name}* has been promoted to Assistant Rep!\nThey can now login to the Rep Dashboard using the Class Password.\n\n0. 🔙 Back`);
+            await message.reply(`✅ *${targetStudent.name}* has been promoted to Assistant Rep!`);
+            await sendRepMembersMenu(message, session.data.isMainRep);
             break;
         }
 
         case 'REP_MEMBERS_REVOKE': {
             if (input === '0') {
                 updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
-                await message.reply(`👥 *CLASS MEMBERS*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View All Members\n2. 🗑️ Remove a Member\n3. 🎖️ Promote to Assistant Rep\n4. 🔻 Revoke Assistant Rep\n\n0. 🔙 Back`);
+                await sendRepMembersMenu(message, session.data.isMainRep);
                 return;
             }
             const selectedIdx = parseInt(input) - 1;
@@ -1575,7 +1658,8 @@ async function handleInput(client, message, userId, text, userName) {
             writeClassDB(db);
 
             updateSessionState(userId, 'REP_MEMBERS_MENU', session.data);
-            await message.reply(`✅ *${targetStudent.name}* has been demoted back to a regular student.\n\n0. 🔙 Back`);
+            await message.reply(`✅ *${targetStudent.name}* has been demoted back to a regular student.`);
+            await sendRepMembersMenu(message, session.data.isMainRep);
             break;
         }
 
