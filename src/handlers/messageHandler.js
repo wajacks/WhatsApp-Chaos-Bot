@@ -479,9 +479,6 @@ function registerMessageHandler(client, dependencies) {
         const voiceCommandHandled = await handleVoiceCommands({ message, text, lowerText, chatId, senderId, client, baseDir, fs, path, execFileAsync, googleTTS, EdgeTTS, MessageMedia, speakCooldowns, SPEAK_COOLDOWN_MS, voiceCooldowns, VOICE_COOLDOWN_MS, voiceSelections, EDGE_TTS_VOICES, DEFAULT_EDGE_VOICE });
         if (voiceCommandHandled) return;
 
-        const aiCommandHandled = await handleAiCommand({ message, text, lowerText, chatId, senderId, userName, getWeather, buildWeatherResponse, aiCooldowns, AI_COOLDOWN_MS, aiMemory, MAX_AI_MEMORY, ai, azureClient });
-        if (aiCommandHandled) return;
-
         // CLASS PORTAL
         // ====================================================
         // ====================================================
@@ -1820,6 +1817,210 @@ function registerMessageHandler(client, dependencies) {
             isGroup
         });
         if (commandHandled) return;
+
+        // Natural-language AI runs after commands and active workflows. This keeps
+        // menu replies, poll votes, game moves, and Class Portal steps on their
+        // existing deterministic routes.
+        const isExplicitAi = /^!ai(?:\s|$)/i.test(lowerText);
+        let shouldHandleNaturalText = false;
+        if (!isExplicitAi && text && !message.hasMedia && message.type !== 'ptt') {
+            if (!isGroup) {
+                shouldHandleNaturalText = true;
+            } else if (!message.fromMe) {
+                const normalizeJid = value => {
+                    if (!value) return '';
+                    try { return String(getCanonicalJid(value) || value).toLowerCase(); }
+                    catch (_) { return String(value).toLowerCase(); }
+                };
+                const botId = client.info && client.info.wid && client.info.wid._serialized;
+                const mentionedIds = Array.isArray(message.mentionedIds) ? message.mentionedIds : [];
+                const botMentioned = botId && mentionedIds.some(id =>
+                    normalizeJid(id) === normalizeJid(botId) ||
+                    String(id).split('@')[0] === String(botId).split('@')[0]
+                );
+                let botRepliedTo = false;
+                if (!botMentioned && message.hasQuotedMsg) {
+                    try {
+                        const quotedMessage = await message.getQuotedMessage();
+                        botRepliedTo = !!quotedMessage?.fromMe;
+                    } catch (quoteError) {
+                        console.warn('[AI ROUTING] Could not inspect quoted message:', quoteError.message);
+                    }
+                }
+                shouldHandleNaturalText = !!(botMentioned || botRepliedTo);
+            }
+        }
+
+        const AI_FEATURE_COMMANDS = {
+            show_menu: '!menu',
+            show_help: '!help',
+            show_games: '!games',
+            game_help: '!help games',
+            show_balance: '!bal',
+            show_profile: '!profile',
+            show_store: '!store',
+            claim_daily: '!daily',
+            random_song: '!song',
+            create_wordforge_lobby: '!wordforge',
+            join_wordforge: '!joinforge',
+            start_wordforge: '!startforge',
+            create_wordchain_lobby: '!wordchain',
+            join_wordchain: '!wjoin',
+            start_wordchain: '!startwordchain',
+            create_wordle_lobby: '!wordle',
+            join_wordle: '!join',
+            start_wordle: '!startwordle',
+            create_scramble_lobby: '!scramble',
+            join_scramble: '!joinscramble',
+            start_scramble: '!startscramble',
+            create_mafia_lobby: '!mafia',
+            join_mafia: '!joinmafia',
+            start_mafia: '!startmafia',
+            create_rebus_lobby: '!rebus',
+            join_rebus: '!joinrebus',
+            start_rebus: '!startrebus',
+            create_truthhunt_lobby: '!truthhunt',
+            join_truthhunt: '!jointruth',
+            start_truthhunt: '!starttruth',
+            create_numberrun_lobby: '!numberrun',
+            join_numberrun: '!joinnumberrun',
+            start_numberrun: '!startnumberrun'
+        };
+        const executeBotFeature = async ({ action, query }) => {
+            const baseCommand = AI_FEATURE_COMMANDS[action];
+            if (!baseCommand && action !== 'search_video') return { error: 'That bot feature is not available through AI.' };
+            const commandText = action === 'search_video'
+                ? '!video ' + String(query || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim()
+                : baseCommand;
+            if (action === 'search_video' && commandText === '!video') {
+                return { error: 'Please specify the video or song title to search for.' };
+            }
+
+            const commandMessage = Object.create(message);
+            Object.defineProperty(commandMessage, 'body', { value: commandText, configurable: true });
+            Object.defineProperty(commandMessage, 'mentionedIds', { value: [], configurable: true });
+            commandMessage.reply = message.reply.bind(message);
+            commandMessage.getMentions = async () => [];
+
+            const handled = await routeCommands({
+                message: commandMessage,
+                client,
+                chatId,
+                senderContact,
+                senderId,
+                economyUserId,
+                userName,
+                text: commandText,
+                lowerText: commandText.toLowerCase(),
+                isGroup
+            });
+            return handled
+                ? { delivered: true }
+                : { error: 'The normal bot router did not accept that feature request.' };
+        };
+
+        const getMyClassPortalSummary = () => {
+            if (typeof readClassDB !== 'function') return { authorized: false, message: 'Class Portal data is unavailable.' };
+            const db = readClassDB();
+            const canonical = value => {
+                if (!value) return '';
+                try { return String(getCanonicalJid(value) || value).toLowerCase(); }
+                catch (_) { return String(value).toLowerCase(); }
+            };
+            const currentId = canonical(senderId);
+            const now = Date.now();
+            const dayMs = 24 * 60 * 60 * 1000;
+            const classes = [];
+
+            for (const [className, classData] of Object.entries(db.classes || {})) {
+                const members = classData.members || {};
+                const matchedMember = Object.entries(members).find(([, member]) =>
+                    canonical(member && member.phoneId) === currentId
+                );
+                const isMainRep = canonical(classData.repId) === currentId;
+                const isAssistant = (classData.assistantReps || []).some(id => canonical(id) === currentId);
+                if (!matchedMember && !isMainRep && !isAssistant) continue;
+
+                const memberKey = matchedMember && matchedMember[0];
+                const role = isMainRep ? 'Class Rep' : isAssistant ? 'Assistant Rep' : 'Student';
+                const data = {
+                    className,
+                    role,
+                    schedule: [],
+                    deadlines: [],
+                    activePolls: [],
+                    updates: [],
+                    ownAttendance: []
+                };
+                const schedule = classData.timetable || {};
+                const eatTodayParts = new Intl.DateTimeFormat('en-CA', {
+                    timeZone: 'Africa/Nairobi', year: 'numeric', month: '2-digit', day: '2-digit'
+                }).formatToParts(new Date(now));
+                const todayParts = Object.fromEntries(eatTodayParts.map(part => [part.type, part.value]));
+                const todayStartUtc = Date.UTC(Number(todayParts.year), Number(todayParts.month) - 1, Number(todayParts.day)) - (3 * 60 * 60 * 1000);
+
+                for (let offset = 0; offset < 7; offset++) {
+                    const dayDate = new Date(todayStartUtc + offset * dayMs);
+                    const weekday = new Intl.DateTimeFormat('en-US', {
+                        timeZone: 'Africa/Nairobi', weekday: 'long'
+                    }).format(dayDate).toLowerCase();
+                    for (const item of (schedule[weekday] || []).slice(0, 5)) {
+                        data.schedule.push({
+                            day: weekday,
+                            unit: String(item.unit || '').slice(0, 100),
+                            time: String(item.time || '').slice(0, 40)
+                        });
+                    }
+                }
+                data.deadlines = (classData.assessments || [])
+                    .filter(item => Number(item.timestamp) > now && Number(item.timestamp) <= now + 14 * dayMs)
+                    .sort((a, b) => Number(a.timestamp) - Number(b.timestamp)
+                    ).slice(0, 8).map(item => ({
+                        unit: String(item.unit || item.type || 'Class work').slice(0, 100),
+                        type: String(item.type || 'deadline').slice(0, 40),
+                        due: new Date(Number(item.timestamp)).toLocaleString('en-KE', { timeZone: 'Africa/Nairobi' })
+                    }));
+                data.activePolls = (classData.polls || [])
+                    .filter(poll => poll.status === 'ACTIVE')
+                    .slice(0, 5).map(poll => ({
+                        question: String(poll.question || '').slice(0, 220),
+                        options: (poll.options || []).slice(0, 8).map(option => String(option).slice(0, 120))
+                    }));
+                data.updates = (classData.updates || [])
+                    .filter(update => Number(update.timestamp) >= now - 7 * dayMs)
+                    .slice(-5).map(update => ({
+                        posted: new Date(Number(update.timestamp)).toLocaleString('en-KE', { timeZone: 'Africa/Nairobi' }),
+                        text: String(update.text || '').slice(0, 400)
+                    }));
+                if (memberKey) {
+                    data.ownAttendance = (classData.attendanceHistory || [])
+                        .slice().sort((a, b) => Number(b.closedAt || 0) - Number(a.closedAt || 0))
+                        .flatMap(record => {
+                            const item = (record.attendance || []).find(entry => entry.memberKey === memberKey);
+                            return item ? [{
+                                date: record.dateKey || '',
+                                unit: String(record.unit || '').slice(0, 100),
+                                status: String(item.status || 'ABSENT'),
+                                checkInTime: item.checkInTime || null,
+                                correctionReason: item.reason || null
+                            }] : [];
+                        }).slice(0, 10);
+                }
+                classes.push(data);
+                if (classes.length >= 3) break;
+            }
+            return classes.length
+                ? { authorized: true, classes }
+                : { authorized: false, message: 'This user is not enrolled in a Class Portal.' };
+        };
+
+        const aiCommandHandled = await handleAiCommand({
+            message, text, lowerText, chatId, senderId, userName,
+            getWeather, buildWeatherResponse, aiCooldowns, AI_COOLDOWN_MS,
+            aiMemory, MAX_AI_MEMORY, ai, azureClient, shouldHandleNaturalText,
+            executeBotFeature, getMyClassPortalSummary
+        });
+        if (aiCommandHandled) return;
     } catch (err) {
         console.error('❌ General Message Handling Error:', err);
     }
