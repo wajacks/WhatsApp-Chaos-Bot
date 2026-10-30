@@ -3182,7 +3182,7 @@ async function handleInput(client, message, userId, text, userName) {
                     recentUpdates.forEach((u, i) => {
                         const dObj = new Date(u.timestamp);
                         const tStr = dObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' });
-                        if (i === sDb.updates.length - 1) upStr += `🚨 *LATEST [${tStr}]*\n*${u.text}*\n\n`;
+                        if (i === recentUpdates.length - 1) upStr += `🚨 *LATEST [${tStr}]*\n*${u.text}*\n\n`;
                         else upStr += `▪️ [${tStr}]\n${u.text}\n\n`;
                     });
                     await message.reply(upStr + `(Type *0* to go back)`);
