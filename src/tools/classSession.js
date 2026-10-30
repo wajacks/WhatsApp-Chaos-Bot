@@ -1,7 +1,81 @@
 const activeClassSessions = new Map();
 const SESSION_TIMEOUT_MS = 600 * 1000; // 10 minutes
 const cron = require('node-cron');
-const { readClassDB, writeClassDB } = require('../database/classdb');
+const { readClassDB, writeClassDB, createClassDBBackup } = require('../database/classdb');
+
+function getEATParts(date = new Date()) {
+    const values = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Africa/Nairobi',
+        weekday: 'long',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23'
+    }).formatToParts(date).map(part => [part.type, part.value]));
+
+    return {
+        weekday: values.weekday,
+        dateKey: `${values.year}-${values.month}-${values.day}`,
+        currentMinutes: (Number(values.hour) * 60) + Number(values.minute)
+    };
+}
+
+function getEATDateKey(date = new Date()) {
+    return getEATParts(date).dateKey;
+}
+
+function normalizeRollCallDate(activeRollCall) {
+    if (!activeRollCall) return null;
+    const raw = activeRollCall.dateKey || activeRollCall.date;
+    if (typeof raw === 'string') {
+        const isoMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (isoMatch) return isoMatch[1];
+        const usMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (usMatch) return `${usMatch[3]}-${usMatch[1].padStart(2, '0')}-${usMatch[2].padStart(2, '0')}`;
+    }
+    return activeRollCall.startedAt ? getEATDateKey(new Date(activeRollCall.startedAt)) : null;
+}
+
+function closeActiveRollCall(classData) {
+    const active = classData?.activeRollCall;
+    if (!active) return null;
+
+    const attendees = active.attendees && typeof active.attendees === 'object' ? active.attendees : {};
+    classData.totalRollCalls = (Number(classData.totalRollCalls) || 0) + 1;
+    if (!Array.isArray(classData.logs)) classData.logs = [];
+    classData.logs.push({
+        text: `Roll Call Completed: ${active.unit || 'Unknown unit'} (${Object.keys(attendees).length} present)`,
+        timestamp: Date.now()
+    });
+    delete classData.activeRollCall;
+    return { ...active, attendees, closedAt: Date.now() };
+}
+
+function openActiveRollCall(classData, unit, dateKey) {
+    const active = classData.activeRollCall;
+    if (active) {
+        if (active.unit === unit && normalizeRollCallDate(active) === dateKey) return false;
+        return false;
+    }
+
+    classData.activeRollCall = {
+        unit,
+        date: dateKey,
+        dateKey,
+        startedAt: Date.now(),
+        source: 'scheduled',
+        attendees: {}
+    };
+    return true;
+}
+
+function closeRollCallFor(classData, unit, dateKey) {
+    const active = classData.activeRollCall;
+    if (!active || active.unit !== unit || normalizeRollCallDate(active) !== dateKey) return null;
+    return closeActiveRollCall(classData);
+}
 
 
 function createSession(userId, state = 'MAIN_MENU', data = {}) {
@@ -245,42 +319,60 @@ function startPollMonitor(client) {
 
 function startTimetableMonitor(client) {
     console.log("[CLASS PORTAL] 🏫 Timetable & Auto-Roll Call Daemon Started (Cron Engine)...");
-    
-    // Runs every minute with explicit East Africa Time enforcement
+
     cron.schedule('* * * * *', async () => {
         const db = readClassDB();
-        
-        // Get precise Mombasa time via cron's native timezone handling
-        const nowEAT = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Nairobi"}));
-        const currentMinutes = (nowEAT.getHours() * 60) + nowEAT.getMinutes();
-        
-        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const todayStr = days[nowEAT.getDay()];
-        const todayDateKey = nowEAT.toISOString().split('T')[0];
+        const { weekday, dateKey: todayDateKey, currentMinutes } = getEATParts();
+        const todayStr = weekday.toLowerCase();
 
         let dbChanged = false;
 
         for (const className in db.classes) {
             const classData = db.classes[className];
-            if (classData.holidayMode) continue; // Skip all alerts if holiday mode is active
+            const active = classData.activeRollCall;
+
+            // Close registers left open across dates, or registers whose scheduled
+            // class ended while the bot was offline. Keep today's manual register
+            // open until its rep closes it or the midnight sweep runs.
+            if (active && normalizeRollCallDate(active) !== todayDateKey) {
+                closeActiveRollCall(classData);
+                dbChanged = true;
+            } else if (active && classData.exceptions?.[todayDateKey]?.[active.unit]?.status === 'CANCELLED') {
+                closeActiveRollCall(classData);
+                dbChanged = true;
+            } else if (active && classData.holidayMode) {
+                closeActiveRollCall(classData);
+                dbChanged = true;
+            }
+
+            if (classData.holidayMode) continue;
             const schedule = classData.timetable?.[todayStr] || [];
-            if (schedule.length === 0) continue;
+            const todaysExceptions = classData.exceptions?.[todayDateKey] || {};
+            const scheduledToday = [
+                ...schedule.filter(cls => classData.exceptions?.[todayDateKey]?.[cls.unit]?.status !== 'CANCELLED'),
+                ...Object.values(todaysExceptions).filter(cls => cls.status === 'MOVED')
+            ];
+
+            if (classData.activeRollCall && classData.activeRollCall.source !== 'manual' && normalizeRollCallDate(classData.activeRollCall) === todayDateKey) {
+                const activeSchedule = scheduledToday.find(cls => cls.unit === classData.activeRollCall.unit);
+                if (activeSchedule && Number.isFinite(activeSchedule.endMinutes) && currentMinutes >= activeSchedule.endMinutes) {
+                    closeActiveRollCall(classData);
+                    dbChanged = true;
+                }
+            }
 
             for (let i = 0; i < schedule.length; i++) {
                 const cls = schedule[i];
-                
-                // Check if a temporary exception exists for this exact class today
-                const isCancelled = classData.exceptions?.[todayDateKey]?.[cls.unit]?.status === 'CANCELLED';
-                if (isCancelled) continue; // Skip all alerts
 
-                // 1. THE 45-MINUTE WARNING (With Anti-Spam)
-                if (cls.startMinutes - currentMinutes === 60) {
+                const isCancelled = classData.exceptions?.[todayDateKey]?.[cls.unit]?.status === 'CANCELLED';
+                if (isCancelled) continue;
+
+                if (cls.startMinutes - currentMinutes === 45) {
                     let shouldWarn = true;
-                    // Anti-Spam Check: Did a class just end?
                     if (i > 0) {
                         const prevClass = schedule[i - 1];
                         const gap = cls.startMinutes - prevClass.endMinutes;
-                        if (gap < 120) shouldWarn = false; // Classes are back-to-back, skip spam
+                        if (gap < 120) shouldWarn = false;
                     }
 
                     if (shouldWarn) {
@@ -288,58 +380,36 @@ function startTimetableMonitor(client) {
                     }
                 }
 
-                // 2. THE START TRIGGER & AUTO-ROLL CALL
-                if (currentMinutes === cls.startMinutes) {
+                // Recover a missed start after a restart by opening the register
+                // while the scheduled class is still in progress. Existing
+                // attendance for this same class is preserved.
+                if (currentMinutes >= cls.startMinutes && currentMinutes < cls.endMinutes && openActiveRollCall(classData, cls.unit, todayDateKey)) {
                     const msg = `🟢 *CLASS IS STARTING*\n\n🏫 *Unit:* ${cls.unit}\n⏰ *Time:* ${cls.startTime} - ${cls.endTime}\n\n` +
                                 `_The attendance register is now open. Choose how to sign in:_\n` +
                                 `1️⃣ Reply with *PRESENT*\n` +
                                 `2️⃣ Type *!class* ➔ Open Student Hub ➔ Select option *8* (Sign Attendance)`;
-                    
                     broadcastToClass(client, classData, msg);
-                    
-                    // Auto-open the database roll call flag
-                    classData.activeRollCall = {
-                        unit: cls.unit,
-                        date: todayDateKey,
-                        attendees: {}
-                    };
                     dbChanged = true;
                 }
 
-                // 3. THE END TRIGGER & ROLL CALL CLOSURE
-                if (currentMinutes === cls.endMinutes) {
+                if (currentMinutes >= cls.endMinutes && closeRollCallFor(classData, cls.unit, todayDateKey)) {
                     broadcastToClass(client, classData, `🛑 *CLASS ENDED*\n\n${cls.unit} has officially concluded. The attendance register is now closed.`);
-                    
-                    // Auto-close roll call
-                    delete classData.activeRollCall;
                     dbChanged = true;
                 }
             }
 
-            // Process any Temporary Makeup Classes scheduled for today
-            const todaysExceptions = classData.exceptions?.[todayDateKey] || {};
-            for (const key in todaysExceptions) {
-                const makeupClass = todaysExceptions[key];
+            for (const makeupClass of Object.values(todaysExceptions)) {
                 if (makeupClass.status === 'MOVED') {
-                    // Start Trigger
-                    if (currentMinutes === makeupClass.startMinutes) {
+                    if (currentMinutes >= makeupClass.startMinutes && currentMinutes < makeupClass.endMinutes && openActiveRollCall(classData, makeupClass.unit, todayDateKey)) {
                         const makeupMsg = `🟢 *MAKEUP CLASS STARTING*\n\n🏫 *Unit:* ${makeupClass.unit}\n⏰ *Time:* ${makeupClass.startTime} - ${makeupClass.endTime}\n\n` +
                                           `_The attendance register is now open. Choose how to sign in:_\n` +
                                           `1️⃣ Reply with *PRESENT*\n` +
                                           `2️⃣ Type *!class* ➔ Open Student Hub ➔ Select option *8* (Sign Attendance)`;
-
                         broadcastToClass(client, classData, makeupMsg);
-                        classData.activeRollCall = {
-                            unit: makeupClass.unit,
-                            date: todayDateKey,
-                            attendees: {}
-                        };
                         dbChanged = true;
                     }
-                    // End Trigger
-                    if (currentMinutes === makeupClass.endMinutes) {
+                    if (currentMinutes >= makeupClass.endMinutes && closeRollCallFor(classData, makeupClass.unit, todayDateKey)) {
                         broadcastToClass(client, classData, `🛑 *MAKEUP CLASS ENDED*\n\n${makeupClass.unit} has officially concluded.`);
-                        delete classData.activeRollCall;
                         dbChanged = true;
                     }
                 }
@@ -508,7 +578,7 @@ function startSystemMaintenance(client) {
         let changed = false;
         for (const className in db.classes) {
             if (db.classes[className].activeRollCall) {
-                delete db.classes[className].activeRollCall;
+                closeActiveRollCall(db.classes[className]);
                 changed = true;
             }
         }
@@ -518,15 +588,9 @@ function startSystemMaintenance(client) {
 
     // 2. 3-DAY BACKUP: Overwrites the backup file at 3:00 AM and notifies Reps
     cron.schedule('0 3 */3 * *', async () => {
-        const fs = require('fs');
-        const path = require('path');
-        const dbPath = path.join(__dirname, '..', '..', 'data', 'classdb.json');
-        const backupPath = path.join(__dirname, '..', '..', 'data', 'classdb_backup.json');
-
         try {
-            // Overwrites the old backup with the new one
-            fs.copyFileSync(dbPath, backupPath);
-            console.log("[SYSTEM] 3-Day Database Backup Overwritten Successfully.");
+            const backupPath = await createClassDBBackup();
+            console.log(`[SYSTEM] Durable database backup created: ${backupPath}`);
 
             const db = readClassDB();
             for (const className in db.classes) {
@@ -556,6 +620,8 @@ module.exports = {
     startDeadlineMonitor,
     startTimetableMonitor,
     getPortalMetrics,
+    closeActiveRollCall,
+    getEATDateKey,
     startPollMonitor,
     startDailyReminders,
     startClassWeekendBroadcast,

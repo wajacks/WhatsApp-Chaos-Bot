@@ -1,9 +1,12 @@
-const { readClassDB, writeClassDB, classExists, isUserAlreadyRep } = require('../database/classdb');
-const { createSession, updateSessionState, getSession, endSession , getPortalMetrics} = require('../tools/classSession');
+const crypto = require('crypto');
+const { readClassDB, writeClassDB, flushClassDB, classExists, isUserAlreadyRep } = require('../database/classdb');
+const { createSession, updateSessionState, getSession, endSession, getPortalMetrics, closeActiveRollCall, getEATDateKey } = require('../tools/classSession');
 const { timeToMinutes, minutesToTime, checkCollision } = require('../tools/timeHelper');
+const { hashSecret, verifySecret, generateAuthorizationCode, generateNumericOtp } = require('../utils/credentials');
 
 // --- NEW: MARKETPLACE LIVE CHAT REGISTRY ---
 const activeMarketChats = new Map();
+const activeApplicationReviews = new Set();
 
 // Helper to combine registered students and ensure the Main Class Rep is always included
 function getAllClassParticipants(classData) {
@@ -73,8 +76,6 @@ function getMarketNotifs(className, userId) {
     });
     return count;
 }
-
-let lastApplicantUserId = null;
 
 // Entry point triggered by !class
 async function handleClassCommand(client, message, userId, userName) {
@@ -243,14 +244,32 @@ async function handleInput(client, message, userId, text, userName) {
                     return; 
                 }
                 
-                // 1. Send Application to Owner
+                // Persist each application independently so replies always target
+                // the quoted applicant, even after restarts or overlapping submissions.
                 const ownerJid = '254111659469@c.us'; // Your Master Owner Number
-                
-                // Formatted specifically so the bot can extract the ID when you reply to it
+                const applicationId = `app_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+                const application = {
+                    id: applicationId,
+                    applicantId: userId,
+                    applicantName: userName,
+                    className: session.data.appClass,
+                    inviteLink: input.trim(),
+                    status: 'PENDING',
+                    submittedAt: Date.now()
+                };
+                if (!Array.isArray(db.applications)) db.applications = [];
+                db.applications.push(application);
+                const pendingApplications = db.applications.filter(item => item.status === 'PENDING' || item.status === 'APPROVING');
+                const resolvedApplications = db.applications.filter(item => item.status !== 'PENDING' && item.status !== 'APPROVING').slice(-200);
+                db.applications = [...resolvedApplications, ...pendingApplications];
+                writeClassDB(db);
+                await flushClassDB();
+
                 const appSummary = `📩 *NEW CLASS REP APPLICATION*\n━━━━━━━━━━━━━━━━━━\n` +
                                    `👤 *WA Profile:* ${userName}\n` +
                                    `🏫 *Class:* ${session.data.appClass}\n` +
                                    `🔗 *Link:* ${input}\n\n` +
+                                   `🆔 *Application ID:* \`${applicationId}\`\n` +
                                    `📱 *User ID:* \`${userId}\`\n━━━━━━━━━━━━━━━━━━\n` +
                                    `👉 *Swipe right to reply to this message with:*\n` +
                                    `*accept* (to approve & send code)\n` +
@@ -258,9 +277,15 @@ async function handleInput(client, message, userId, text, userName) {
                 
                 try {
                     await client.sendMessage(ownerJid, appSummary);
-                    lastApplicantUserId = userId;
                 } catch (e) {
                     console.warn("[CLASS PORTAL] Could not send application to owner.", e);
+                    db.applications = db.applications.filter(item => item.id !== applicationId);
+                    writeClassDB(db);
+                    await flushClassDB();
+                    updateSessionState(userId, 'MAIN_MENU');
+                    await message.reply('❌ I could not deliver your application to the administrators. Please try again later.');
+                    await sendMainMenu(message);
+                    return;
                 }
 
                 // 2. Wrap up with the Applicant
@@ -281,7 +306,7 @@ async function handleInput(client, message, userId, text, userName) {
                 const cleanInput = input.trim().toUpperCase();
                 
                 // Validate against the database array
-                if (!db.repCodes || !db.repCodes.includes(cleanInput)) {
+                if (!db.repCodes || !db.repCodes.some(code => verifySecret(cleanInput, code))) {
                     await message.reply(`❌ *INVALID CODE*\n\nThe authorization code is incorrect, already used, or expired.\n\nPlease try again or type *0* to go back.`);
                     return;
                 }
@@ -324,13 +349,13 @@ async function handleInput(client, message, userId, text, userName) {
                 }
 
                 // SECURITY: Double check the code wasn't used by someone else while they were typing
-                if (!db.repCodes || !db.repCodes.includes(session.data.authCode)) {
+                if (!db.repCodes || !db.repCodes.some(code => verifySecret(session.data.authCode, code))) {
                     await message.reply(`❌ *AUTHORIZATION EXPIRED*\n\nYour code was just used by someone else or revoked by the system. Class creation failed.\n\nType *0* to go back.`);
                     return;
                 }
 
                 // CONSUME THE CODE: Remove it from the database permanently
-                db.repCodes = db.repCodes.filter(c => c !== session.data.authCode);
+                db.repCodes = db.repCodes.filter(c => !verifySecret(session.data.authCode, c));
 
                 const newClassName = session.data.pendingClassName;
                 
@@ -339,7 +364,7 @@ async function handleInput(client, message, userId, text, userName) {
                     repName: userName, 
                     repId: userId,
                     assistantReps: [],     
-                    classPassword: input,
+                    classPassword: hashSecret(input),
                     timetable: { sunday: [], monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [] },
                     updates: [],
                     members: {}, 
@@ -350,7 +375,7 @@ async function handleInput(client, message, userId, text, userName) {
                 writeClassDB(db);
 
                 updateSessionState(userId, 'MAIN_MENU');
-                await message.reply(`🎉 *CLASS SUCCESSFULLY CREATED!*\n\n🏫 *Class:* ${newClassName}\n👑 *Rep:* ${userName}\n🔑 *Class Password:* ${input}\n\nYour portal is now live. Reply with *1* to login and start building your timetable, or *99* to exit.\n\n*DO NOT FORGET YOUR PASSWORD.*`);
+                await message.reply(`🎉 *CLASS SUCCESSFULLY CREATED!*\n\n🏫 *Class:* ${newClassName}\n👑 *Rep:* ${userName}\n\nYour portal is now live. Share the password you just entered with your students. Reply with *1* to login and start building your timetable, or *99* to exit.\n\n*DO NOT FORGET YOUR PASSWORD.*`);
                 await sendMainMenu(message);
                 break;
             }
@@ -394,7 +419,7 @@ async function handleInput(client, message, userId, text, userName) {
                 const targetClass = session.data.selectedClass;
                 const classData = db.classes[targetClass];
 
-                if (input !== classData.classPassword) {
+                if (!verifySecret(input, classData.classPassword)) {
                     await message.reply(`❌ Incorrect Class Password for *${targetClass}*.\nTry again, or type *0* to go back.`);
                     return;
                 }
@@ -488,7 +513,7 @@ async function handleInput(client, message, userId, text, userName) {
                         return;
                     }
 
-                    const attendees = Object.values(activeRC.attendees);
+                    const attendees = Object.values(activeRC.attendees || {});
                     let report = `🛑 *ROLL CALL CLOSED*\n━━━━━━━━━━━━━━━━━━\n📚 Unit: *${activeRC.unit}*\n📅 Date: *${activeRC.date}*\n👥 Total Present: *${attendees.length}*\n━━━━━━━━━━━━━━━━━━\n\n`;
                     
                     if (attendees.length === 0) {
@@ -499,14 +524,7 @@ async function handleInput(client, message, userId, text, userName) {
                         });
                     }
 
-                    // Log the roll call in audit logs
-                    db.classes[session.data.loggedInClass].logs.push({
-                        text: `Roll Call Completed: ${activeRC.unit} (${attendees.length} present)`,
-                        timestamp: Date.now()
-                    });
-
-                    // Remove active roll call from memory
-                    delete db.classes[session.data.loggedInClass].activeRollCall;
+                    closeActiveRollCall(db.classes[session.data.loggedInClass]);
                     writeClassDB(db);
 
                     await message.reply(report + `\n\n(Type *0* to go back to Dashboard)`);
@@ -736,10 +754,19 @@ async function handleInput(client, message, userId, text, userName) {
                     return;
                 }
 
+                if (db.classes[session.data.loggedInClass].activeRollCall) {
+                    const active = db.classes[session.data.loggedInClass].activeRollCall;
+                    await message.reply(`⚠️ A roll call for *${active.unit}* is already open. Close it before starting another register.\n\n(Type *0* to go back)`);
+                    return;
+                }
+
                 // Open the register in the database
                 db.classes[session.data.loggedInClass].activeRollCall = {
                     unit: targetUnit,
                     date: new Date().toLocaleDateString("en-US", {timeZone: "Africa/Nairobi"}),
+                    dateKey: getEATDateKey(),
+                    startedAt: Date.now(),
+                    source: 'manual',
                     attendees: {}
                 };
                 writeClassDB(db);
@@ -873,6 +900,12 @@ async function handleInput(client, message, userId, text, userName) {
 
                 // Default estimation of 3 hours (180 mins) per class slot
                 const endMins = startMins + 180;
+
+                const collisionCheck = checkCollision(tempTimetable[currentDayStr], startMins, endMins);
+                if (collisionCheck && collisionCheck.collision) {
+                    await message.reply(`❌ This time overlaps with *${collisionCheck.conflict.unit}* (${collisionCheck.conflict.startTime}–${collisionCheck.conflict.endTime}). Choose a time that does not overlap.`);
+                    return;
+                }
 
                 tempTimetable[currentDayStr].push({
                     unit,
@@ -1691,13 +1724,13 @@ async function handleInput(client, message, userId, text, userName) {
             const targetIssue = issues[selectedIdx];
             
             // Generate a random 4-digit One-Time Code
-            const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
+            const otpCode = generateNumericOtp();
             
             // Unlock the student and assign the OTP
             if (db.classes[session.data.loggedInClass].members[targetIssue.memberId]) {
                 db.classes[session.data.loggedInClass].members[targetIssue.memberId].locked = false;
                 db.classes[session.data.loggedInClass].members[targetIssue.memberId].pendingRepReset = true;
-                db.classes[session.data.loggedInClass].members[targetIssue.memberId].resetOtp = otpCode;
+                db.classes[session.data.loggedInClass].members[targetIssue.memberId].resetOtp = hashSecret(otpCode);
             }
             
             issues.splice(selectedIdx, 1);
@@ -2156,7 +2189,7 @@ async function handleInput(client, message, userId, text, userName) {
                 }
 
                 const newPoll = {
-                    id: 'poll_' + Date.now(),
+                    id: `poll_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`,
                     question: session.data.pollQuestion,
                     options: session.data.pollOptions,
                     votes: {},
@@ -2173,7 +2206,8 @@ async function handleInput(client, message, userId, text, userName) {
                 newPoll.options.forEach((opt, idx) => {
                     blastMsg += `${idx + 1}️⃣ ${opt}\n`;
                 });
-                blastMsg += `\n👉 *Reply directly to this message with a single number (e.g., 1 or 2) to cast your anonymous vote.*`;
+                blastMsg += `\n👉 *Reply to this exact poll message with a single number (e.g., 1 or 2) to cast your anonymous vote.*`;
+                blastMsg += `\n_Poll ID: ${newPoll.id}_`;
 
                 await message.reply(`🚀 *LAUNCHING POLL*\n\nBroadcasting to ${memberIds.length} students...`);
 
@@ -2712,9 +2746,9 @@ async function handleInput(client, message, userId, text, userName) {
               db.classes[session.data.loggedInClass].members[newMemberId] = {
                   name: session.data.regName,
                   admission: session.data.regAdm,
-                  password: session.data.regPass,
+                  password: hashSecret(session.data.regPass),
                   securityQuestion: session.data.secQuestion,
-                  securityAnswer: input.trim().toLowerCase(), // Save as lowercase for easy matching
+                  securityAnswer: hashSecret(input.trim().toLowerCase()),
                   locked: false,
                   phoneId: userId
               };
@@ -2785,7 +2819,7 @@ async function handleInput(client, message, userId, text, userName) {
                 const studentRecord = db.classes[session.data.loggedInClass].members[targetStudentId];
                 let attempts = session.data.attempts || 0;
 
-                if (input === studentRecord.password) {
+                if (verifySecret(input, studentRecord.password)) {
                     // Success
                     updateSessionState(userId, 'STUDENT_DASHBOARD', { ...session.data, currentStudentId: targetStudentId, studentName: studentRecord.name });
                     await message.reply(`✅ *Access Granted*\nWelcome back, ${studentRecord.name}!`);
@@ -2817,7 +2851,7 @@ async function handleInput(client, message, userId, text, userName) {
               let secAttempts = session.data.secAttempts || 0;
 
               // Compare input in lowercase to make it forgiving (e.g. "Fluffy" vs "fluffy")
-              if (input.trim().toLowerCase() === secRecord.securityAnswer) {
+              if (verifySecret(input.trim().toLowerCase(), secRecord.securityAnswer)) {
                   updateSessionState(userId, 'STUDENT_RESET_PASS', session.data);
                   await message.reply(`✅ *IDENTITY VERIFIED*\n\nPlease enter a *NEW* Personal Password for your account:`);
               } else {
@@ -2853,7 +2887,7 @@ async function handleInput(client, message, userId, text, userName) {
                 }
 
                 const resetStudentId = session.data.loginTargetId;
-                db.classes[session.data.loggedInClass].members[resetStudentId].password = input;
+                db.classes[session.data.loggedInClass].members[resetStudentId].password = hashSecret(input);
                 writeClassDB(db);
                 
                 updateSessionState(userId, 'STUDENT_DASHBOARD', { ...session.data, currentStudentId: resetStudentId, studentName: db.classes[session.data.loggedInClass].members[resetStudentId].name });
@@ -2882,7 +2916,7 @@ async function handleInput(client, message, userId, text, userName) {
               const otpRecord = db.classes[session.data.loggedInClass].members[otpTargetId];
               let otpAttempts = session.data.otpAttempts || 0;
 
-              if (input === otpRecord.resetOtp) {
+              if (verifySecret(input, otpRecord.resetOtp)) {
                   updateSessionState(userId, 'STUDENT_FORCE_NEW_PASS', session.data);
                   await message.reply(`✅ *CODE ACCEPTED*\n\nLet's get your account fully recovered.\n\nPlease enter a *NEW Personal Password*:`);
               } else {
@@ -2930,9 +2964,9 @@ async function handleInput(client, message, userId, text, userName) {
             const memberRef = db.classes[session.data.loggedInClass].members[finalTargetId];
             
             // Save new credentials and clear OTP locks
-            memberRef.password = session.data.tempPass;
+            memberRef.password = hashSecret(session.data.tempPass);
             memberRef.securityQuestion = session.data.newSecQuestion;
-            memberRef.securityAnswer = input.trim().toLowerCase();
+            memberRef.securityAnswer = hashSecret(input.trim().toLowerCase());
             memberRef.pendingRepReset = false;
             delete memberRef.resetOtp;
             
@@ -3128,15 +3162,14 @@ async function handleInput(client, message, userId, text, userName) {
 
                     const mId = session.data.currentStudentId;
                     const studentData = sDb.members[mId];
-                    const todayDate = new Date().toLocaleDateString("en-US", {timeZone: "Africa/Nairobi"});
-
-                    if (studentData.lastSigned === todayDate) {
-                        await message.reply(`✅ You have already signed the register for today!\n\n(Type *0* to go back)`);
+                    if (!sDb.activeRollCall.attendees || typeof sDb.activeRollCall.attendees !== 'object') sDb.activeRollCall.attendees = {};
+                    if (sDb.activeRollCall.attendees[mId]) {
+                        await message.reply(`✅ You have already signed the register for *${sDb.activeRollCall.unit}*.\n\n(Type *0* to go back)`);
                         return;
                     }
 
                     studentData.attendedClasses = (studentData.attendedClasses || 0) + 1;
-                    studentData.lastSigned = todayDate;
+                    studentData.lastSigned = sDb.activeRollCall.dateKey || sDb.activeRollCall.date;
                     // Push students to the Rep's active register
                     sDb.activeRollCall.attendees[mId] = {
                         name: studentData.name,
@@ -3420,15 +3453,17 @@ async function handleAttendance(message, userId, client) {
 
     const db = readClassDB();
     let studentClass = null;
+    let memberId = null;
     let studentData = null;
 
     // 1. Find which class this student belongs to
     for (const className in db.classes) {
         if (db.classes[className].members) {
-            const memberObj = Object.values(db.classes[className].members).find(m => m.phoneId === userId);
-            if (memberObj) {
+            const foundId = Object.keys(db.classes[className].members).find(id => db.classes[className].members[id].phoneId === userId);
+            if (foundId) {
                 studentClass = className;
-                studentData = memberObj;
+                memberId = foundId;
+                studentData = db.classes[className].members[foundId];
                 break;
             }
         }
@@ -3445,10 +3480,7 @@ async function handleAttendance(message, userId, client) {
     }
 
     // 3. Find their internal ID to check if they already signed in
-    const memberId = Object.keys(db.classes[studentClass].members).find(
-        key => db.classes[studentClass].members[key].phoneId === userId
-    );
-
+    if (!activeRC.attendees) activeRC.attendees = {};
     if (activeRC.attendees[memberId]) {
         await message.reply(`⚠️ You are already marked present for *${activeRC.unit}*.`);
         return true; 
@@ -3463,8 +3495,7 @@ async function handleAttendance(message, userId, client) {
 
     // Update their Ghost Tracker tally
     studentData.attendedClasses = (studentData.attendedClasses || 0) + 1;
-    const todayDate = new Date().toLocaleDateString("en-US", {timeZone: "Africa/Nairobi"});
-    studentData.lastSigned = todayDate;
+    studentData.lastSigned = activeRC.dateKey || getEATDateKey();
 
     writeClassDB(db);
 
@@ -3472,67 +3503,129 @@ async function handleAttendance(message, userId, client) {
     return true;
 }
 
-/**
- * Allows the owner to type "accept" or "reject <reason>" directly in DMs
- */
-async function handleOwnerPlaintextResponse(client, message, text, lowerText) {
-    if (lowerText === 'accept' || lowerText.startsWith('reject')) {
-        if (!lastApplicantUserId) {
-            await message.reply('⚠️ No recent class rep application found in memory to process.');
-            return true; // Handled (prevents bot from treating it as an AI prompt or normal command)
-        }
-
-        const action = lowerText.split(/\s+/)[0];
-        const targetJid = lastApplicantUserId;
-        const db = readClassDB();
-
-        if (action === 'accept') {
-            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; 
-            let code = 'REP-';
-            for (let i = 0; i < 5; i++) {
-                code += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            
-            if (!db.repCodes) db.repCodes = [];
-            db.repCodes.push(code);
-            writeClassDB(db);
-
-            try {
-                await client.sendMessage(
-                    targetJid, 
-                    `🎉 *APPLICATION APPROVED!*\n━━━━━━━━━━━━━━━━━━\n\nYour request to become a Class Representative has been verified and accepted.\n\n🎟️ *Your Authorization Code:* \`${code}\`\n\nTo setup your class:\n1. Type \`!class\`\n2. Select *Create a New Class*\n3. Enter your code when prompted.`
-                );
-            } catch (e) {
-                console.warn('[CLASS PORTAL] Could not send code to applicant DMs:', e);
-            }
-            
-            await message.reply(`✅ *APPLICATION ACCEPTED*\n\nThe auth code \`${code}\` has been generated and delivered automatically to the applicant.`);
-            lastApplicantUserId = null; // Clear memory after processing
-            return true;
-            
-        } else if (action === 'reject') {
-            const reason = text.slice(6).trim() || 'Failed security verification checks.';
-            
-            try {
-                await client.sendMessage(
-                    targetJid, 
-                    `❌ *APPLICATION REJECTED*\n━━━━━━━━━━━━━━━━━━\n\nYour request to create a Class Portal was denied by the administrators.\n\n*Reason:* ${reason}`
-                );
-            } catch (e) {
-                console.warn('[CLASS PORTAL] Could not send rejection to applicant DMs:', e);
-            }
-            
-            await message.reply(`✅ *APPLICATION REJECTED*\n\nThe rejection notice has been delivered to the applicant.`);
-            lastApplicantUserId = null; // Clear memory after processing
-            return true;
-        }
+async function handleOwnerApplicationReply(client, message, text, applicationId) {
+    if (activeApplicationReviews.has(applicationId)) {
+        await message.reply('⏳ This application is already being processed.');
+        return true;
     }
-    return false;
+
+    activeApplicationReviews.add(applicationId);
+    try {
+        return await processOwnerApplicationReply(client, message, text, applicationId);
+    } finally {
+        activeApplicationReviews.delete(applicationId);
+    }
+}
+
+async function processOwnerApplicationReply(client, message, text, applicationId) {
+    const action = String(text || '').trim().split(/\s+/)[0].toLowerCase();
+    if (!['accept', 'reject'].includes(action)) return false;
+
+    const db = readClassDB();
+    if (!Array.isArray(db.applications)) db.applications = [];
+    const application = db.applications.find(item => item.id === applicationId);
+    if (!application) {
+        await message.reply('⚠️ I could not find that application. Ask the applicant to submit it again.');
+        return true;
+    }
+    if (application.status === 'APPROVED' || application.status === 'REJECTED') {
+        await message.reply(`ℹ️ Application ${applicationId} was already ${application.status.toLowerCase()}.`);
+        return true;
+    }
+
+    if (action === 'accept') {
+        // Revoke a hash left by an interrupted approval before issuing a replacement.
+        if (application.authorizationCodeHash) {
+            db.repCodes = (db.repCodes || []).filter(hash => hash !== application.authorizationCodeHash);
+        }
+
+        const code = generateAuthorizationCode();
+        const codeHash = hashSecret(code);
+        if (!Array.isArray(db.repCodes)) db.repCodes = [];
+        db.repCodes.push(codeHash);
+        application.status = 'APPROVING';
+        application.authorizationCodeHash = codeHash;
+        application.reviewStartedAt = Date.now();
+        writeClassDB(db);
+        await flushClassDB();
+
+        try {
+            await client.sendMessage(
+                application.applicantId,
+                `🎉 *APPLICATION APPROVED!*\n━━━━━━━━━━━━━━━━━━\n\nYour request to become a Class Representative has been verified and accepted.\n\n🎟️ *Your Authorization Code:* \`${code}\`\n\nTo setup your class:\n1. Type \`!class\`\n2. Select *Create a New Class*\n3. Enter your code when prompted.`
+            );
+        } catch (error) {
+            db.repCodes = db.repCodes.filter(hash => hash !== codeHash);
+            application.status = 'PENDING';
+            delete application.authorizationCodeHash;
+            delete application.reviewStartedAt;
+            writeClassDB(db);
+            await flushClassDB();
+            console.warn('[CLASS PORTAL] Could not send authorization code to applicant:', error.message);
+            await message.reply('❌ The code could not be delivered, so this application remains pending. You can retry by replying accept to its application card.');
+            return true;
+        }
+
+        application.status = 'APPROVED';
+        application.reviewedAt = Date.now();
+        delete application.authorizationCodeHash;
+        delete application.reviewStartedAt;
+        writeClassDB(db);
+        await flushClassDB();
+        await message.reply(`✅ Application ${applicationId} approved. The authorization code was delivered to the applicant.`);
+        return true;
+    }
+
+    if (application.authorizationCodeHash) {
+        db.repCodes = (db.repCodes || []).filter(hash => hash !== application.authorizationCodeHash);
+        delete application.authorizationCodeHash;
+        delete application.reviewStartedAt;
+        application.status = 'PENDING';
+        writeClassDB(db);
+        await flushClassDB();
+    }
+
+    let reasonText = String(text || '').trim().replace(/^reject\b/i, '').trim();
+    if (reasonText.startsWith(applicationId)) reasonText = reasonText.slice(applicationId.length).trim();
+    const reason = reasonText || 'Failed security verification checks.';
+    try {
+        await client.sendMessage(
+            application.applicantId,
+            `❌ *APPLICATION REJECTED*\n━━━━━━━━━━━━━━━━━━\n\nYour request to create a Class Portal was denied by the administrators.\n\n*Reason:* ${reason}`
+        );
+    } catch (error) {
+        console.warn('[CLASS PORTAL] Could not send rejection notice to applicant:', error.message);
+        await message.reply('❌ The rejection notice could not be delivered. The application remains pending.');
+        return true;
+    }
+
+    application.status = 'REJECTED';
+    application.rejectionReason = reason;
+    application.reviewedAt = Date.now();
+    writeClassDB(db);
+    await flushClassDB();
+    await message.reply(`✅ Application ${applicationId} rejected. The applicant was notified.`);
+    return true;
+}
+
+async function handleOwnerPlaintextResponse(client, message, text, lowerText) {
+    if (!/^(accept|reject)(?:\s|$)/i.test(String(text || '').trim())) return false;
+    const match = String(text || '').trim().match(/^(accept|reject)\s+(app_[A-Za-z0-9_-]+)(?:\s+([\s\S]*))?$/i);
+    if (!match) {
+        await message.reply('Reply to the specific application card with `accept` or `reject <reason>`. You can also use `accept <Application ID>` or `reject <Application ID> <reason>`.');
+        return true;
+    }
+
+    const action = match[1].toLowerCase();
+    const applicationId = match[2];
+    const details = match[3] || '';
+    return handleOwnerApplicationReply(client, message, `${action} ${details}`.trim(), applicationId);
 }
 
 module.exports = {
     handleClassCommand,
     handleInput,
     handleAttendance,
-    handleOwnerPlaintextResponse
+    handleOwnerPlaintextResponse,
+    handleOwnerApplicationReply
 };
