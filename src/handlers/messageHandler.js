@@ -7,6 +7,7 @@ const { handleHymnalCommand } = require('../features/hymnal/handler');
 const { handleChatSummaryCommand } = require('../features/ai/chatSummary');
 const { handleWeatherCommand } = require('../features/weather/command');
 const { handleCoinPurchaseCommand } = require('../features/economy/purchaseHandler');
+const { hashSecret, generateAuthorizationCode } = require('../utils/credentials');
 
 const { createCommandRouter } = require('../commands/router');
 
@@ -227,6 +228,13 @@ function registerMessageHandler(client, dependencies) {
                 endSession(senderId);
                 // Falls through smoothly to execute your command
             } else {
+                // Attendance confirmations must remain available while the
+                // student is inside a Class Portal menu session.
+                if (lowerText === 'present') {
+                    const wasHandledAsAttendance = await handleAttendance(message, senderId, client);
+                    if (wasHandledAsAttendance) return;
+                }
+
                 // Route your standard portal menu input directly to the class state machine
                 await classHandler.handleInput(client, message, senderId, text, userName);
                 return; // CRITICAL: Stop execution for regular portal inputs
@@ -517,15 +525,11 @@ function registerMessageHandler(client, dependencies) {
                             const db = readClassDB();
                             
                             // Generate OTP
-                            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; 
-                            let code = 'REP-';
-                            for (let i = 0; i < 5; i++) {
-                                code += chars.charAt(Math.floor(Math.random() * chars.length));
-                            }
+                            const code = generateAuthorizationCode();
                             
                             // Save code
                             if (!db.repCodes) db.repCodes = [];
-                            db.repCodes.push(code);
+                            db.repCodes.push(hashSecret(code));
                             writeClassDB(db);
 
                             // Auto-DM applicant

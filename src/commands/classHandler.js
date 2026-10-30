@@ -1,6 +1,7 @@
 const { readClassDB, writeClassDB, classExists, isUserAlreadyRep } = require('../database/classdb');
-const { createSession, updateSessionState, getSession, endSession , getPortalMetrics} = require('../tools/classSession');
+const { createSession, updateSessionState, getSession, endSession, getPortalMetrics, closeActiveRollCall, getEATDateKey } = require('../tools/classSession');
 const { timeToMinutes, minutesToTime, checkCollision } = require('../tools/timeHelper');
+const { hashSecret, verifySecret, generateAuthorizationCode, generateNumericOtp } = require('../utils/credentials');
 
 // --- NEW: MARKETPLACE LIVE CHAT REGISTRY ---
 const activeMarketChats = new Map();
@@ -281,7 +282,7 @@ async function handleInput(client, message, userId, text, userName) {
                 const cleanInput = input.trim().toUpperCase();
                 
                 // Validate against the database array
-                if (!db.repCodes || !db.repCodes.includes(cleanInput)) {
+                if (!db.repCodes || !db.repCodes.some(code => verifySecret(cleanInput, code))) {
                     await message.reply(`❌ *INVALID CODE*\n\nThe authorization code is incorrect, already used, or expired.\n\nPlease try again or type *0* to go back.`);
                     return;
                 }
@@ -324,13 +325,13 @@ async function handleInput(client, message, userId, text, userName) {
                 }
 
                 // SECURITY: Double check the code wasn't used by someone else while they were typing
-                if (!db.repCodes || !db.repCodes.includes(session.data.authCode)) {
+                if (!db.repCodes || !db.repCodes.some(code => verifySecret(session.data.authCode, code))) {
                     await message.reply(`❌ *AUTHORIZATION EXPIRED*\n\nYour code was just used by someone else or revoked by the system. Class creation failed.\n\nType *0* to go back.`);
                     return;
                 }
 
                 // CONSUME THE CODE: Remove it from the database permanently
-                db.repCodes = db.repCodes.filter(c => c !== session.data.authCode);
+                db.repCodes = db.repCodes.filter(c => !verifySecret(session.data.authCode, c));
 
                 const newClassName = session.data.pendingClassName;
                 
@@ -339,7 +340,7 @@ async function handleInput(client, message, userId, text, userName) {
                     repName: userName, 
                     repId: userId,
                     assistantReps: [],     
-                    classPassword: input,
+                    classPassword: hashSecret(input),
                     timetable: { sunday: [], monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [] },
                     updates: [],
                     members: {}, 
@@ -350,7 +351,7 @@ async function handleInput(client, message, userId, text, userName) {
                 writeClassDB(db);
 
                 updateSessionState(userId, 'MAIN_MENU');
-                await message.reply(`🎉 *CLASS SUCCESSFULLY CREATED!*\n\n🏫 *Class:* ${newClassName}\n👑 *Rep:* ${userName}\n🔑 *Class Password:* ${input}\n\nYour portal is now live. Reply with *1* to login and start building your timetable, or *99* to exit.\n\n*DO NOT FORGET YOUR PASSWORD.*`);
+                await message.reply(`🎉 *CLASS SUCCESSFULLY CREATED!*\n\n🏫 *Class:* ${newClassName}\n👑 *Rep:* ${userName}\n\nYour portal is now live. Share the password you just entered with your students. Reply with *1* to login and start building your timetable, or *99* to exit.\n\n*DO NOT FORGET YOUR PASSWORD.*`);
                 await sendMainMenu(message);
                 break;
             }
@@ -394,7 +395,7 @@ async function handleInput(client, message, userId, text, userName) {
                 const targetClass = session.data.selectedClass;
                 const classData = db.classes[targetClass];
 
-                if (input !== classData.classPassword) {
+                if (!verifySecret(input, classData.classPassword)) {
                     await message.reply(`❌ Incorrect Class Password for *${targetClass}*.\nTry again, or type *0* to go back.`);
                     return;
                 }
@@ -488,7 +489,7 @@ async function handleInput(client, message, userId, text, userName) {
                         return;
                     }
 
-                    const attendees = Object.values(activeRC.attendees);
+                    const attendees = Object.values(activeRC.attendees || {});
                     let report = `🛑 *ROLL CALL CLOSED*\n━━━━━━━━━━━━━━━━━━\n📚 Unit: *${activeRC.unit}*\n📅 Date: *${activeRC.date}*\n👥 Total Present: *${attendees.length}*\n━━━━━━━━━━━━━━━━━━\n\n`;
                     
                     if (attendees.length === 0) {
@@ -499,14 +500,7 @@ async function handleInput(client, message, userId, text, userName) {
                         });
                     }
 
-                    // Log the roll call in audit logs
-                    db.classes[session.data.loggedInClass].logs.push({
-                        text: `Roll Call Completed: ${activeRC.unit} (${attendees.length} present)`,
-                        timestamp: Date.now()
-                    });
-
-                    // Remove active roll call from memory
-                    delete db.classes[session.data.loggedInClass].activeRollCall;
+                    closeActiveRollCall(db.classes[session.data.loggedInClass]);
                     writeClassDB(db);
 
                     await message.reply(report + `\n\n(Type *0* to go back to Dashboard)`);
@@ -736,10 +730,19 @@ async function handleInput(client, message, userId, text, userName) {
                     return;
                 }
 
+                if (db.classes[session.data.loggedInClass].activeRollCall) {
+                    const active = db.classes[session.data.loggedInClass].activeRollCall;
+                    await message.reply(`⚠️ A roll call for *${active.unit}* is already open. Close it before starting another register.\n\n(Type *0* to go back)`);
+                    return;
+                }
+
                 // Open the register in the database
                 db.classes[session.data.loggedInClass].activeRollCall = {
                     unit: targetUnit,
                     date: new Date().toLocaleDateString("en-US", {timeZone: "Africa/Nairobi"}),
+                    dateKey: getEATDateKey(),
+                    startedAt: Date.now(),
+                    source: 'manual',
                     attendees: {}
                 };
                 writeClassDB(db);
@@ -873,6 +876,12 @@ async function handleInput(client, message, userId, text, userName) {
 
                 // Default estimation of 3 hours (180 mins) per class slot
                 const endMins = startMins + 180;
+
+                const collisionCheck = checkCollision(tempTimetable[currentDayStr], startMins, endMins);
+                if (collisionCheck && collisionCheck.collision) {
+                    await message.reply(`❌ This time overlaps with *${collisionCheck.conflict.unit}* (${collisionCheck.conflict.startTime}–${collisionCheck.conflict.endTime}). Choose a time that does not overlap.`);
+                    return;
+                }
 
                 tempTimetable[currentDayStr].push({
                     unit,
@@ -1691,13 +1700,13 @@ async function handleInput(client, message, userId, text, userName) {
             const targetIssue = issues[selectedIdx];
             
             // Generate a random 4-digit One-Time Code
-            const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
+            const otpCode = generateNumericOtp();
             
             // Unlock the student and assign the OTP
             if (db.classes[session.data.loggedInClass].members[targetIssue.memberId]) {
                 db.classes[session.data.loggedInClass].members[targetIssue.memberId].locked = false;
                 db.classes[session.data.loggedInClass].members[targetIssue.memberId].pendingRepReset = true;
-                db.classes[session.data.loggedInClass].members[targetIssue.memberId].resetOtp = otpCode;
+                db.classes[session.data.loggedInClass].members[targetIssue.memberId].resetOtp = hashSecret(otpCode);
             }
             
             issues.splice(selectedIdx, 1);
@@ -2712,9 +2721,9 @@ async function handleInput(client, message, userId, text, userName) {
               db.classes[session.data.loggedInClass].members[newMemberId] = {
                   name: session.data.regName,
                   admission: session.data.regAdm,
-                  password: session.data.regPass,
+                  password: hashSecret(session.data.regPass),
                   securityQuestion: session.data.secQuestion,
-                  securityAnswer: input.trim().toLowerCase(), // Save as lowercase for easy matching
+                  securityAnswer: hashSecret(input.trim().toLowerCase()),
                   locked: false,
                   phoneId: userId
               };
@@ -2785,7 +2794,7 @@ async function handleInput(client, message, userId, text, userName) {
                 const studentRecord = db.classes[session.data.loggedInClass].members[targetStudentId];
                 let attempts = session.data.attempts || 0;
 
-                if (input === studentRecord.password) {
+                if (verifySecret(input, studentRecord.password)) {
                     // Success
                     updateSessionState(userId, 'STUDENT_DASHBOARD', { ...session.data, currentStudentId: targetStudentId, studentName: studentRecord.name });
                     await message.reply(`✅ *Access Granted*\nWelcome back, ${studentRecord.name}!`);
@@ -2817,7 +2826,7 @@ async function handleInput(client, message, userId, text, userName) {
               let secAttempts = session.data.secAttempts || 0;
 
               // Compare input in lowercase to make it forgiving (e.g. "Fluffy" vs "fluffy")
-              if (input.trim().toLowerCase() === secRecord.securityAnswer) {
+              if (verifySecret(input.trim().toLowerCase(), secRecord.securityAnswer)) {
                   updateSessionState(userId, 'STUDENT_RESET_PASS', session.data);
                   await message.reply(`✅ *IDENTITY VERIFIED*\n\nPlease enter a *NEW* Personal Password for your account:`);
               } else {
@@ -2853,7 +2862,7 @@ async function handleInput(client, message, userId, text, userName) {
                 }
 
                 const resetStudentId = session.data.loginTargetId;
-                db.classes[session.data.loggedInClass].members[resetStudentId].password = input;
+                db.classes[session.data.loggedInClass].members[resetStudentId].password = hashSecret(input);
                 writeClassDB(db);
                 
                 updateSessionState(userId, 'STUDENT_DASHBOARD', { ...session.data, currentStudentId: resetStudentId, studentName: db.classes[session.data.loggedInClass].members[resetStudentId].name });
@@ -2882,7 +2891,7 @@ async function handleInput(client, message, userId, text, userName) {
               const otpRecord = db.classes[session.data.loggedInClass].members[otpTargetId];
               let otpAttempts = session.data.otpAttempts || 0;
 
-              if (input === otpRecord.resetOtp) {
+              if (verifySecret(input, otpRecord.resetOtp)) {
                   updateSessionState(userId, 'STUDENT_FORCE_NEW_PASS', session.data);
                   await message.reply(`✅ *CODE ACCEPTED*\n\nLet's get your account fully recovered.\n\nPlease enter a *NEW Personal Password*:`);
               } else {
@@ -2930,9 +2939,9 @@ async function handleInput(client, message, userId, text, userName) {
             const memberRef = db.classes[session.data.loggedInClass].members[finalTargetId];
             
             // Save new credentials and clear OTP locks
-            memberRef.password = session.data.tempPass;
+            memberRef.password = hashSecret(session.data.tempPass);
             memberRef.securityQuestion = session.data.newSecQuestion;
-            memberRef.securityAnswer = input.trim().toLowerCase();
+            memberRef.securityAnswer = hashSecret(input.trim().toLowerCase());
             memberRef.pendingRepReset = false;
             delete memberRef.resetOtp;
             
@@ -3128,15 +3137,14 @@ async function handleInput(client, message, userId, text, userName) {
 
                     const mId = session.data.currentStudentId;
                     const studentData = sDb.members[mId];
-                    const todayDate = new Date().toLocaleDateString("en-US", {timeZone: "Africa/Nairobi"});
-
-                    if (studentData.lastSigned === todayDate) {
-                        await message.reply(`✅ You have already signed the register for today!\n\n(Type *0* to go back)`);
+                    if (!sDb.activeRollCall.attendees || typeof sDb.activeRollCall.attendees !== 'object') sDb.activeRollCall.attendees = {};
+                    if (sDb.activeRollCall.attendees[mId]) {
+                        await message.reply(`✅ You have already signed the register for *${sDb.activeRollCall.unit}*.\n\n(Type *0* to go back)`);
                         return;
                     }
 
                     studentData.attendedClasses = (studentData.attendedClasses || 0) + 1;
-                    studentData.lastSigned = todayDate;
+                    studentData.lastSigned = sDb.activeRollCall.dateKey || sDb.activeRollCall.date;
                     // Push students to the Rep's active register
                     sDb.activeRollCall.attendees[mId] = {
                         name: studentData.name,
@@ -3420,15 +3428,17 @@ async function handleAttendance(message, userId, client) {
 
     const db = readClassDB();
     let studentClass = null;
+    let memberId = null;
     let studentData = null;
 
     // 1. Find which class this student belongs to
     for (const className in db.classes) {
         if (db.classes[className].members) {
-            const memberObj = Object.values(db.classes[className].members).find(m => m.phoneId === userId);
-            if (memberObj) {
+            const foundId = Object.keys(db.classes[className].members).find(id => db.classes[className].members[id].phoneId === userId);
+            if (foundId) {
                 studentClass = className;
-                studentData = memberObj;
+                memberId = foundId;
+                studentData = db.classes[className].members[foundId];
                 break;
             }
         }
@@ -3445,10 +3455,7 @@ async function handleAttendance(message, userId, client) {
     }
 
     // 3. Find their internal ID to check if they already signed in
-    const memberId = Object.keys(db.classes[studentClass].members).find(
-        key => db.classes[studentClass].members[key].phoneId === userId
-    );
-
+    if (!activeRC.attendees) activeRC.attendees = {};
     if (activeRC.attendees[memberId]) {
         await message.reply(`⚠️ You are already marked present for *${activeRC.unit}*.`);
         return true; 
@@ -3463,8 +3470,7 @@ async function handleAttendance(message, userId, client) {
 
     // Update their Ghost Tracker tally
     studentData.attendedClasses = (studentData.attendedClasses || 0) + 1;
-    const todayDate = new Date().toLocaleDateString("en-US", {timeZone: "Africa/Nairobi"});
-    studentData.lastSigned = todayDate;
+    studentData.lastSigned = activeRC.dateKey || getEATDateKey();
 
     writeClassDB(db);
 
@@ -3487,14 +3493,10 @@ async function handleOwnerPlaintextResponse(client, message, text, lowerText) {
         const db = readClassDB();
 
         if (action === 'accept') {
-            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; 
-            let code = 'REP-';
-            for (let i = 0; i < 5; i++) {
-                code += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
+            const code = generateAuthorizationCode();
             
             if (!db.repCodes) db.repCodes = [];
-            db.repCodes.push(code);
+            db.repCodes.push(hashSecret(code));
             writeClassDB(db);
 
             try {
