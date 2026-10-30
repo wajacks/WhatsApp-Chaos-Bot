@@ -234,6 +234,9 @@ The WhatsApp login is saved under `data/session`. User economy data and game sta
 - The setup script restricts `data/`, `data/session/`, and `downloads/` to the bot account. Treat backups of `data/` as private: they contain authentication state and player identifiers.
 - The Class Portal also writes a scheduled backup to `data/classdb_backup.json`; continue backing up the full `data/` directory.
 
+For an additional off-site Class Portal backup, create a **private Azure Blob container** and set `AZURE_CLASS_BACKUP_CONTAINER_SAS_URL` to a container SAS URL with HTTPS plus read/create/write permissions. Generate a separate encryption key with `openssl rand -base64 32` and place it in `CLASS_BACKUP_ENCRYPTION_KEY`. Keep both values only in the server's private `.env`. Every scheduled three-day backup is gzipped, encrypted with AES-256-GCM, uploaded, then downloaded and decrypted again to verify its integrity and database shape. This is a verification check; it does not automatically restore the live database. If the variables are unset, the existing local backup continues unchanged.
+
+
 ## 🧰 Troubleshooting
 
 **The bot exits with an Azure credentials error**  

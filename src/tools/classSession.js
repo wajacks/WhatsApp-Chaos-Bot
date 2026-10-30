@@ -2,6 +2,7 @@ const activeClassSessions = new Map();
 const SESSION_TIMEOUT_MS = 600 * 1000; // 10 minutes
 const cron = require('node-cron');
 const { readClassDB, writeClassDB, createClassDBBackup } = require('../database/classdb');
+const { createVerifiedOffsiteClassDBBackup } = require('../database/offsiteBackup');
 
 function getEATParts(date = new Date()) {
     const values = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
@@ -590,8 +591,23 @@ function startSystemMaintenance(client) {
     cron.schedule('0 3 */3 * *', async () => {
         try {
             const backupPath = await createClassDBBackup();
-            console.log(`[SYSTEM] Durable database backup created: ${backupPath}`);
+            console.log(`[SYSTEM] Durable local database backup created: ${backupPath}`);
 
+            let offsiteBackup = { configured: false, verified: false };
+            try {
+                offsiteBackup = await createVerifiedOffsiteClassDBBackup(backupPath);
+                if (offsiteBackup.verified) {
+                    console.log(`[SYSTEM] Encrypted Azure class backup uploaded and verified: ${offsiteBackup.blobName}`);
+                }
+            } catch (backupError) {
+                console.error('[SYSTEM] Encrypted off-site class backup failed:', backupError.message);
+            }
+
+            const backupNotice = offsiteBackup.verified
+                ? 'The local backup and encrypted Azure copy were both verified.'
+                : offsiteBackup.configured
+                    ? 'The local backup completed, but the encrypted Azure copy could not be verified. The system administrator has been notified in the logs.'
+                    : 'The local backup completed. Encrypted Azure off-site backup is not configured.';
             const db = readClassDB();
             for (const className in db.classes) {
                 const classData = db.classes[className];
@@ -599,8 +615,8 @@ function startSystemMaintenance(client) {
                     try {
                         await new Promise(resolve => setTimeout(resolve, 5000));
                         await client.sendMessage(
-                            classData.repId, 
-                            `💾 *SYSTEM MAINTENANCE*\n\nThe scheduled 3-day database backup was completed successfully. All class data for *${className}* is secure.`
+                            classData.repId,
+                            `💾 *SYSTEM MAINTENANCE*\n\n${backupNotice}\nClass data: *${className}*.`
                         );
                     } catch (e) {}
                 }
