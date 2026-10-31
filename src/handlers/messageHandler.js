@@ -10,6 +10,7 @@ const { handleWeatherCommand } = require('../features/weather/command');
 const { handleCoinPurchaseCommand } = require('../features/economy/purchaseHandler');
 const { createCommandRouter } = require('../commands/router');
 const { areSameWhatsAppUser } = require('../utils/identity');
+const { createAiPresence } = require('../features/ai/presence');
 
 function registerMessageHandler(client, dependencies) {
     const {
@@ -2106,13 +2107,21 @@ function registerMessageHandler(client, dependencies) {
         });
         if (voiceNoteHandled) return;
 
-        const aiCommandHandled = await handleAiCommand({
-            message, text, lowerText, chatId, senderId, userName,
-            getWeather, buildWeatherResponse, aiCooldowns, AI_COOLDOWN_MS,
-            aiMemory, MAX_AI_MEMORY, ai, azureClient, shouldHandleNaturalText,
-            executeBotFeature, executeBotCommand, getBotGuide, getMyClassPortalSummary
-        });
-        if (aiCommandHandled) return;
+        const aiRequestEligible =
+            /^!ai(?:\s|$)/i.test(lowerText) || shouldHandleNaturalText;
+        const aiPresence = aiRequestEligible ? createAiPresence(client, chatId) : null;
+        try {
+            if (aiPresence) await aiPresence.typing();
+            const aiCommandHandled = await handleAiCommand({
+                message, text, lowerText, chatId, senderId, userName,
+                getWeather, buildWeatherResponse, aiCooldowns, AI_COOLDOWN_MS,
+                aiMemory, MAX_AI_MEMORY, ai, azureClient, shouldHandleNaturalText,
+                executeBotFeature, executeBotCommand, getBotGuide, getMyClassPortalSummary
+            });
+            if (aiCommandHandled) return;
+        } finally {
+            if (aiPresence) await aiPresence.clear();
+        }
     } catch (err) {
         console.error('❌ General Message Handling Error:', err);
     }
