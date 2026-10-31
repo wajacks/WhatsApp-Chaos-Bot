@@ -1,3 +1,5 @@
+const { startScheduledRestart } = require('../tools/scheduledRestart');
+
 function registerClientEvents(client, {
     qrcode,
     startDeadlineMonitor,
@@ -30,6 +32,7 @@ function registerClientEvents(client, {
         startClassWeekendBroadcast(client);
         startSystemMaintenance(client);
         restoreWordForgeGames(client);
+        startScheduledRestart();
     });
 
         // ====================================================
