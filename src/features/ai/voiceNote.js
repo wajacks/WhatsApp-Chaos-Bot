@@ -117,7 +117,8 @@ async function transcribeVoiceNote(message) {
         try { payload = await response.json(); } catch (_) {}
         if (response.ok || !retryableStatuses.has(response.status) || attempt === retryDelaysMs.length) break;
 
-        const retryAfterSeconds = Number(response.headers.get('retry-after'));
+        const retryAfterHeader = response.headers.get('retry-after');
+        const retryAfterSeconds = retryAfterHeader === null ? Number.NaN : Number(retryAfterHeader);
         const backoffMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0
             ? Math.min(Math.max(retryAfterSeconds * 1000, 1000), retryDelaysMs[attempt])
             : retryDelaysMs[attempt];
