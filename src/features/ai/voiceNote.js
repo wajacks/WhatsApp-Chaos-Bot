@@ -22,10 +22,10 @@ function normalizeJid(value, getCanonicalJid) {
 
 async function isAddressedToBot({ message, isGroup, client, getCanonicalJid }) {
     if (!isGroup) return true;
-    if (/^!ai( :\s|$)/i.test(String(message.body || '').trim())) return true;
+    if (/^!ai(?:\s|$)/i.test(String(message.body || '').trim())) return true;
 
     const botId = client && client.info && client.info.wid && client.info.wid._serialized;
-    const mentionedIds = Array.isArray(message.mentionedIds)   message.mentionedIds : [];
+    const mentionedIds = Array.isArray(message.mentionedIds) ? message.mentionedIds : [];
     const botMentioned = botId && mentionedIds.some(id =>
         normalizeJid(id, getCanonicalJid) === normalizeJid(botId, getCanonicalJid) ||
         String(id).split('@')[0] === String(botId).split('@')[0]
@@ -57,7 +57,7 @@ function getSpeechEndpoint() {
 
 function configuredLocales() {
     const raw = process.env.AZURE_SPEECH_LOCALES === undefined
-        ? 'en-KE,sw-KE'
+        ? 'en-KE,sw-KE,ar-EG,af-ZA,zu-ZA,so-SO,am-ET'
         : process.env.AZURE_SPEECH_LOCALES;
     return String(raw).split(',').map(locale => locale.trim()).filter(Boolean).slice(0, 10);
 }
