@@ -1,6 +1,7 @@
 const { execFile } = require('child_process');
 const { handleVoiceCommands } = require('../features/voice/handler');
 const { handleAiCommand } = require('../features/ai/handler');
+const { handleAiVoiceNote } = require('../features/ai/voiceNote');
 const { handlePendingDrawSelection, handleImageCommands } = require('../features/images/handler');
 const { handleBibleMessages } = require('../features/bible/handler');
 const { handleHymnalCommand } = require('../features/hymnal/handler');
@@ -2032,6 +2033,16 @@ function registerMessageHandler(client, dependencies) {
                 ? { authorized: true, classes }
                 : { authorized: false, message: 'This user is not enrolled in a Class Portal.' };
         };
+
+        const voiceNoteHandled = await handleAiVoiceNote({
+            message, chatId, senderId, userName, isGroup, client, getCanonicalJid,
+            getWeather, buildWeatherResponse, aiCooldowns, AI_COOLDOWN_MS,
+            aiMemory, MAX_AI_MEMORY, ai, azureClient,
+            executeBotFeature, getMyClassPortalSummary,
+            baseDir, fs, path, execFileAsync, googleTTS, EdgeTTS, MessageMedia,
+            voiceSelections, EDGE_TTS_VOICES, DEFAULT_EDGE_VOICE
+        });
+        if (voiceNoteHandled) return;
 
         const aiCommandHandled = await handleAiCommand({
             message, text, lowerText, chatId, senderId, userName,
