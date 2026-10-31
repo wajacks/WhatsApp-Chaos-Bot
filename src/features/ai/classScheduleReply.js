@@ -61,7 +61,7 @@ function buildRelativeClassScheduleReply(prompt, getMyClassPortalSummary, refere
         return '• ' + entry.unit + classLabel + timeLabel;
     });
 
-    return dateSentence + ' Your Class Portal timetable lists:\\n' + lines.join('\\n');
+    return dateSentence + ' Your Class Portal timetable lists:\n' + lines.join('\n');
 }
 
 module.exports = { buildRelativeClassScheduleReply, getRequestedOffset };
