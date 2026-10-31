@@ -35,7 +35,11 @@ function readRestartHistory(now) {
 function reserveRestartSlot(now) {
     const history = readRestartHistory(now);
     if (history.length >= MAX_RESTARTS_PER_HOUR) {
-        return { allowed: false, count: history.length };
+        return {
+            allowed: false,
+            count: history.length,
+            retryAt: history[0] + RESTART_HISTORY_WINDOW_MS
+        };
     }
 
     history.push(now);
@@ -53,7 +57,7 @@ function startWhatsAppHealthWatchdog(client) {
     let consecutiveFailures = 0;
     let probeInProgress = false;
     let restartInProgress = false;
-    let restartSuppressed = false;
+    let restartSuppressedUntil = 0;
     let lastManualState = '';
     let recentFrameFailures = [];
 
@@ -66,18 +70,22 @@ function startWhatsAppHealthWatchdog(client) {
     }
 
     function restartThroughPm2(reason) {
-        if (restartInProgress || restartSuppressed) return;
+        if (restartInProgress) return;
 
         const now = Date.now();
+        if (now < restartSuppressedUntil) return;
+
         const reservation = reserveRestartSlot(now);
         if (!reservation.allowed) {
-            restartSuppressed = true;
+            restartSuppressedUntil = reservation.retryAt || (now + RESTART_HISTORY_WINDOW_MS);
             console.error(
-                '[WA WATCHDOG] Restart suppressed after ' + reservation.count +
-                ' automatic restarts in the last hour. Check the WhatsApp session and PM2 logs.'
+                '[WA WATCHDOG] Restart rate limit reached after ' + reservation.count +
+                ' automatic restarts in the last hour. Will retry after ' +
+                new Date(restartSuppressedUntil).toISOString() + ' if WhatsApp is still unhealthy.'
             );
             return;
         }
+        restartSuppressedUntil = 0;
 
         restartInProgress = true;
         console.error('[WA WATCHDOG] WhatsApp remains unhealthy; restarting chaos-bot through PM2. Reason: ' + reason);
@@ -114,7 +122,7 @@ function startWhatsAppHealthWatchdog(client) {
     }
 
     async function probe() {
-        if (probeInProgress || restartInProgress || restartSuppressed) return;
+        if (probeInProgress || restartInProgress) return;
         probeInProgress = true;
 
         let timeoutHandle;
