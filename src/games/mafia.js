@@ -3017,6 +3017,7 @@ class MafiaGame {
 }
 
 module.exports = {
+    hasActiveGames: () => Boolean(global.activeMafiaGame && (global.activeMafiaGame.inLobby || global.activeMafiaGame.gameStarted)),
 
     // Exported for focused identity-link tests and integrations.
     MafiaGame,
