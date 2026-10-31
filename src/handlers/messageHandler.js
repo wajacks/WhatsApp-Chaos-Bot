@@ -145,9 +145,11 @@ function registerMessageHandler(client, dependencies) {
         return classApproverNumbers.has(number);
     };
 
-    client.on('message', async message => {
+    const registeredClient = client;
+    const handleIncomingMessage = async (message, options = {}) => {
+    const client = options.clientOverride || registeredClient;
     if (message.from === 'status@broadcast') return;
-    await reactToCommand(message);
+    if (!options.aiCommand) await reactToCommand(message);
 
 
     try {
@@ -312,11 +314,13 @@ function registerMessageHandler(client, dependencies) {
         });
         if (hymnalHandled) return;
 
-        // Save chat history and let the active Mafia narrator see eligible public game chat.
-        logMessage(chatId, userName, text);
-        if (isGroup && text && !text.startsWith('!')) {
-            void handleMafiaPublicMessage(chatId, senderId, userName, text)
-                .catch(error => console.warn('[MAFIA AI NARRATOR] Message hook error:', error.message));
+        // Keep synthetic AI-dispatched commands out of chat summaries and Mafia narration.
+        if (!options.aiCommand) {
+            logMessage(chatId, userName, text);
+            if (isGroup && text && !text.startsWith('!')) {
+                void handleMafiaPublicMessage(chatId, senderId, userName, text)
+                    .catch(error => console.warn('[MAFIA AI NARRATOR] Message hook error:', error.message));
+            }
         }
 
         // ====================================================
@@ -1836,6 +1840,7 @@ function registerMessageHandler(client, dependencies) {
             lowerText,
             isGroup
         });
+        if (options.aiCommandCapture && commandHandled) options.aiCommandCapture.recognized = true;
         if (commandHandled) return;
 
         // Natural-language AI runs after commands and active workflows. This keeps
@@ -1870,6 +1875,81 @@ function registerMessageHandler(client, dependencies) {
                 shouldHandleNaturalText = !!(botMentioned || botRepliedTo);
             }
         }
+
+        const getBotGuide = () => {
+            let menu = typeof getBotMenu === 'function' ? getBotMenu() : '';
+            const ownerMarker = menu.indexOf('👑░◈ _*OWNER ACCESS*_ ◈░');
+            if (!isOwner(senderId) && ownerMarker >= 0) menu = menu.slice(0, ownerMarker);
+            const guide = {
+                menu,
+                games: typeof getGamesList === 'function' ? getGamesList() : '',
+                classPortal: 'The Class Portal is private-DM only. Start with !class. Use 0 to go back and 99 to log out. Enter passwords and recovery codes only in the normal private Class Portal flow; the AI never receives portal credentials.'
+            };
+            if (isOwner(senderId) && typeof getOwnerMenu === 'function') {
+                guide.ownerMenu = getOwnerMenu();
+            }
+            return guide;
+        };
+
+        const executeBotCommand = async ({ command }) => {
+            const commandText = String(command || '').trim();
+            if (!commandText.startsWith('!') || commandText.length > 500 || /[\r\n\u0000-\u001f\u007f]/.test(commandText)) {
+                return { error: 'Provide one normal bot command, on a single line, up to 500 characters.' };
+            }
+            if (/\b(password|passcode|credential|api[\s_-]*key|access[\s_-]*token|otp|security[\s_-]*answer|hidden[\s_-]*(?:game[\s_-]*)?(?:role|answer|solution)|secret[\s_-]*(?:role|answer|action))\b/i.test(commandText)) {
+                return { error: 'The AI command bridge cannot retrieve or relay credentials or hidden game information. Use the protected bot flow for credentials, or ask for public game rules or a hint.' };
+            }
+            if (isGroup && /^!owner(?:\s|$)/i.test(commandText)) {
+                return { error: 'Owner controls must be used in a private chat, not from a group AI request.' };
+            }
+
+            const capture = { sent: false, recognized: false };
+            const commandMessage = Object.create(message);
+            Object.defineProperty(commandMessage, 'body', { value: commandText, configurable: true });
+            const originalMentionIds = Array.isArray(message.mentionedIds) ? message.mentionedIds : [];
+            const botId = client.info && client.info.wid && client.info.wid._serialized;
+            const filteredMentionIds = originalMentionIds.filter(id =>
+                !botId || String(id).split('@')[0] !== String(botId).split('@')[0]
+            );
+            Object.defineProperty(commandMessage, 'mentionedIds', { value: filteredMentionIds, configurable: true });
+            commandMessage.reply = async (...args) => {
+                capture.sent = true;
+                return message.reply(...args);
+            };
+            commandMessage.getMentions = async () => {
+                if (typeof message.getMentions !== 'function') return [];
+                try {
+                    const mentions = await message.getMentions();
+                    return (mentions || []).filter(contact =>
+                        !botId || String(getContactJid(contact) || '').split('@')[0] !== String(botId).split('@')[0]
+                    );
+                } catch (_) {
+                    return [];
+                }
+            };
+
+            const commandClient = new Proxy(client, {
+                get(target, property) {
+                    if (property === 'sendMessage') {
+                        return async (...args) => {
+                            capture.sent = true;
+                            return target.sendMessage(...args);
+                        };
+                    }
+                    const value = Reflect.get(target, property, target);
+                    return typeof value === 'function' ? value.bind(target) : value;
+                }
+            });
+
+            await handleIncomingMessage(commandMessage, {
+                aiCommand: true,
+                aiCommandCapture: capture,
+                clientOverride: commandClient
+            });
+            return capture.sent || capture.recognized
+                ? { delivered: true }
+                : { error: 'That command was not recognized by the normal bot handlers. Ask me for the correct command or use !menu / !games.' };
+        };
 
         const AI_FEATURE_COMMANDS = {
             show_menu: '!menu',
@@ -1915,28 +1995,7 @@ function registerMessageHandler(client, dependencies) {
             if (action === 'search_video' && commandText === '!video') {
                 return { error: 'Please specify the video or song title to search for.' };
             }
-
-            const commandMessage = Object.create(message);
-            Object.defineProperty(commandMessage, 'body', { value: commandText, configurable: true });
-            Object.defineProperty(commandMessage, 'mentionedIds', { value: [], configurable: true });
-            commandMessage.reply = message.reply.bind(message);
-            commandMessage.getMentions = async () => [];
-
-            const handled = await routeCommands({
-                message: commandMessage,
-                client,
-                chatId,
-                senderContact,
-                senderId,
-                economyUserId,
-                userName,
-                text: commandText,
-                lowerText: commandText.toLowerCase(),
-                isGroup
-            });
-            return handled
-                ? { delivered: true }
-                : { error: 'The normal bot router did not accept that feature request.' };
+            return executeBotCommand({ command: commandText });
         };
 
         const getMyClassPortalSummary = () => {
@@ -2034,11 +2093,13 @@ function registerMessageHandler(client, dependencies) {
                 : { authorized: false, message: 'This user is not enrolled in a Class Portal.' };
         };
 
+        if (options.aiCommand) return;
+
         const voiceNoteHandled = await handleAiVoiceNote({
             message, chatId, senderId, userName, isGroup, client, getCanonicalJid,
             getWeather, buildWeatherResponse, aiCooldowns, AI_COOLDOWN_MS,
             aiMemory, MAX_AI_MEMORY, ai, azureClient,
-            executeBotFeature, getMyClassPortalSummary,
+            executeBotFeature, executeBotCommand, getBotGuide, getMyClassPortalSummary,
             baseDir, fs, path, execFileAsync, googleTTS, EdgeTTS, MessageMedia,
             voiceSelections, EDGE_TTS_VOICES, DEFAULT_EDGE_VOICE
         });
@@ -2048,13 +2109,14 @@ function registerMessageHandler(client, dependencies) {
             message, text, lowerText, chatId, senderId, userName,
             getWeather, buildWeatherResponse, aiCooldowns, AI_COOLDOWN_MS,
             aiMemory, MAX_AI_MEMORY, ai, azureClient, shouldHandleNaturalText,
-            executeBotFeature, getMyClassPortalSummary
+            executeBotFeature, executeBotCommand, getBotGuide, getMyClassPortalSummary
         });
         if (aiCommandHandled) return;
     } catch (err) {
         console.error('❌ General Message Handling Error:', err);
     }
-});
+    };
+    registeredClient.on('message', handleIncomingMessage);
 }
 
 module.exports = { registerMessageHandler };
