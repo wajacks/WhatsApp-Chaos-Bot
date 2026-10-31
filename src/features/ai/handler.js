@@ -75,7 +75,7 @@ const BOT_GUIDE_TOOL_DECLARATION = {
 
 const BOT_COMMAND_TOOL_DECLARATION = {
     name: 'execute_bot_command',
-    description: 'Run one clearly requested, ordinary Chaos Bot command through the existing command dispatcher. The dispatcher applies normal user, host, owner, and Class Portal permission checks. Never use this to retrieve passwords, credentials, hidden game state, private messages, or another user’s protected data. Ask for a WhatsApp mention when a target is required.',
+    description: 'Run one clearly requested, ordinary user-facing Chaos Bot command through the same message-handling path as a typed command. Existing user, host, owner, and Class Portal checks still apply. Never use this to retrieve passwords, credentials, hidden game state, private messages, or another user’s protected data. Ask for a WhatsApp mention when a target is required.',
     parameters: {
         type: 'OBJECT',
         properties: {
