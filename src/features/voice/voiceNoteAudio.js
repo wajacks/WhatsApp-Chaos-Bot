@@ -65,7 +65,7 @@ async function sendTextAsVoiceNote(context) {
         const region = getSpeechRegion();
         if (!provider && speechKey && region && !/^false$/i.test(String(process.env.AI_VOICE_AZURE_TTS_FALLBACK || 'true'))) {
             try {
-                const voice = String(process.env.AZURE_SPEECH_TTS_VOICE || 'en-KE-AsiliaNeural').trim();
+                const voice = String(process.env.AZURE_SPEECH_TTS_VOICE || (selectedVoice && selectedVoice.voice) || 'en-KE-AsiliaNeural').trim();
                 const language = voice.split('-').slice(0, 2).join('-');
                 const ssml = '<speak version="1.0" xml:lang="' + escapeXml(language) + '"><voice name="' +
                     escapeXml(voice) + '">' + escapeXml(speechText) + '</voice></speak>';

@@ -85,7 +85,9 @@ printf '%s\n' "Optional media tools and PM2 setup are documented in README.md."
     warn "Set OWNER_NUMBER in .env to enable owner-only controls."
 fi
 
-if grep -Eiq '^AI_VOICE_NOTES_ENABLED=true
+if grep -Eiq '^AI_VOICE_NOTES_ENABLED=true' .env && ! grep -Eq '^AZURE_SPEECH_KEY=.' .env; then
+    warn "AI voice notes are enabled but AZURE_SPEECH_KEY is missing. Configure the Speech credentials or set AI_VOICE_NOTES_ENABLED=false."
+fi
 
 printf '\n'
 info "Core setup is complete."
