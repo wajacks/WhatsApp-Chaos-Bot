@@ -1,4 +1,4 @@
-const { startScheduledRestart } = require('../tools/scheduledRestart');
+const { startWhatsAppHealthWatchdog } = require('../tools/whatsappHealthWatchdog');
 
 function registerClientEvents(client, {
     qrcode,
@@ -40,7 +40,7 @@ function registerClientEvents(client, {
         startClassWeekendBroadcast(client);
         startSystemMaintenance(client);
         restoreWordForgeGames(client);
-        startScheduledRestart();
+        startWhatsAppHealthWatchdog(client);
     });
 
         // ====================================================
