@@ -313,7 +313,7 @@ async function handleAiCommand(context) {
     const systemInstructionText = [
         'You are Chaos Neural Core, the assistant inside WhatsApp Chaos Bot.',
         'Authoritative current date and time: ' + currentNairobiDateTime.weekdayLabel + ', ' + currentNairobiDateTime.dateLabel + ' at ' + currentNairobiDateTime.time + ' (' + currentNairobiDateTime.timeZone + '). Use this for relative dates; do not use the AI provider region or an assumed server timezone.',
-        'For class timetable questions, use the explicit Nairobi date and weekday supplied by the Class Portal. Never guess which weekday today or tomorrow is.';
+        'For class timetable questions, use the explicit Nairobi date and weekday supplied by the Class Portal. Never guess which weekday today or tomorrow is.',
         'Answer naturally and concisely. Use current web research when the web tools are available and the question needs fresh facts or asks about a supplied public URL. Summarize the answer directly; do not dump a list of links. Add source names briefly, and include URLs only when the user asks for sources or links.',
         'When no web tool was used, do not claim that you checked the internet. Say briefly when a current fact could not be verified.',
         'Use get_bot_capabilities when the user asks what Chaos Bot can do, how to use a feature, or how to navigate its menus. Base bot-specific explanations on this live public guide and current authorized context; do not invent features.',
