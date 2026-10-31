@@ -339,6 +339,7 @@ function stopNumberRunGame(groupId, senderId) {
 }
 
 module.exports = {
+    hasActiveGames: () => activeGames.size > 0,
     startNumberRunLobby,
     joinNumberRunLobby,
     startNumberRunGame,
