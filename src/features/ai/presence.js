@@ -1,4 +1,5 @@
 const STATE_REFRESH_MS = 20_000;
+const CLEAR_GRACE_MS = 5_000;
 
 function createAiPresence(client, chatId) {
     if (!client || typeof client.getChatById !== 'function' || !chatId) {
@@ -12,6 +13,8 @@ function createAiPresence(client, chatId) {
     let chatPromise;
     let currentState = '';
     let refreshTimer = null;
+    let clearTimer = null;
+    let generation = 0;
     let operationQueue = Promise.resolve();
     let warned = false;
 
@@ -47,6 +50,20 @@ function createAiPresence(client, chatId) {
         }
     });
 
+    const stopRefresh = () => {
+        if (refreshTimer) {
+            clearInterval(refreshTimer);
+            refreshTimer = null;
+        }
+    };
+
+    const cancelClear = () => {
+        if (clearTimer) {
+            clearTimeout(clearTimer);
+            clearTimer = null;
+        }
+    };
+
     const ensureRefresh = () => {
         if (refreshTimer) return;
         refreshTimer = setInterval(() => {
@@ -56,30 +73,38 @@ function createAiPresence(client, chatId) {
     };
 
     const setState = async state => {
+        cancelClear();
+        generation += 1;
         currentState = state;
         ensureRefresh();
         await applyState(state);
     };
 
     const clear = async () => {
-        currentState = '';
-        if (refreshTimer) {
-            clearInterval(refreshTimer);
-            refreshTimer = null;
-        }
-        if (!chatPromise) return;
+        if (!chatPromise || clearTimer) return;
 
-        await enqueue(async () => {
-            try {
-                const chat = await chatPromise;
-                await chat.clearState();
-            } catch (error) {
-                if (!warned) {
-                    console.warn('[AI PRESENCE] Could not clear chat state:', error.message);
-                    warned = true;
+        stopRefresh();
+        const clearGeneration = generation;
+        clearTimer = setTimeout(() => {
+            clearTimer = null;
+            if (generation !== clearGeneration) return;
+
+            currentState = '';
+            void enqueue(async () => {
+                if (generation !== clearGeneration || currentState) return;
+                try {
+                    const chat = await chatPromise;
+                    if (generation !== clearGeneration || currentState) return;
+                    await chat.clearState();
+                } catch (error) {
+                    if (!warned) {
+                        console.warn('[AI PRESENCE] Could not clear chat state:', error.message);
+                        warned = true;
+                    }
                 }
-            }
-        });
+            });
+        }, CLEAR_GRACE_MS);
+        if (typeof clearTimer.unref === 'function') clearTimer.unref();
     };
 
     return {
