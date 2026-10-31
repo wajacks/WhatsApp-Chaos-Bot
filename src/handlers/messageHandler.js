@@ -1883,7 +1883,7 @@ function registerMessageHandler(client, dependencies) {
             const guide = {
                 menu,
                 games: typeof getGamesList === 'function' ? getGamesList() : '',
-                classPortal: 'The Class Portal is private-DM only. Start with !class. Use 0 to go back and 99 to log out. Enter passwords and recovery codes only in the normal private Class Portal flow; the AI never receives portal credentials.'
+                classPortal: 'The Class Portal is private-DM only. Start with !class. Student and Rep menus follow the account’s assigned role. Use 0 to go back and 99 to log out. Ask the AI for your own timetable, deadlines, active polls, updates, or attendance summary. Enter passwords and recovery codes only in the normal private Class Portal flow; the AI is never given stored portal credentials.'
             };
             if (isOwner(senderId) && typeof getOwnerMenu === 'function') {
                 guide.ownerMenu = getOwnerMenu();
