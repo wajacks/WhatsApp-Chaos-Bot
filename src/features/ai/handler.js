@@ -43,7 +43,7 @@ function reserveWebResearch(senderId) {
 
 const FEATURE_TOOL_DECLARATION = {
     name: 'execute_bot_feature',
-    description: 'Run one explicitly requested, allow-listed WhatsApp Chaos Bot feature through its existing command router. Choose only when the user clearly asks to perform the action. Never use for payments, purchases, owner/admin controls, class administration, or stopping/cancelling games.',
+    description: 'Run one of the listed quick Chaos Bot actions. For other normal bot commands, use execute_bot_command. Choose only when the user clearly asks for that action; the existing handlers enforce permissions.',
     parameters: {
         type: 'OBJECT',
         properties: {
@@ -311,7 +311,8 @@ async function handleAiCommand(context) {
         '- src/database stores local runtime data under data/.',
         '- The private Class Portal is implemented in src/commands/classHandler.js, src/tools/classSession.js, and src/database/classdb.js.',
         '- AI chat uses Azure OpenAI first and Gemini as its configured fallback; Gemini provides web grounding for requests that need it.',
-        '- Existing bot features can only be invoked through the explicit allow-list; not every command is available to AI.',
+        '- Natural-language actions use the ordinary bot message handlers and command router; existing permission checks remain authoritative.',
+        '- The public command and game guide is supplied by get_bot_capabilities. Do not invent command syntax or feature behavior.',
         'The current speaker is ' + String(userName || 'a Chaos Bot user').slice(0, 80) + '. Do not infer personal details or roles from their name.'
     ].join('\n');
 
