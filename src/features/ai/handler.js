@@ -1,4 +1,5 @@
 const { GEMINI_MODEL } = require('../geminiConfig');
+const { isWhatsAppFrameError } = require('../../tools/whatsappHealthWatchdog');
 
 const FEATURE_ACTIONS = [
     'show_menu', 'show_help', 'show_games', 'game_help',
@@ -532,8 +533,12 @@ async function handleAiCommand(context) {
             await sendReply('❌ AI is unavailable right now. Please try again in a moment.');
         }
     } catch (error) {
-        console.error('❌ AI request failed:', error);
         history.pop();
+        if (isWhatsAppFrameError(error)) {
+            console.error('[AI DELIVERY ERROR] WhatsApp Web frame detached while sending the response:', error.message);
+            throw error;
+        }
+        console.error('❌ AI request failed:', error);
         await sendReply('❌ AI is unavailable right now. Please try again in a moment.');
     }
     return true;
