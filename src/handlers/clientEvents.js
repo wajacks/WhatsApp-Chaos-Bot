@@ -20,6 +20,14 @@ function registerClientEvents(client, {
         qrcode.generate(qr, { small: true });
     });
 
+    client.on('change_state', state => {
+        console.log(`[WHATSAPP STATE] ${new Date().toISOString()} state=${state}`);
+    });
+
+    client.on('disconnected', reason => {
+        console.error(`[WHATSAPP DISCONNECTED] ${new Date().toISOString()} reason=${reason}`);
+    });
+
     client.on('ready', async () => {
         console.log('\nCHAOS BOT by Chriss IS ONLINE!');
         console.log('Waiting for group and private messages...\n');
