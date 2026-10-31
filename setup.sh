@@ -72,8 +72,39 @@ if ! grep -Eq '^AZURE_OPENAI_KEY=.+$' .env || ! grep -Eq '^AZURE_OPENAI_ENDPOINT
     warn "Add AZURE_OPENAI_KEY and AZURE_OPENAI_ENDPOINT to .env before starting the bot; the current app initializes Azure OpenAI during startup."
 fi
 
-if ! grep -Eq '^OWNER_NUMBER=.+$' .env; then
+if ! grep -Eq '^OWNER_NUMBER=.+
+
+printf '\n'
+info "Core setup is complete."
+printf '%s\n' "Next:"
+printf '%s\n' "  1. Review .env and configure the required Azure OpenAI credentials."
+printf '%s\n' "  2. Install the Chromium system libraries listed in README.md."
+printf '%s\n' "  3. Start the bot with: node index.js"
+printf '%s\n' "Optional media tools and PM2 setup are documented in README.md."
+ .env; then
     warn "Set OWNER_NUMBER in .env to enable owner-only controls."
+fi
+
+if grep -Eiq '^AI_VOICE_NOTES_ENABLED=true
+
+printf '\n'
+info "Core setup is complete."
+printf '%s\n' "Next:"
+printf '%s\n' "  1. Review .env and configure the required Azure OpenAI credentials."
+printf '%s\n' "  2. Install the Chromium system libraries listed in README.md."
+printf '%s\n' "  3. Start the bot with: node index.js"
+printf '%s\n' "Optional media tools and PM2 setup are documented in README.md."
+ .env && ! grep -Eq '^AZURE_SPEECH_KEY=.+
+
+printf '\n'
+info "Core setup is complete."
+printf '%s\n' "Next:"
+printf '%s\n' "  1. Review .env and configure the required Azure OpenAI credentials."
+printf '%s\n' "  2. Install the Chromium system libraries listed in README.md."
+printf '%s\n' "  3. Start the bot with: node index.js"
+printf '%s\n' "Optional media tools and PM2 setup are documented in README.md."
+ .env; then
+    warn "AI voice notes are enabled but AZURE_SPEECH_KEY is missing. Configure the Speech credentials or set AI_VOICE_NOTES_ENABLED=false."
 fi
 
 printf '\n'
