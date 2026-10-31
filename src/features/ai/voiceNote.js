@@ -2,6 +2,10 @@ const { handleAiCommand } = require('./handler');
 const { sendTextAsVoiceNote } = require('../voice/voiceNoteAudio');
 const { areSameWhatsAppUser } = require('../../utils/identity');
 const { createAiPresence } = require('./presence');
+const {
+    isWhatsAppFrameError,
+    reportWhatsAppFrameFailure
+} = require('../../tools/whatsappHealthWatchdog');
 
 const SPEECH_API_VERSION = '2025-10-15';
 
@@ -197,6 +201,11 @@ async function handleAiVoiceNote(context) {
         try {
             await handleAiCommand(aiContext);
         } catch (error) {
+            if (isWhatsAppFrameError(error)) {
+                console.error('[AI VOICE] WhatsApp frame detached while delivering the audio reply.');
+                reportWhatsAppFrameFailure(client, error);
+                return true;
+            }
             console.error('[AI VOICE] AI/audio reply failed:', error.message);
             await message.reply('🎙️ I could not prepare an audio reply right now. Please try again or send the request as text.');
         }
