@@ -560,6 +560,7 @@ async function handleTruthHuntGroupMessage(groupId, senderId, text) {
 }
 
 module.exports = {
+    hasActiveGames: () => activeGames.size > 0,
     startTruthHuntLobby,
     joinTruthHuntLobby,
     startTruthHuntGame,
