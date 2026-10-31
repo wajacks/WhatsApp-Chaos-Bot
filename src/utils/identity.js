@@ -81,6 +81,72 @@ function getCanonicalJid(value) {
     return clean;
 }
 
+
+function getWhatsAppId(value) {
+    if (!value) return '';
+    if (typeof value === 'object') {
+        const rawId = value._serialized ||
+            (typeof value.id === 'object' && value.id ? value.id._serialized : value.id) ||
+            value.pn || value.number;
+        return rawId ? getWhatsAppId(rawId) : '';
+    }
+    return String(value).trim().toLowerCase();
+}
+
+function phoneAlias(value) {
+    const match = String(value || '').match(/^(\d+)(?:@(?:c\.us|s\.whatsapp\.net))?$/i);
+    return match ? 'phone:' + match[1] : '';
+}
+
+function getIdentityAliases(value) {
+    const id = getWhatsAppId(value);
+    const aliases = new Set(id ? ['jid:' + id] : []);
+    const phone = phoneAlias(id);
+    if (phone) aliases.add(phone);
+    return aliases;
+}
+
+function aliasesOverlap(left, right) {
+    for (const alias of left) {
+        if (right.has(alias)) return true;
+    }
+    return false;
+}
+
+async function areSameWhatsAppUser(client, left, right) {
+    const leftId = getWhatsAppId(left);
+    const rightId = getWhatsAppId(right);
+    if (!leftId || !rightId) return false;
+    if (leftId === rightId) return true;
+
+    const leftAliases = getIdentityAliases(leftId);
+    const rightAliases = getIdentityAliases(rightId);
+    if (aliasesOverlap(leftAliases, rightAliases)) return true;
+
+    const lidIds = [...new Set([leftId, rightId].filter(id => id.endsWith('@lid')))];
+    if (!lidIds.length || !client || typeof client.getContactLidAndPhone !== 'function') return false;
+
+    try {
+        const mappings = await client.getContactLidAndPhone(lidIds);
+        for (const mapping of Array.isArray(mappings) ? mappings : []) {
+            const mappedAliases = new Set([
+                ...getIdentityAliases(mapping && mapping.lid),
+                ...getIdentityAliases(mapping && mapping.pn)
+            ]);
+            if (!mappedAliases.size) continue;
+            if (aliasesOverlap(leftAliases, mappedAliases)) {
+                mappedAliases.forEach(alias => leftAliases.add(alias));
+            }
+            if (aliasesOverlap(rightAliases, mappedAliases)) {
+                mappedAliases.forEach(alias => rightAliases.add(alias));
+            }
+        }
+    } catch (_) {
+        // A failed LID lookup should simply leave this mention unmatched.
+    }
+
+    return aliasesOverlap(leftAliases, rightAliases);
+}
 async function getSenderContact(message) {
     try {
         return await message.getContact();
@@ -108,6 +174,7 @@ module.exports = {
     normalizeJid,
     normalizePhoneNumber,
     getCanonicalJid,
+    areSameWhatsAppUser,
     getSenderContact,
     getSenderJid,
     getContactJid
