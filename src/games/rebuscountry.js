@@ -650,6 +650,7 @@ Stole *$${stealAmount}* from @${mentionedJid.split('@')[0]}!`;
 // ============================================================
 
 module.exports = {
+    hasActiveGames: () => activeGames.size > 0,
     startRebusLobby,
     startRebusGame,
     stopRebusGame,
