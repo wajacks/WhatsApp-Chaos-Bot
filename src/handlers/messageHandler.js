@@ -12,6 +12,7 @@ const { createCommandRouter } = require('../commands/router');
 const { areSameWhatsAppUser } = require('../utils/identity');
 const { createAiPresence } = require('../features/ai/presence');
 const { beginIncomingActivity } = require('../bot/activity');
+const { reportWhatsAppFrameFailure } = require('../tools/whatsappHealthWatchdog');
 
 function registerMessageHandler(client, dependencies) {
     const {
@@ -2124,6 +2125,7 @@ function registerMessageHandler(client, dependencies) {
             if (aiPresence) await aiPresence.clear();
         }
     } catch (err) {
+        reportWhatsAppFrameFailure(client, err);
         console.error('❌ General Message Handling Error:', err);
     }
     };
