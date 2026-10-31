@@ -1,5 +1,6 @@
 const { handleAiCommand } = require('./handler');
 const { sendTextAsVoiceNote } = require('../voice/voiceNoteAudio');
+const { areSameWhatsAppUser } = require('../../utils/identity');
 
 const SPEECH_API_VERSION = '2025-10-15';
 
@@ -11,26 +12,17 @@ function isAudioMessage(message) {
     return !!message && !!message.hasMedia && ['ptt', 'audio'].includes(String(message.type || '').toLowerCase());
 }
 
-function normalizeJid(value, getCanonicalJid) {
-    if (!value) return '';
-    try {
-        return String((getCanonicalJid && getCanonicalJid(value)) || value).toLowerCase();
-    } catch (_) {
-        return String(value).toLowerCase();
-    }
-}
-
-async function isAddressedToBot({ message, isGroup, client, getCanonicalJid }) {
+async function isAddressedToBot({ message, isGroup, client }) {
     if (!isGroup) return true;
     if (/^!ai(?:\s|$)/i.test(String(message.body || '').trim())) return true;
 
     const botId = client && client.info && client.info.wid && client.info.wid._serialized;
     const mentionedIds = Array.isArray(message.mentionedIds) ? message.mentionedIds : [];
-    const botMentioned = botId && mentionedIds.some(id =>
-        normalizeJid(id, getCanonicalJid) === normalizeJid(botId, getCanonicalJid) ||
-        String(id).split('@')[0] === String(botId).split('@')[0]
-    );
-    if (botMentioned) return true;
+    if (botId) {
+        for (const id of mentionedIds) {
+            if (await areSameWhatsAppUser(client, id, botId)) return true;
+        }
+    }
 
     if (message.hasQuotedMsg) {
         try {
@@ -144,7 +136,7 @@ async function handleAiVoiceNote(context) {
     const { message, isGroup, client, getCanonicalJid } = context;
     if (!isAudioMessage(message) || message.fromMe || !voiceNotesEnabled()) return false;
 
-    const addressed = await isAddressedToBot({ message, isGroup, client, getCanonicalJid });
+    const addressed = await isAddressedToBot({ message, isGroup, client });
     if (!addressed) return false;
 
     if (!process.env.AZURE_SPEECH_KEY || (!process.env.AZURE_SPEECH_ENDPOINT && !process.env.AZURE_SPEECH_REGION)) {
