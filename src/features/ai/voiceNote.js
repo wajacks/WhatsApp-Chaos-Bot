@@ -94,19 +94,41 @@ async function transcribeVoiceNote(message) {
 
     const endpoint = getSpeechEndpoint() + '/speechtotext/transcriptions:transcribe?api-version=' + SPEECH_API_VERSION;
     const timeoutMs = getPositiveInteger(process.env.AI_VOICE_TRANSCRIBE_TIMEOUT_MS, 60000, 180000);
-    const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Ocp-Apim-Subscription-Key': key },
-        body: form,
-        signal: AbortSignal.timeout(timeoutMs)
-    });
-
+    const deadline = Date.now() + timeoutMs;
+    const retryDelaysMs = [2000, 4000, 8000, 16000];
+    const retryableStatuses = new Set([429, 500, 502, 503, 504]);
+    let response;
     let payload = {};
-    try { payload = await response.json(); } catch (_) {}
-    if (!response.ok) {
+
+    for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
+        const remainingMs = deadline - Date.now();
+        if (remainingMs <= 0) {
+            throw new Error('Azure Speech transcription timed out before a retry could complete.');
+        }
+
+        response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Ocp-Apim-Subscription-Key': key },
+            body: form,
+            signal: AbortSignal.timeout(remainingMs)
+        });
+
+        payload = {};
+        try { payload = await response.json(); } catch (_) {}
+        if (response.ok || !retryableStatuses.has(response.status) || attempt === retryDelaysMs.length) break;
+
+        const retryAfterSeconds = Number(response.headers.get('retry-after'));
+        const backoffMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0
+            ? Math.min(Math.max(retryAfterSeconds * 1000, 1000), retryDelaysMs[attempt])
+            : retryDelaysMs[attempt];
+        if (Date.now() + backoffMs >= deadline) break;
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+    }
+
+    if (!response || !response.ok) {
         const detail = String(payload && payload.error && payload.error.message || payload.message || '')
             .replace(/[\r\n\t]+/g, ' ').slice(0, 240);
-        throw new Error('Azure Speech transcription failed (' + response.status + ')' + (detail ? ': ' + detail : '.'));
+        throw new Error('Azure Speech transcription failed (' + (response && response.status || 'unknown') + ')' + (detail ? ': ' + detail : '.'));
     }
 
     const transcript = Array.isArray(payload.combinedPhrases)
