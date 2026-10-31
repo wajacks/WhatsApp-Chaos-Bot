@@ -1,6 +1,7 @@
 const { handleAiCommand } = require('./handler');
 const { sendTextAsVoiceNote } = require('../voice/voiceNoteAudio');
 const { areSameWhatsAppUser } = require('../../utils/identity');
+const { createAiPresence } = require('./presence');
 
 const SPEECH_API_VERSION = '2025-10-15';
 
@@ -133,7 +134,7 @@ async function transcribeVoiceNote(message) {
 }
 
 async function handleAiVoiceNote(context) {
-    const { message, isGroup, client, getCanonicalJid } = context;
+    const { message, isGroup, client } = context;
     if (!isAudioMessage(message) || message.fromMe || !voiceNotesEnabled()) return false;
 
     const addressed = await isAddressedToBot({ message, isGroup, client });
@@ -144,58 +145,65 @@ async function handleAiVoiceNote(context) {
         return true;
     }
 
-    let transcript;
+    const presence = createAiPresence(client, context.chatId || message.from);
     try {
-        transcript = await transcribeVoiceNote(message);
-    } catch (error) {
-        console.error('[AI VOICE] Transcription failed:', error.message);
-        const messageText = /exceeds the configured audio size limit/i.test(error.message)
-            ? '🎙️ That voice note is too large for the current limit. Please send a shorter one.'
-            : '🎙️ I could not transcribe that voice note right now. Please try again in a moment.';
-        await message.reply(messageText);
-        return true;
-    }
-
-    if (!transcript) {
-        await message.reply('🎙️ I could not make out any speech in that audio. Please try a clearer voice note.');
-        return true;
-    }
-
-    const aiContext = {
-        ...context,
-        text: transcript,
-        lowerText: transcript.toLowerCase(),
-        shouldHandleNaturalText: true,
-        isVoiceInput: true,
-        replyWithAudio: async answer => {
-            const spokenText = String(answer || '').trim();
-            if (!spokenText) return '';
-            return sendTextAsVoiceNote({
-                text: spokenText,
-                chatId: context.chatId,
-                senderId: context.senderId,
-                client,
-                baseDir: context.baseDir,
-                fs: context.fs,
-                path: context.path,
-                execFileAsync: context.execFileAsync,
-                googleTTS: context.googleTTS,
-                EdgeTTS: context.EdgeTTS,
-                MessageMedia: context.MessageMedia,
-                voiceSelections: context.voiceSelections,
-                EDGE_TTS_VOICES: context.EDGE_TTS_VOICES,
-                DEFAULT_EDGE_VOICE: context.DEFAULT_EDGE_VOICE
-            });
+        await presence.typing();
+        let transcript;
+        try {
+            transcript = await transcribeVoiceNote(message);
+        } catch (error) {
+            console.error('[AI VOICE] Transcription failed:', error.message);
+            const messageText = /exceeds the configured audio size limit/i.test(error.message)
+                ? '🎙️ That voice note is too large for the current limit. Please send a shorter one.'
+                : '🎙️ I could not transcribe that voice note right now. Please try again in a moment.';
+            await message.reply(messageText);
+            return true;
         }
-    };
 
-    try {
-        await handleAiCommand(aiContext);
-    } catch (error) {
-        console.error('[AI VOICE] AI/audio reply failed:', error.message);
-        await message.reply('🎙️ I could not prepare an audio reply right now. Please try again or send the request as text.');
+        if (!transcript) {
+            await message.reply('🎙️ I could not make out any speech in that audio. Please try a clearer voice note.');
+            return true;
+        }
+
+        const aiContext = {
+            ...context,
+            text: transcript,
+            lowerText: transcript.toLowerCase(),
+            shouldHandleNaturalText: true,
+            isVoiceInput: true,
+            replyWithAudio: async answer => {
+                const spokenText = String(answer || '').trim();
+                if (!spokenText) return '';
+                await presence.recording();
+                return sendTextAsVoiceNote({
+                    text: spokenText,
+                    chatId: context.chatId,
+                    senderId: context.senderId,
+                    client,
+                    baseDir: context.baseDir,
+                    fs: context.fs,
+                    path: context.path,
+                    execFileAsync: context.execFileAsync,
+                    googleTTS: context.googleTTS,
+                    EdgeTTS: context.EdgeTTS,
+                    MessageMedia: context.MessageMedia,
+                    voiceSelections: context.voiceSelections,
+                    EDGE_TTS_VOICES: context.EDGE_TTS_VOICES,
+                    DEFAULT_EDGE_VOICE: context.DEFAULT_EDGE_VOICE
+                });
+            }
+        };
+
+        try {
+            await handleAiCommand(aiContext);
+        } catch (error) {
+            console.error('[AI VOICE] AI/audio reply failed:', error.message);
+            await message.reply('🎙️ I could not prepare an audio reply right now. Please try again or send the request as text.');
+        }
+        return true;
+    } finally {
+        await presence.clear();
     }
-    return true;
 }
 
 module.exports = { handleAiVoiceNote, isAudioMessage, transcribeVoiceNote };
