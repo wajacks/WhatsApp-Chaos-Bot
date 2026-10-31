@@ -957,6 +957,7 @@ async function stopWordChainCommand(
 // ============================================================
 
 module.exports = {
+    hasActiveGames: () => activeWordChainGames.size > 0,
     startWordChainLobby,
     joinWordChain,
     startWordChainGame,

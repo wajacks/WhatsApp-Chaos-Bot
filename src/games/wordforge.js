@@ -1075,6 +1075,7 @@ function restoreWordForgeGames(client) {
 }
 
 module.exports = {
+    hasActiveGames: () => activeGames.size > 0,
     startWordForgeLobby,
     joinWordForgeLobby,
     startWordForgeGame,

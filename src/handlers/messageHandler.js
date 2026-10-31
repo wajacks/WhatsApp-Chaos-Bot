@@ -11,6 +11,7 @@ const { handleCoinPurchaseCommand } = require('../features/economy/purchaseHandl
 const { createCommandRouter } = require('../commands/router');
 const { areSameWhatsAppUser } = require('../utils/identity');
 const { createAiPresence } = require('../features/ai/presence');
+const { beginIncomingActivity } = require('../bot/activity');
 
 function registerMessageHandler(client, dependencies) {
     const {
@@ -2126,7 +2127,14 @@ function registerMessageHandler(client, dependencies) {
         console.error('❌ General Message Handling Error:', err);
     }
     };
-    registeredClient.on('message', handleIncomingMessage);
+    registeredClient.on('message', async message => {
+        const finishActivity = beginIncomingActivity();
+        try {
+            await handleIncomingMessage(message);
+        } finally {
+            finishActivity();
+        }
+    });
 }
 
 module.exports = { registerMessageHandler };
