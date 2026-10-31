@@ -288,4 +288,5 @@ function endScrambleGame(chatId, client, reason = '🛑 *Scrambled Word match en
     return message;
 }
 
-module.exports = { startScrambleLobby, startScrambleGame, stopScrambleGame, joinScrambleLobby, processScrambleGuess, processScrambleHint, endScrambleGame, _test: { shuffle, scrambleWord, calculatePoints, normalizeAnswer } };
+module.exports = {
+    hasActiveGames: () => activeScrambleGames.size > 0, startScrambleLobby, startScrambleGame, stopScrambleGame, joinScrambleLobby, processScrambleGuess, processScrambleHint, endScrambleGame, _test: { shuffle, scrambleWord, calculatePoints, normalizeAnswer } };
