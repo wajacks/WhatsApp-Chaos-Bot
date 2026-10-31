@@ -490,6 +490,7 @@ function stopGame(chatId, senderId) {
 }
 
 module.exports = {
+    hasActiveGames: () => activeGames.size > 0,
     startWordleLobby,
     startWordleGame,
     joinLobby,
