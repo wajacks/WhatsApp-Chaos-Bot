@@ -1,5 +1,7 @@
 const { GEMINI_MODEL } = require('../geminiConfig');
 const { isWhatsAppFrameError } = require('../../tools/whatsappHealthWatchdog');
+const { getNairobiDateTime } = require('../../utils/nairobiTime');
+const { buildRelativeClassScheduleReply } = require('./classScheduleReply');
 
 const FEATURE_ACTIONS = [
     'show_menu', 'show_help', 'show_games', 'game_help',
@@ -297,12 +299,21 @@ async function handleAiCommand(context) {
         return true;
     }
 
+    const classScheduleReply = buildRelativeClassScheduleReply(prompt, getMyClassPortalSummary);
+    if (classScheduleReply) {
+        await sendReply(classScheduleReply);
+        return true;
+    }
+
     const memoryKey = String(chatId) + ':' + String(senderId);
     if (!aiMemory.has(memoryKey)) aiMemory.set(memoryKey, []);
     const history = aiMemory.get(memoryKey);
     const currentUserEntry = { role: 'user', content: prompt };
+    const currentNairobiDateTime = getNairobiDateTime();
     const systemInstructionText = [
         'You are Chaos Neural Core, the assistant inside WhatsApp Chaos Bot.',
+        'Authoritative current date and time: ' + currentNairobiDateTime.weekdayLabel + ', ' + currentNairobiDateTime.dateLabel + ' at ' + currentNairobiDateTime.time + ' (' + currentNairobiDateTime.timeZone + '). Use this for relative dates; do not use the AI provider region or an assumed server timezone.',
+        'For class timetable questions, use the explicit Nairobi date and weekday supplied by the Class Portal. Never guess which weekday today or tomorrow is.';
         'Answer naturally and concisely. Use current web research when the web tools are available and the question needs fresh facts or asks about a supplied public URL. Summarize the answer directly; do not dump a list of links. Add source names briefly, and include URLs only when the user asks for sources or links.',
         'When no web tool was used, do not claim that you checked the internet. Say briefly when a current fact could not be verified.',
         'Use get_bot_capabilities when the user asks what Chaos Bot can do, how to use a feature, or how to navigate its menus. Base bot-specific explanations on this live public guide and current authorized context; do not invent features.',
@@ -319,6 +330,7 @@ async function handleAiCommand(context) {
         '- The private Class Portal is implemented in src/commands/classHandler.js, src/tools/classSession.js, and src/database/classdb.js.',
         '- AI chat uses Azure OpenAI first and Gemini as its configured fallback; Gemini provides web grounding for requests that need it.',
         '- Natural-language actions use the ordinary bot message handlers and command router; existing permission checks remain authoritative.',
+        '- The Class Portal timetable is date-labeled in Africa/Nairobi. For a direct today/tomorrow class question, answer from the listed classes for that exact Nairobi date only.',
         '- The public command and game guide is supplied by get_bot_capabilities. Do not invent command syntax or feature behavior.',
         'The current speaker is ' + String(userName || 'a Chaos Bot user').slice(0, 80) + '. Do not infer personal details or roles from their name.'
     ].join('\n');
