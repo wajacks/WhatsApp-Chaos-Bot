@@ -240,6 +240,12 @@ async function handleAiCommand(context) {
         await message.reply(content);
     };
 
+    // Structured bot results such as weather should stay readable in chat,
+    // while free-form assistant answers can use the voice-note reply path.
+    const sendDisplayReply = async content => {
+        await message.reply(content);
+    };
+
     const explicitCommand = isExplicitAiCommand(lowerText);
     if (!explicitCommand && !shouldHandleNaturalText) return false;
 
@@ -276,16 +282,16 @@ async function handleAiCommand(context) {
             ? weatherMatch[1].replace(/[?!.]+$/, '').replace(/\b(today|now|please|right now)\b/gi, '').trim()
             : '';
         if (!city) {
-            await sendReply('Please specify a city, e.g., “What’s the weather in Nairobi?”');
+            await sendDisplayReply('Please specify a city, e.g., “What’s the weather in Nairobi?”');
             return true;
         }
         try {
             const weatherData = await getWeather({ city });
-            if (weatherData.error) await sendReply(weatherData.error);
-            else await sendReply(buildWeatherResponse(weatherData, userName));
+            if (weatherData.error) await sendDisplayReply(weatherData.error);
+            else await sendDisplayReply(buildWeatherResponse(weatherData, userName));
         } catch (error) {
             console.error('❌ AI Weather Error:', error);
-            await sendReply('❌ I could not retrieve the weather right now. Please try again.');
+            await sendDisplayReply('❌ I could not retrieve the weather right now. Please try again.');
         }
         return true;
     }
