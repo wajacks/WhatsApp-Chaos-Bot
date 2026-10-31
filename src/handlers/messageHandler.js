@@ -13,6 +13,7 @@ const { areSameWhatsAppUser } = require('../utils/identity');
 const { createAiPresence } = require('../features/ai/presence');
 const { beginIncomingActivity } = require('../bot/activity');
 const { reportWhatsAppFrameFailure } = require('../tools/whatsappHealthWatchdog');
+const { getNairobiCalendarDay } = require('../utils/nairobiTime');
 
 function registerMessageHandler(client, dependencies) {
     const {
@@ -2013,6 +2014,9 @@ function registerMessageHandler(client, dependencies) {
             const currentId = canonical(senderId);
             const now = Date.now();
             const dayMs = 24 * 60 * 60 * 1000;
+            const scheduleReferenceDate = new Date(now);
+            const todayNairobi = getNairobiCalendarDay(0, scheduleReferenceDate);
+            const tomorrowNairobi = getNairobiCalendarDay(1, scheduleReferenceDate);
             const classes = [];
 
             for (const [className, classData] of Object.entries(db.classes || {})) {
@@ -2029,6 +2033,11 @@ function registerMessageHandler(client, dependencies) {
                 const data = {
                     className,
                     role,
+                    calendar: {
+                        timeZone: 'Africa/Nairobi',
+                        today: todayNairobi,
+                        tomorrow: tomorrowNairobi
+                    },
                     schedule: [],
                     deadlines: [],
                     activePolls: [],
@@ -2036,20 +2045,12 @@ function registerMessageHandler(client, dependencies) {
                     ownAttendance: []
                 };
                 const schedule = classData.timetable || {};
-                const eatTodayParts = new Intl.DateTimeFormat('en-CA', {
-                    timeZone: 'Africa/Nairobi', year: 'numeric', month: '2-digit', day: '2-digit'
-                }).formatToParts(new Date(now));
-                const todayParts = Object.fromEntries(eatTodayParts.map(part => [part.type, part.value]));
-                const todayStartUtc = Date.UTC(Number(todayParts.year), Number(todayParts.month) - 1, Number(todayParts.day)) - (3 * 60 * 60 * 1000);
-
                 for (let offset = 0; offset < 7; offset++) {
-                    const dayDate = new Date(todayStartUtc + offset * dayMs);
-                    const weekday = new Intl.DateTimeFormat('en-US', {
-                        timeZone: 'Africa/Nairobi', weekday: 'long'
-                    }).format(dayDate).toLowerCase();
-                    for (const item of (schedule[weekday] || []).slice(0, 5)) {
+                    const targetDay = getNairobiCalendarDay(offset, scheduleReferenceDate);
+                    for (const item of (schedule[targetDay.weekday] || []).slice(0, 5)) {
                         data.schedule.push({
-                            day: weekday,
+                            date: targetDay.dateKey,
+                            day: targetDay.weekday,
                             unit: String(item.unit || '').slice(0, 100),
                             time: String(item.time || '').slice(0, 40)
                         });
