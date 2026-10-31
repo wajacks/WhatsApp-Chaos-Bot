@@ -9,6 +9,7 @@ const { handleChatSummaryCommand } = require('../features/ai/chatSummary');
 const { handleWeatherCommand } = require('../features/weather/command');
 const { handleCoinPurchaseCommand } = require('../features/economy/purchaseHandler');
 const { createCommandRouter } = require('../commands/router');
+const { areSameWhatsAppUser } = require('../utils/identity');
 
 function registerMessageHandler(client, dependencies) {
     const {
@@ -1852,17 +1853,17 @@ function registerMessageHandler(client, dependencies) {
             if (!isGroup) {
                 shouldHandleNaturalText = true;
             } else if (!message.fromMe) {
-                const normalizeJid = value => {
-                    if (!value) return '';
-                    try { return String(getCanonicalJid(value) || value).toLowerCase(); }
-                    catch (_) { return String(value).toLowerCase(); }
-                };
                 const botId = client.info && client.info.wid && client.info.wid._serialized;
                 const mentionedIds = Array.isArray(message.mentionedIds) ? message.mentionedIds : [];
-                const botMentioned = botId && mentionedIds.some(id =>
-                    normalizeJid(id) === normalizeJid(botId) ||
-                    String(id).split('@')[0] === String(botId).split('@')[0]
-                );
+                let botMentioned = false;
+                if (botId) {
+                    for (const id of mentionedIds) {
+                        if (await areSameWhatsAppUser(client, id, botId)) {
+                            botMentioned = true;
+                            break;
+                        }
+                    }
+                }
                 let botRepliedTo = false;
                 if (!botMentioned && message.hasQuotedMsg) {
                     try {
