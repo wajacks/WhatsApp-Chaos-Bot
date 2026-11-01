@@ -1,4 +1,6 @@
 const activeClassSessions = new Map();
+const timetableNotificationQueues = new Map();
+const TIGHT_CLASS_TRANSITION_DELAY_MS = 15_000;
 const SESSION_TIMEOUT_MS = 600 * 1000; // 10 minutes
 const cron = require('node-cron');
 const { readClassDB, writeClassDB, createClassDBBackup } = require('../database/classdb');
@@ -368,6 +370,7 @@ function startTimetableMonitor(client) {
 
         for (const className in db.classes) {
             const classData = db.classes[className];
+            let endNoticeQueuedThisTick = false;
             const active = classData.activeRollCall;
 
             // Close registers left open across dates, or registers whose scheduled
@@ -395,8 +398,17 @@ function startTimetableMonitor(client) {
             if (classData.activeRollCall && classData.activeRollCall.source !== 'manual' && normalizeRollCallDate(classData.activeRollCall) === todayDateKey) {
                 const activeSchedule = scheduledToday.find(cls => cls.unit === classData.activeRollCall.unit);
                 if (activeSchedule && Number.isFinite(activeSchedule.endMinutes) && currentMinutes >= activeSchedule.endMinutes) {
-                    closeActiveRollCall(classData);
-                    dbChanged = true;
+                    const closedRollCall = closeActiveRollCall(classData);
+                    if (closedRollCall) {
+                        enqueueClassNotification(
+                            client,
+                            className,
+                            classData,
+                            `🛑 *CLASS ENDED*\n\n${closedRollCall.unit} has officially concluded. The attendance register is now closed.`
+                        );
+                        endNoticeQueuedThisTick = true;
+                        dbChanged = true;
+                    }
                 }
             }
 
@@ -427,12 +439,21 @@ function startTimetableMonitor(client) {
                                 `_The attendance register is now open. Choose how to sign in:_\n` +
                                 `1️⃣ Reply with *PRESENT*\n` +
                                 `2️⃣ Type *!class* ➔ Open Student Hub ➔ Select option *8* (Sign Attendance)`;
-                    broadcastToClass(client, classData, msg);
+                    enqueueClassNotification(client, className, classData, msg, endNoticeQueuedThisTick ? TIGHT_CLASS_TRANSITION_DELAY_MS : 0);
                     dbChanged = true;
                 }
 
-                if (currentMinutes >= cls.endMinutes && closeRollCallFor(classData, cls.unit, todayDateKey)) {
-                    broadcastToClass(client, classData, `🛑 *CLASS ENDED*\n\n${cls.unit} has officially concluded. The attendance register is now closed.`);
+                const closedScheduledRollCall = currentMinutes >= cls.endMinutes
+                    ? closeRollCallFor(classData, cls.unit, todayDateKey)
+                    : null;
+                if (closedScheduledRollCall) {
+                    enqueueClassNotification(
+                        client,
+                        className,
+                        classData,
+                        `🛑 *CLASS ENDED*\n\n${closedScheduledRollCall.unit} has officially concluded. The attendance register is now closed.`
+                    );
+                    endNoticeQueuedThisTick = true;
                     dbChanged = true;
                 }
             }
@@ -444,11 +465,20 @@ function startTimetableMonitor(client) {
                                           `_The attendance register is now open. Choose how to sign in:_\n` +
                                           `1️⃣ Reply with *PRESENT*\n` +
                                           `2️⃣ Type *!class* ➔ Open Student Hub ➔ Select option *8* (Sign Attendance)`;
-                        broadcastToClass(client, classData, makeupMsg);
+                        enqueueClassNotification(client, className, classData, makeupMsg, endNoticeQueuedThisTick ? TIGHT_CLASS_TRANSITION_DELAY_MS : 0);
                         dbChanged = true;
                     }
-                    if (currentMinutes >= makeupClass.endMinutes && closeRollCallFor(classData, makeupClass.unit, todayDateKey)) {
-                        broadcastToClass(client, classData, `🛑 *MAKEUP CLASS ENDED*\n\n${makeupClass.unit} has officially concluded.`);
+                    const closedMakeupRollCall = currentMinutes >= makeupClass.endMinutes
+                        ? closeRollCallFor(classData, makeupClass.unit, todayDateKey)
+                        : null;
+                    if (closedMakeupRollCall) {
+                        enqueueClassNotification(
+                            client,
+                            className,
+                            classData,
+                            `🛑 *MAKEUP CLASS ENDED*\n\n${closedMakeupRollCall.unit} has officially concluded.`
+                        );
+                        endNoticeQueuedThisTick = true;
                         dbChanged = true;
                     }
                 }
@@ -574,25 +604,44 @@ function startClassWeekendBroadcast(client) {
     });
 }
 
-// Helper to blast all students
-// Fire and forget: Do not use 'await' when calling this function
-function broadcastToClass(client, classData, messageText) {
+// Helper to blast all students. Callers may await it when notification order matters.
+async function broadcastToClass(client, classData, messageText) {
     const members = classData.members || {};
     const memberIds = Object.keys(members);
-    
-    // Background execution wrapper
-    (async () => {
-        for (let i = 0; i < memberIds.length; i++) {
-            const mId = memberIds[i];
-            try {
-                // Keep the anti-spam delay, but now it doesn't block the rest of the bot
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                await client.sendMessage(members[mId].phoneId, messageText);
-            } catch (e) {
-                console.warn(`Failed to broadcast to ${members[mId].name}`);
-            }
+
+    for (const mId of memberIds) {
+        try {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            await client.sendMessage(members[mId].phoneId, messageText);
+        } catch (e) {
+            console.warn(`Failed to broadcast to ${members[mId].name}`);
         }
-    })(); // Execute immediately in background
+    }
+}
+
+// Keep timetable notices for a class in order. This prevents a back-to-back
+// class start message from racing its previous class end message.
+function enqueueClassNotification(client, className, classData, messageText, delayMs = 0) {
+    const previous = timetableNotificationQueues.get(className) || Promise.resolve();
+    const current = previous
+        .catch(() => {})
+        .then(async () => {
+            if (delayMs > 0) {
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+            await broadcastToClass(client, classData, messageText);
+        })
+        .catch(error => {
+            console.warn(`[CLASS PORTAL] Timetable notice failed for ${className}:`, error.message);
+        });
+
+    timetableNotificationQueues.set(className, current);
+    current.then(() => {
+        if (timetableNotificationQueues.get(className) === current) {
+            timetableNotificationQueues.delete(className);
+        }
+    });
+    return current;
 }
 
 function getPortalMetrics(className, repId) {
