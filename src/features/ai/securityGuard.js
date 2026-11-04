@@ -62,7 +62,7 @@ function saveState() {
 function identityKey(senderId) {
     const normalized = String(senderId || '').trim().toLowerCase();
     return normalized
-        ? crypto.createHash('sha256').update(normalized).digest('hex');
+        ? crypto.createHash('sha256').update(normalized).digest('hex')
         : '';
 }
 
@@ -83,6 +83,7 @@ const PROMPT_INJECTION_PATTERNS = [
     /\b(?:repeat|quote|print|dump|reproduce|show)\b.{0,50}\b(?:everything|all text|all messages|all instructions)\b.{0,50}\b(?:above|before|hidden|system|developer)\b/i,
     /\b(?:translate|encode|base64|rot13|reverse|use the first letters?)\b.{0,80}\b(?:hidden|system|developer|internal|secret)\b.{0,40}\b(?:prompt|instructions?|rules?|secrets?|credentials?)\b/i,
     /\b(?:pretend|act|roleplay)\b.{0,50}\b(?:owner|developer|administrator|admin|system)\b.{0,80}\b(?:reveal|show|dump|bypass|ignore|secret|credential|prompt|instruction)\b/i
+    /\b(?:dump|export|read|send|show|list|print|give me)\b.{0,50}\b(?:raw database|entire database|database contents|all user records|everyone['’]s (?:data|messages|balances)|other users['’] (?:data|messages|balances)|private messages)\b/i
 ];
 
 function isPromptExtractionAttempt(prompt) {
@@ -126,8 +127,8 @@ function pruneAllUsers(now) {
     }
 }
 
-function limited(reason, retryAfterMs = 0) {
-    return { allowed: false, reason, retryAfterMs: Math.max(0, retryAfterMs) };
+function limited(reason, retryAfterMs = 0, notify = true) {
+    return { allowed: false, reason, retryAfterMs: Math.max(0, retryAfterMs), notify };
 }
 
 function acquireAiRequest(senderId, prompt, now = Date.now()) {
@@ -152,10 +153,10 @@ function acquireAiRequest(senderId, prompt, now = Date.now()) {
     record.lastSeenAt = now;
 
     if (record.securityBlockedUntil > now) {
-        return limited('security_lockout', record.securityBlockedUntil - now);
+        return limited('security_lockout', record.securityBlockedUntil - now, false);
     }
     if (record.rateLimitedUntil > now) {
-        return limited('rate_limited', record.rateLimitedUntil - now);
+        return limited('rate_limited', record.rateLimitedUntil - now, false);
     }
 
     const recentHour = record.promptTimes.filter(timestamp => timestamp > now - HOUR_MS);
@@ -197,7 +198,7 @@ function acquireAiRequest(senderId, prompt, now = Date.now()) {
 
     if (inFlightUsers.has(key)) {
         if (!saveState()) return limited('storage');
-        return limited('in_flight');
+        return limited('in_flight', 0, false);
     }
 
     inFlightUsers.add(key);
