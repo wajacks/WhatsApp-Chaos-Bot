@@ -654,6 +654,7 @@ async function handleAiCommandCore(context) {
             }
         }
         const uniqueSources = Array.from(new Map(sources.map(source => [source.url, source])).values()).slice(0, 5);
+        if (!uniqueSources.length) throw new Error('Azure web_search completed without returning any source citations.');
         console.info('[AI WEB SEARCH] Azure Responses API completed a grounded web search (' + uniqueSources.length + ' cited sources).');
         return { answer, sources: uniqueSources, usedWebTools: true };
     };    const callAzure = async () => {
