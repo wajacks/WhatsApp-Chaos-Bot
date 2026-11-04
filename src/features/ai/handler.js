@@ -147,7 +147,7 @@ function routeMismatchedMediaAction(prompt, toolName, args, executeBotFeature, e
     if (requestedIntent === 'multiple') {
         return { error: 'The current message asks for more than one media action. Ask which single action the user wants first; do not run either action yet.' };
     }
-    if (!requestedIntent || !toolIntent || requestedIntent === toolIntent) {
+    if (!requestedIntent || requestedIntent === toolIntent) {
         return executeNormally();
     }
     if (requestedIntent === 'image_analysis' && executeBotCommand) {
@@ -161,8 +161,8 @@ function routeMismatchedMediaAction(prompt, toolName, args, executeBotFeature, e
         return executeBotFeature({ action: 'generate_image', prompt: imagePrompt });
     }
     if (requestedIntent === 'media') {
-        console.warn('[AI ROUTING] Blocked an image action that conflicts with the current song/video request.');
-        return { error: 'The current request asks for music or video, so the mismatched image action was not run. Ask for a title or clarify which action to perform.' };
+        console.warn('[AI ROUTING] Blocked a bot action that conflicts with the current song/video request.');
+        return { error: 'The current request asks for music or video, so no unrelated bot action was run. Ask for a title or clarify which action to perform.' };
     }
     return { error: 'That action does not match the current request. No bot action was run.' };
 }
