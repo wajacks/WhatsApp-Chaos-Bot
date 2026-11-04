@@ -252,7 +252,7 @@ async function handleAiCommand(context) {
         : String(text || '').replace(/@\d{5,20}/g, '').trim();
     const admission = acquireAiRequest(senderId, guardPrompt);
     if (!admission.allowed) {
-        await message.reply(buildAiGuardReply(admission));
+        if (admission.notify !== false) await message.reply(buildAiGuardReply(admission));
         return true;
     }
 
