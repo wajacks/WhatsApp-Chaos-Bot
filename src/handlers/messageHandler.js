@@ -1,6 +1,7 @@
 const { execFile } = require('child_process');
 const { handleVoiceCommands } = require('../features/voice/handler');
 const { handleAiCommand } = require('../features/ai/handler');
+const { sendTextAsVoiceNote } = require('../features/voice/voiceNoteAudio');
 const { handleAiVoiceNote } = require('../features/ai/voiceNote');
 const { handlePendingDrawSelection, handleImageCommands } = require('../features/images/handler');
 const { handleBibleMessages } = require('../features/bible/handler');
@@ -1853,7 +1854,33 @@ function registerMessageHandler(client, dependencies) {
         // existing deterministic routes.
         const isExplicitAi = /^!ai(?:\s|$)/i.test(lowerText);
         let shouldHandleNaturalText = false;
-        if (!isExplicitAi && text && !message.hasMedia && message.type !== 'ptt') {
+        let quotedBotReplyContext = '';
+        let quotedImageContext = '';
+        let botRepliedTo = false;
+        if (message.hasQuotedMsg) {
+            try {
+                const quotedMessage = await message.getQuotedMessage();
+                botRepliedTo = !!quotedMessage?.fromMe;
+                if (!message.hasMedia && quotedMessage?.hasMedia && String(quotedMessage.type || '').toLowerCase() === 'image') {
+                    quotedImageContext = 'The current message replies to a photo. The existing !analyze command can access the quoted photo.';
+                }
+                if (botRepliedTo) {
+                    let quotedText = String(quotedMessage.body || quotedMessage.caption || '').trim().slice(0, 1200);
+                    if (/\b(?:password|passcode|credential|OTP|API[\s_-]*key|session secret|secret role|hidden game (?:role|answer|solution))\b/i.test(quotedText)) {
+                        quotedText = '[Sensitive bot reply omitted from AI context.]';
+                    }
+                    const mediaType = quotedMessage.hasMedia
+                        ? 'Quoted bot reply includes media of type ' + String(quotedMessage.type || 'unknown') + '.'
+                        : '';
+                    quotedBotReplyContext = [mediaType, quotedText ? 'Quoted bot reply text: ' + quotedText : ''].filter(Boolean).join('\n');
+                    if (!quotedBotReplyContext) quotedBotReplyContext = 'The quoted bot reply has no readable text.';
+                }
+            } catch (quoteError) {
+                console.warn('[AI ROUTING] Could not inspect quoted message:', quoteError.message);
+            }
+        }
+        const isImageMessage = !!message.hasMedia && String(message.type || '').toLowerCase() === 'image';
+        if (!isExplicitAi && text && (!message.hasMedia || isImageMessage) && message.type !== 'ptt') {
             if (!isGroup) {
                 shouldHandleNaturalText = true;
             } else if (!message.fromMe) {
@@ -1868,15 +1895,6 @@ function registerMessageHandler(client, dependencies) {
                         }
                     }
                 }
-                let botRepliedTo = false;
-                if (!botMentioned && message.hasQuotedMsg) {
-                    try {
-                        const quotedMessage = await message.getQuotedMessage();
-                        botRepliedTo = !!quotedMessage?.fromMe;
-                    } catch (quoteError) {
-                        console.warn('[AI ROUTING] Could not inspect quoted message:', quoteError.message);
-                    }
-                }
                 shouldHandleNaturalText = !!(botMentioned || botRepliedTo);
             }
         }
@@ -1888,6 +1906,20 @@ function registerMessageHandler(client, dependencies) {
             const guide = {
                 menu,
                 games: typeof getGamesList === 'function' ? getGamesList() : '',
+                workflows: [
+                    'Generate an image: !draw <description> opens Image Studio. The user chooses Azure ($5,000 game dollars) or Pollinations (free), then replies 1 or 2 within 60 seconds.',
+                    'Analyze a photo: attach a photo with !analyze <question> or reply to a photo with that command. Non-owner cost is $2,000 game dollars; photos only.',
+                    'Find a named YouTube song or video: !video <query> opens the normal media flow. !song or !randomsong asks for a random song. !hymn <query> searches English hymns.',
+                    'Weather: !weather <city> or ask the AI for weather in a named city.',
+                    'Owner contact: ask for the Master Owner’s contact card, or use !contactowner. This sends a public vCard only and does not grant owner access.',
+                    'Voice replies: short AI chat replies can arrive as voice notes automatically. Explicitly ask for a voice note to hear a longer AI answer; text is used if speech synthesis fails.',
+                    'Economy: !bal, !profile, !lb [xp|money], !daily, !store, !buy <item>, !beg, !pay <amount> with a WhatsApp mention or reply, and !buycoins for an owner-reviewed top-up.',
+                    'Games: use the lobby and join/start commands in the games guide; the normal game host rules apply.',
+                    ...( /^true$/i.test(String(process.env.AI_VOICE_NOTES_ENABLED || '').trim())
+                        ? ['Voice-note AI is enabled: send a voice note in private chat, or tag/reply to the bot with a voice note in a group. The transcript is not posted; the AI replies in audio.']
+                        : []),
+                    'The AI can invoke ordinary commands shown in this live menu when the current request clearly asks for them. Existing permissions, costs, confirmations, and multi-step workflows still apply.'
+                ],
                 classPortal: 'The Class Portal is private-DM only. Start with !class. Student and Rep menus follow the account’s assigned role. Use 0 to go back and 99 to log out. Ask the AI for your own timetable, deadlines, active polls, updates, or attendance summary. Enter passwords and recovery codes only in the normal private Class Portal flow; the AI is never given stored portal credentials.'
             };
             if (isOwner(senderId) && typeof getOwnerMenu === 'function') {
@@ -1966,6 +1998,8 @@ function registerMessageHandler(client, dependencies) {
             show_store: '!store',
             claim_daily: '!daily',
             random_song: '!song',
+            generate_image: '!draw',
+            contact_owner: '!contactowner',
             create_wordforge_lobby: '!wordforge',
             join_wordforge: '!joinforge',
             start_wordforge: '!startforge',
@@ -1991,12 +2025,18 @@ function registerMessageHandler(client, dependencies) {
             join_numberrun: '!joinnumberrun',
             start_numberrun: '!startnumberrun'
         };
-        const executeBotFeature = async ({ action, query }) => {
+        const executeBotFeature = async ({ action, query, prompt }) => {
             const baseCommand = AI_FEATURE_COMMANDS[action];
             if (!baseCommand && action !== 'search_video') return { error: 'That bot feature is not available through AI.' };
+            const imagePrompt = String(prompt || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
+            if (action === 'generate_image' && (!imagePrompt || imagePrompt.length > 2000)) {
+                return { error: 'Please provide an image description of 1 to 2,000 characters.' };
+            }
             const commandText = action === 'search_video'
                 ? '!video ' + String(query || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim()
-                : baseCommand;
+                : action === 'generate_image'
+                    ? '!draw ' + imagePrompt
+                    : baseCommand;
             if (action === 'search_video' && commandText === '!video') {
                 return { error: 'Please specify the video or song title to search for.' };
             }
@@ -2105,6 +2145,7 @@ function registerMessageHandler(client, dependencies) {
             getWeather, buildWeatherResponse, aiCooldowns, AI_COOLDOWN_MS,
             aiMemory, MAX_AI_MEMORY, ai, azureClient,
             executeBotFeature, executeBotCommand, getBotGuide, getMyClassPortalSummary,
+            quotedBotReplyContext, quotedImageContext,
             baseDir, fs, path, execFileAsync, googleTTS, EdgeTTS, MessageMedia,
             voiceSelections, EDGE_TTS_VOICES, DEFAULT_EDGE_VOICE
         });
@@ -2119,7 +2160,12 @@ function registerMessageHandler(client, dependencies) {
                 message, text, lowerText, chatId, senderId, userName,
                 getWeather, buildWeatherResponse, aiCooldowns, AI_COOLDOWN_MS,
                 aiMemory, MAX_AI_MEMORY, ai, azureClient, shouldHandleNaturalText,
-                executeBotFeature, executeBotCommand, getBotGuide, getMyClassPortalSummary
+                executeBotFeature, executeBotCommand, getBotGuide, getMyClassPortalSummary,
+                quotedBotReplyContext, quotedImageContext,
+                replyWithAudio: answer => sendTextAsVoiceNote({
+                    text: answer, chatId, senderId, client, baseDir, fs, path, execFileAsync,
+                    googleTTS, EdgeTTS, MessageMedia, voiceSelections, EDGE_TTS_VOICES, DEFAULT_EDGE_VOICE
+                })
             });
             if (aiCommandHandled) return;
         } finally {
