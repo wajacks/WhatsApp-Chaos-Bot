@@ -3,11 +3,32 @@ const fs = require('fs');
 const path = require('path');
 
 const SECURITY_STATE_PATH = path.resolve(__dirname, '../../../data/ai_security.json');
-const MAX_PROMPTS_PER_MINUTE = 5;
-const MAX_PROMPTS_PER_HOUR = 30;
 const PROMPT_WINDOW_MS = 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
+
+function positiveEnvInteger(name, fallback, min, max) {
+    const parsed = Number.parseInt(process.env[name] || '', 10);
+    return Number.isFinite(parsed) ? Math.max(min, Math.min(max, parsed)) : fallback;
+}
+
+function getOveruseBanSteps() {
+    const fallback = [40, 180, 900, 3600];
+    const configured = String(process.env.AI_OVERUSE_BAN_STEPS_SECONDS || '').trim();
+    if (!configured) return fallback.map(seconds => seconds * 1000);
+    const steps = configured.split(',')
+        .map(value => Number.parseInt(value.trim(), 10))
+        .filter(seconds => Number.isFinite(seconds) && seconds > 0)
+        .slice(0, 8)
+        .map(seconds => Math.max(30, Math.min(3600, seconds)) * 1000);
+    return steps.length ? steps : fallback.map(seconds => seconds * 1000);
+}
+
+const MAX_PROMPTS_PER_MINUTE = positiveEnvInteger('AI_PROMPTS_PER_MINUTE', 12, 1, 60);
+const MAX_PROMPTS_PER_HOUR = positiveEnvInteger('AI_PROMPTS_PER_HOUR', 100, 1, 500);
+const OVERUSE_BAN_STEPS_MS = getOveruseBanSteps();
+const OVERUSE_STRIKE_WINDOW_MS = positiveEnvInteger('AI_OVERUSE_STRIKE_WINDOW_DAYS', 7, 1, 90) * DAY_MS;
+const OVERUSE_STRIKE_DECAY_MS = positiveEnvInteger('AI_OVERUSE_STRIKE_DECAY_HOURS', 24, 1, 720) * HOUR_MS;
 const JAILBREAK_WINDOW_MS = HOUR_MS;
 const FIRST_SECURITY_LOCK_MS = HOUR_MS;
 const REPEAT_SECURITY_LOCK_MS = DAY_MS;
@@ -106,7 +127,8 @@ function pruneRecord(record, now) {
     record.securityAttempts = cleanTimestamps(record.securityAttempts, now - DAY_MS);
     record.securityBlocks = cleanTimestamps(record.securityBlocks, now - DAY_MS);
     record.securityBlockedUntil = Number(record.securityBlockedUntil) || 0;
-    record.rateLimitedUntil = Number(record.rateLimitedUntil) || 0;
+    record.overuseEvents = cleanTimestamps(record.overuseEvents, now - OVERUSE_STRIKE_WINDOW_MS);
+    record.usageBannedUntil = Number(record.usageBannedUntil) || 0;
     record.lastSeenAt = Number(record.lastSeenAt) || now;
     return record;
 }
@@ -117,8 +139,9 @@ function pruneAllUsers(now) {
         const hasRecentActivity = record.promptTimes.length ||
             record.securityAttempts.length ||
             record.securityBlocks.length ||
+            record.overuseEvents.length ||
             record.securityBlockedUntil > now ||
-            record.rateLimitedUntil > now;
+            record.usageBannedUntil > now;
         if (!hasRecentActivity && now - record.lastSeenAt > DAY_MS) delete state.users[key];
     }
 
@@ -135,7 +158,51 @@ function limited(reason, retryAfterMs = 0, notify = true) {
     return { allowed: false, reason, retryAfterMs: Math.max(0, retryAfterMs), notify };
 }
 
-function acquireAiRequest(senderId, prompt, now = Date.now()) {
+function isNonCountedBotRequest(prompt) {
+    const normalized = normalizePrompt(prompt);
+    if (!normalized || isPromptExtractionAttempt(normalized)) return false;
+    if (/^!/i.test(normalized)) return true;
+
+    return /\b(?:chaos bot|this bot|your bot|the bot|bot features?|bot commands?|bot menu|\bmenu\b|\bhelp\b|\bgames?\b|\bwordchain\b|\bwordforge\b|\bwordle\b|\bscramble\b|\bmafia\b|\brebus\b|\btruth hunt\b|\bnumber run\b|\bclass portal\b|\bclass(?:es)?\b|\btimetable\b|\battendance\b|\broll call\b|\bdeadline\b|\bpolls?\b|\bmy balance\b|\bwallet\b|\bcoins?\b|\bxp\b|\bleaderboard\b|\bprofile\b|\bdaily reward\b|\bstore\b|\bbuy\b|\bpay\b|\bsong\b|\bvideo\b|\bhymn\b|\bweather\b|\bimage studio\b|\b!contactowner\b|\bowner contact\b)\b/i.test(normalized) ||
+        /\bwhat can (?:you|this bot) do\b|\bhow do i use (?:this )?bot\b|\bhow to use (?:this )?bot\b|\bmy class(?:es)?\b|\bour class(?:es)?\b/i.test(normalized);
+}
+
+function formatDuration(durationMs) {
+    const seconds = Math.max(1, Math.ceil(durationMs / 1000));
+    if (seconds < 60) return seconds + ' seconds';
+    const minutes = Math.ceil(seconds / 60);
+    if (minutes < 60) return minutes + (minutes === 1 ? ' minute' : ' minutes');
+    return Math.ceil(minutes / 60) + ' hour' + (Math.ceil(minutes / 60) === 1 ? '' : 's');
+}
+
+function beginOverusePause(record, now, reason) {
+    let events = cleanTimestamps(record.overuseEvents, now - OVERUSE_STRIKE_WINDOW_MS);
+    const lastEvent = events.length ? events[events.length - 1] : 0;
+    const quietPeriods = lastEvent ? Math.floor((now - lastEvent) / OVERUSE_STRIKE_DECAY_MS) : 0;
+    if (quietPeriods > 0) events = events.slice(0, Math.max(0, events.length - quietPeriods));
+
+    const strike = events.length + 1;
+    const durationMs = OVERUSE_BAN_STEPS_MS[Math.min(strike - 1, OVERUSE_BAN_STEPS_MS.length - 1)];
+    events.push(now);
+    record.overuseEvents = events;
+    record.usageBannedUntil = now + durationMs;
+    // A pause resets the burst windows so the user can return after waiting
+    // without immediately retriggering the same penalty.
+    record.promptTimes = [];
+    const extra = strike >= 4
+        ? 'Repeated bursts now trigger the longest configured pause.'
+        : strike === 3
+            ? 'This is a warning; another rapid burst can lead to the longest pause.'
+            : 'A quiet period lowers the penalty level.';
+    const message = '⏳ I’m pausing AI for ' + formatDuration(durationMs) +
+        ' because requests came too quickly. Normal bot commands still work. ' + extra;
+    return { strike, durationMs, message, reason };
+}
+
+function acquireAiRequest(senderId, prompt, options = {}) {
+    if (typeof options === 'number') options = { now: options };
+    const now = Number(options.now) || Date.now();
+    const isOwner = options.isOwner === true;
     const key = identityKey(senderId);
     if (!key) return limited('identity');
     if (!storageHealthy) return limited('storage');
@@ -148,7 +215,8 @@ function acquireAiRequest(senderId, prompt, now = Date.now()) {
             securityAttempts: [],
             securityBlocks: [],
             securityBlockedUntil: 0,
-            rateLimitedUntil: 0,
+            overuseEvents: [],
+            usageBannedUntil: 0,
             lastSeenAt: now
         };
         state.users[key] = record;
@@ -159,33 +227,10 @@ function acquireAiRequest(senderId, prompt, now = Date.now()) {
     if (record.securityBlockedUntil > now) {
         return limited('security_lockout', record.securityBlockedUntil - now, false);
     }
-    if (record.rateLimitedUntil > now) {
-        return limited('rate_limited', record.rateLimitedUntil - now, false);
-    }
 
-    const recentHour = record.promptTimes.filter(timestamp => timestamp > now - HOUR_MS);
-    if (recentHour.length >= MAX_PROMPTS_PER_HOUR) {
-        record.rateLimitedUntil = Math.max(now + HOUR_MS, recentHour[0] + HOUR_MS);
-        if (!saveState()) return limited('storage');
-        return limited('rate_limited', record.rateLimitedUntil - now);
-    }
-
-    const recentMinute = record.promptTimes.filter(timestamp => timestamp > now - PROMPT_WINDOW_MS);
-    if (recentMinute.length >= MAX_PROMPTS_PER_MINUTE) {
-        record.rateLimitedUntil = Math.max(now + PROMPT_WINDOW_MS, recentMinute[0] + PROMPT_WINDOW_MS);
-        if (!saveState()) return limited('storage');
-        return limited('rate_limited', record.rateLimitedUntil - now);
-    }
-
-    // Count every eligible AI request, including blocked extraction attempts.
-    record.promptTimes.push(now);
-    operationsSincePrune++;
-    if (operationsSincePrune >= 100) {
-        pruneAllUsers(now);
-        operationsSincePrune = 0;
-    }
-
-    if (isPromptExtractionAttempt(prompt)) {
+    const extractionAttempt = isPromptExtractionAttempt(prompt);
+    if (extractionAttempt) {
+        if (!isOwner) record.promptTimes.push(now);
         record.securityAttempts.push(now);
         const recentAttacks = record.securityAttempts.filter(timestamp => timestamp > now - JAILBREAK_WINDOW_MS);
         if (recentAttacks.length >= 3) {
@@ -200,9 +245,43 @@ function acquireAiRequest(senderId, prompt, now = Date.now()) {
         return limited('security_refusal');
     }
 
-    if (inFlightUsers.has(key)) {
+    if (inFlightUsers.has(key)) return limited('in_flight', 0, false);
+
+    const rateLimitExempt = isOwner || isNonCountedBotRequest(prompt);
+    if (rateLimitExempt) {
+        inFlightUsers.add(key);
+        if (!saveState()) {
+            inFlightUsers.delete(key);
+            return limited('storage');
+        }
+        return {
+            allowed: true,
+            rateLimitExempt: true,
+            release() { inFlightUsers.delete(key); }
+        };
+    }
+
+    if (record.usageBannedUntil > now) {
+        return limited('usage_ban', record.usageBannedUntil - now, false);
+    }
+
+    const recentHour = record.promptTimes.filter(timestamp => timestamp > now - HOUR_MS);
+    const recentMinute = record.promptTimes.filter(timestamp => timestamp > now - PROMPT_WINDOW_MS);
+    if (recentHour.length >= MAX_PROMPTS_PER_HOUR || recentMinute.length >= MAX_PROMPTS_PER_MINUTE) {
+        const pause = beginOverusePause(record, now, recentHour.length >= MAX_PROMPTS_PER_HOUR ? 'hourly_burst' : 'minute_burst');
         if (!saveState()) return limited('storage');
-        return limited('in_flight', 0, false);
+        return {
+            ...limited('usage_ban', pause.durationMs),
+            strike: pause.strike,
+            message: pause.message
+        };
+    }
+
+    record.promptTimes.push(now);
+    operationsSincePrune++;
+    if (operationsSincePrune >= 100) {
+        pruneAllUsers(now);
+        operationsSincePrune = 0;
     }
 
     inFlightUsers.add(key);
@@ -213,13 +292,12 @@ function acquireAiRequest(senderId, prompt, now = Date.now()) {
 
     return {
         allowed: true,
-        release() {
-            inFlightUsers.delete(key);
-        }
+        rateLimitExempt: false,
+        release() { inFlightUsers.delete(key); }
     };
 }
-
 module.exports = {
     acquireAiRequest,
-    isPromptExtractionAttempt
+    isPromptExtractionAttempt,
+    isNonCountedBotRequest
 };
