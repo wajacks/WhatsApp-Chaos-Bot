@@ -163,8 +163,8 @@ function isNonCountedBotRequest(prompt) {
     if (!normalized || isPromptExtractionAttempt(normalized)) return false;
     if (/^!/i.test(normalized)) return true;
 
-    return /\b(?:chaos bot|this bot|your bot|the bot|bot features?|bot commands?|bot menu|\bmenu\b|\bhelp\b|\bgames?\b|\bwordchain\b|\bwordforge\b|\bwordle\b|\bscramble\b|\bmafia\b|\brebus\b|\btruth hunt\b|\bnumber run\b|\bclass portal\b|\bclass(?:es)?\b|\btimetable\b|\battendance\b|\broll call\b|\bdeadline\b|\bpolls?\b|\bmy balance\b|\bwallet\b|\bcoins?\b|\bxp\b|\bleaderboard\b|\bprofile\b|\bdaily reward\b|\bstore\b|\bbuy\b|\bpay\b|\bsong\b|\bvideo\b|\bhymn\b|\bweather\b|\bimage studio\b|\b!contactowner\b|\bowner contact\b)\b/i.test(normalized) ||
-        /\bwhat can (?:you|this bot) do\b|\bhow do i use (?:this )?bot\b|\bhow to use (?:this )?bot\b|\bmy class(?:es)?\b|\bour class(?:es)?\b/i.test(normalized);
+    return /\b(?:chaos bot|this bot|your bot|the bot|bot features?|bot commands?|bot menu|\bmenu\b|\bhelp\b|\bgames?\b|\bwordchain\b|\bwordforge\b|\bwordle\b|\bscramble\b|\bmafia\b|\brebus\b|\btruth hunt\b|\bnumber run\b|\bclass portal\b|\bclass(?:es)?\b|\btimetable\b|\battendance\b|\broll call\b|\bdeadline\b|\bpolls?\b|\b(?:my\s+)?balances?\b|\bwallet\b|\bcoins?\b|\bxp\b|\bleaderboard\b|\bprofile\b|\bdaily reward\b|\bstore\b|\bbuy\b|\bpay\b|\bsong\b|\bvideo\b|\bhymn\b|\bweather\b|\bimage studio\b|\b!contactowner\b|\bowner contact\b)\b/i.test(normalized) ||
+        /\bwhat can (?:you|this bot) do\b|\bhow do i use (?:this )?bot\b|\bhow to use (?:this )?bot\b|\bmy class(?:es)?\b|\bour class(?:es)?\b|\b(?:show|check|get|claim|play|find|search|open|view|create|join|start|send|generate|draw|analy[sz]e)\s+(?:me\s+)?(?:my\s+)?(?:balance|profile|store|daily reward|game|class|classes|timetable|attendance|poll|song|video|hymn|image|picture|photo|owner contact)\b/i.test(normalized);
 }
 
 function formatDuration(durationMs) {
