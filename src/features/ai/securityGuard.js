@@ -76,6 +76,10 @@ function normalizePrompt(prompt) {
 }
 
 const PROMPT_INJECTION_PATTERNS = [
+    // Catch requests to reproduce the bot's configuration or paraphrase hidden instructions.
+    /\b(?:print|show|dump|export|reveal|list|summari[sz]e|describe|read|provide|give me|tell me)\b.{0,80}\b(?:the\s+)?(?:(?:bot|assistant|model|runtime|internal)\s+(?:config(?:uration)?|setup|system context|developer rules|instructions?)|(?:config(?:uration)?|setup)\s+(?:of|for)\s+(?:the\s+)?(?:bot|assistant|model|runtime))\b/i,
+    /\b(?:summari[sz]e|paraphrase|list|describe|explain|outline|repeat|quote|recite|provide|give me|tell me)\b.{0,80}\b(?:the\s+)?(?:(?:system|developer|hidden|internal)\s+(?:prompt|instructions?|rules?|polic(?:y|ies))|rules?\s+you\s+(?:(?:were\s+)?given|follow)|instructions?\s+you\s+(?:(?:were\s+)?given|follow))\b/i,
+    /\b(?:replace|overwrite|change|modify|rewrite|update|adopt)\b.{0,80}\b(?:your|the)\s+(?:system|developer|internal|hidden)\s+(?:prompt|instructions?|rules?|configuration|setup)\b/i,
     /\b(?:ignore|disregard|forget|override|bypass)\b.{0,100}\b(?:previous|prior|above|system|developer|safety|security)\b.{0,50}\b(?:instructions?|rules?|prompt|policy|guardrails?)\b/i,
     /\b(?:reveal|show|print|repeat|quote|dump|export|leak|disclose|provide|give me|tell me)\b.{0,80}\b(?:your\s+)?(?:hidden|system|developer|internal|original|secret)\b.{0,50}\b(?:prompt|instructions?|rules?|policy|secrets?|credentials?|api[\s_-]*keys?|tokens?|database|files?)\b/i,
     /\b(?:what is|what are|repeat|show|print|dump|quote|reveal)\b.{0,50}\b(?:your\s+)?(?:hidden\s+|system\s+|developer\s+|internal\s+)?(?:system\s+prompt|developer\s+prompt|instructions?|rules?|polic(?:y|ies))\b/i,
