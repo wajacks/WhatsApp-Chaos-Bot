@@ -158,16 +158,16 @@ function acquireAiRequest(senderId, prompt, now = Date.now()) {
         return limited('rate_limited', record.rateLimitedUntil - now);
     }
 
-    const recentMinute = record.promptTimes.filter(timestamp => timestamp > now - PROMPT_WINDOW_MS);
-    if (recentMinute.length >= MAX_PROMPTS_PER_MINUTE) {
-        record.rateLimitedUntil = Math.max(now + PROMPT_WINDOW_MS, recentMinute[0] + PROMPT_WINDOW_MS);
+    const recentHour = record.promptTimes.filter(timestamp => timestamp > now - HOUR_MS);
+    if (recentHour.length >= MAX_PROMPTS_PER_HOUR) {
+        record.rateLimitedUntil = Math.max(now + HOUR_MS, recentHour[0] + HOUR_MS);
         if (!saveState()) return limited('storage');
         return limited('rate_limited', record.rateLimitedUntil - now);
     }
 
-    const recentHour = record.promptTimes.filter(timestamp => timestamp > now - HOUR_MS);
-    if (recentHour.length >= MAX_PROMPTS_PER_HOUR) {
-        record.rateLimitedUntil = Math.max(now + HOUR_MS, recentHour[0] + HOUR_MS);
+    const recentMinute = record.promptTimes.filter(timestamp => timestamp > now - PROMPT_WINDOW_MS);
+    if (recentMinute.length >= MAX_PROMPTS_PER_MINUTE) {
+        record.rateLimitedUntil = Math.max(now + PROMPT_WINDOW_MS, recentMinute[0] + PROMPT_WINDOW_MS);
         if (!saveState()) return limited('storage');
         return limited('rate_limited', record.rateLimitedUntil - now);
     }
