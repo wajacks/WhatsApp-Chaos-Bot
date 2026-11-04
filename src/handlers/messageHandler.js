@@ -1860,7 +1860,7 @@ function registerMessageHandler(client, dependencies) {
             try {
                 const quotedMessage = await message.getQuotedMessage();
                 botRepliedTo = !!quotedMessage?.fromMe;
-                if (quotedMessage?.hasMedia && String(quotedMessage.type || '').toLowerCase() === 'image') {
+                if (!message.hasMedia && quotedMessage?.hasMedia && String(quotedMessage.type || '').toLowerCase() === 'image') {
                     quotedImageContext = 'The current message replies to a photo. The existing !analyze command can access the quoted photo.';
                 }
                 if (botRepliedTo) {
