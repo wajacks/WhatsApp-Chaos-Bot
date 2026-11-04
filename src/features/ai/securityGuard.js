@@ -82,7 +82,7 @@ const PROMPT_INJECTION_PATTERNS = [
     /\b(?:show|print|dump|export|read|list|send|reveal|give me)\b.{0,70}\b(?:\.env|environment variables?|api[\s_-]*keys?|passwords?|credentials?|access tokens?|session secrets?|raw database|server files?)\b/i,
     /\b(?:repeat|quote|print|dump|reproduce|show)\b.{0,50}\b(?:everything|all text|all messages|all instructions)\b.{0,50}\b(?:above|before|hidden|system|developer)\b/i,
     /\b(?:translate|encode|base64|rot13|reverse|use the first letters?)\b.{0,80}\b(?:hidden|system|developer|internal|secret)\b.{0,40}\b(?:prompt|instructions?|rules?|secrets?|credentials?)\b/i,
-    /\b(?:pretend|act|roleplay)\b.{0,50}\b(?:owner|developer|administrator|admin|system)\b.{0,80}\b(?:reveal|show|dump|bypass|ignore|secret|credential|prompt|instruction)\b/i
+    /\b(?:pretend|act|roleplay)\b.{0,50}\b(?:owner|developer|administrator|admin|system)\b.{0,80}\b(?:reveal|show|dump|bypass|ignore|secret|credential|prompt|instruction)\b/i,
     /\b(?:dump|export|read|send|show|list|print|give me)\b.{0,50}\b(?:raw database|entire database|database contents|all user records|everyone['’]s (?:data|messages|balances)|other users['’] (?:data|messages|balances)|private messages)\b/i
 ];
 
