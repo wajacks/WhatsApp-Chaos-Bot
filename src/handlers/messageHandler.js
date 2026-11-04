@@ -1,6 +1,7 @@
 const { execFile } = require('child_process');
 const { handleVoiceCommands } = require('../features/voice/handler');
 const { handleAiCommand } = require('../features/ai/handler');
+const { sendTextAsVoiceNote } = require('../features/voice/voiceNoteAudio');
 const { handleAiVoiceNote } = require('../features/ai/voiceNote');
 const { handlePendingDrawSelection, handleImageCommands } = require('../features/images/handler');
 const { handleBibleMessages } = require('../features/bible/handler');
@@ -1910,6 +1911,8 @@ function registerMessageHandler(client, dependencies) {
                     'Analyze a photo: attach a photo with !analyze <question> or reply to a photo with that command. Non-owner cost is $2,000 game dollars; photos only.',
                     'Find a named YouTube song or video: !video <query> opens the normal media flow. !song or !randomsong asks for a random song. !hymn <query> searches English hymns.',
                     'Weather: !weather <city> or ask the AI for weather in a named city.',
+                    'Owner contact: ask for the Master Owner’s contact card, or use !contactowner. This sends a public vCard only and does not grant owner access.',
+                    'Voice replies: short AI chat replies can arrive as voice notes automatically. Explicitly ask for a voice note to hear a longer AI answer; text is used if speech synthesis fails.',
                     'Economy: !bal, !profile, !lb [xp|money], !daily, !store, !buy <item>, !beg, !pay <amount> with a WhatsApp mention or reply, and !buycoins for an owner-reviewed top-up.',
                     'Games: use the lobby and join/start commands in the games guide; the normal game host rules apply.',
                     ...( /^true$/i.test(String(process.env.AI_VOICE_NOTES_ENABLED || '').trim())
@@ -1996,6 +1999,7 @@ function registerMessageHandler(client, dependencies) {
             claim_daily: '!daily',
             random_song: '!song',
             generate_image: '!draw',
+            contact_owner: '!contactowner',
             create_wordforge_lobby: '!wordforge',
             join_wordforge: '!joinforge',
             start_wordforge: '!startforge',
@@ -2157,7 +2161,11 @@ function registerMessageHandler(client, dependencies) {
                 getWeather, buildWeatherResponse, aiCooldowns, AI_COOLDOWN_MS,
                 aiMemory, MAX_AI_MEMORY, ai, azureClient, shouldHandleNaturalText,
                 executeBotFeature, executeBotCommand, getBotGuide, getMyClassPortalSummary,
-                quotedBotReplyContext, quotedImageContext
+                quotedBotReplyContext, quotedImageContext,
+                replyWithAudio: answer => sendTextAsVoiceNote({
+                    text: answer, chatId, senderId, client, baseDir, fs, path, execFileAsync,
+                    googleTTS, EdgeTTS, MessageMedia, voiceSelections, EDGE_TTS_VOICES, DEFAULT_EDGE_VOICE
+                })
             });
             if (aiCommandHandled) return;
         } finally {
