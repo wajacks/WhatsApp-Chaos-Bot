@@ -2145,7 +2145,7 @@ function registerMessageHandler(client, dependencies) {
             getWeather, buildWeatherResponse, aiCooldowns, AI_COOLDOWN_MS,
             aiMemory, MAX_AI_MEMORY, ai, azureClient,
             executeBotFeature, executeBotCommand, getBotGuide, getMyClassPortalSummary,
-            quotedBotReplyContext, quotedImageContext,
+            quotedBotReplyContext, quotedImageContext, isOwnerRequest: isOwner(senderId),
             baseDir, fs, path, execFileAsync, googleTTS, EdgeTTS, MessageMedia,
             voiceSelections, EDGE_TTS_VOICES, DEFAULT_EDGE_VOICE
         });
@@ -2161,7 +2161,7 @@ function registerMessageHandler(client, dependencies) {
                 getWeather, buildWeatherResponse, aiCooldowns, AI_COOLDOWN_MS,
                 aiMemory, MAX_AI_MEMORY, ai, azureClient, shouldHandleNaturalText,
                 executeBotFeature, executeBotCommand, getBotGuide, getMyClassPortalSummary,
-                quotedBotReplyContext, quotedImageContext,
+                quotedBotReplyContext, quotedImageContext, isOwnerRequest: isOwner(senderId),
                 replyWithAudio: answer => sendTextAsVoiceNote({
                     text: answer, chatId, senderId, client, baseDir, fs, path, execFileAsync,
                     googleTTS, EdgeTTS, MessageMedia, voiceSelections, EDGE_TTS_VOICES, DEFAULT_EDGE_VOICE
