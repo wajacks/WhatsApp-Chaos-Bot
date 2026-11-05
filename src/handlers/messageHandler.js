@@ -2157,7 +2157,7 @@ function registerMessageHandler(client, dependencies) {
         try {
             if (aiPresence) await aiPresence.typing();
             const aiCommandHandled = await handleAiCommand({
-                message, text, lowerText, chatId, senderId, userName,
+                message, client, text, lowerText, chatId, senderId, userName,
                 getWeather, buildWeatherResponse, aiCooldowns, AI_COOLDOWN_MS,
                 aiMemory, MAX_AI_MEMORY, ai, azureClient, shouldHandleNaturalText,
                 executeBotFeature, executeBotCommand, getBotGuide, getMyClassPortalSummary,
