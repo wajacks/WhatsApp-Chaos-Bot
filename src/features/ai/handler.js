@@ -258,6 +258,7 @@ function isExplicitGroupMentionRequest(prompt) {
         new RegExp(target + '[\\s\\S]{0,60}\\b(?:tag|mention|address|greet|joke|roast|congratulat\\w*|thank|wish|tease|meme)\\b', 'i').test(value) ||
         new RegExp('\\b(?:tell|say|send|reply|message)\\s+(?:something\\s+)?(?:to\\s+)?' + target, 'i').test(value) ||
         new RegExp('\\b(?:tell|say|send|reply|message)\\b[\\s\\S]{0,60}\\bto\\s+' + target, 'i').test(value) ||
+        new RegExp('\\b(?:say|send|reply|message|give|talk)\\b[\\s\\S]{0,60}\\b(?:to|about|for)\\s+' + target, 'i').test(value) ||
         new RegExp('\\bmake\\s+' + target + '\\s+(?:laugh|smile)\\b', 'i').test(value);
 }
 
