@@ -20,7 +20,42 @@ const FEATURE_ACTIONS = [
 ];
 
 const webResearchUsage = new Map();
+const multiMessageReplyCooldowns = new Map();
 const DEFAULT_WEB_RESEARCH_DAILY_LIMIT = 20;
+const DEFAULT_AI_MULTI_MESSAGE_COOLDOWN_MINUTES = 10;
+const MAX_AI_MULTI_MESSAGE_COOLDOWN_USERS = 5000;
+
+function getMultiMessageCooldownMs() {
+    const configured = Number.parseInt(process.env.AI_MULTI_MESSAGE_COOLDOWN_MINUTES || '', 10);
+    const minutes = Number.isFinite(configured)
+        ? Math.max(0, Math.min(1440, configured))
+        : DEFAULT_AI_MULTI_MESSAGE_COOLDOWN_MINUTES;
+    return minutes * 60 * 1000;
+}
+
+function getMultiMessageCooldownRemaining(senderId, now = Date.now()) {
+    const key = String(senderId || '').trim().toLowerCase();
+    if (!key) return 0;
+    const until = Number(multiMessageReplyCooldowns.get(key)) || 0;
+    if (until <= now) {
+        multiMessageReplyCooldowns.delete(key);
+        return 0;
+    }
+    return until - now;
+}
+
+function markMultiMessageCooldown(senderId, cooldownMs, now = Date.now()) {
+    const key = String(senderId || '').trim().toLowerCase();
+    if (!key || cooldownMs <= 0) return;
+    for (const [userKey, until] of multiMessageReplyCooldowns) {
+        if (until <= now) multiMessageReplyCooldowns.delete(userKey);
+    }
+    if (!multiMessageReplyCooldowns.has(key) && multiMessageReplyCooldowns.size >= MAX_AI_MULTI_MESSAGE_COOLDOWN_USERS) {
+        const oldestKey = multiMessageReplyCooldowns.keys().next().value;
+        if (oldestKey) multiMessageReplyCooldowns.delete(oldestKey);
+    }
+    multiMessageReplyCooldowns.set(key, now + cooldownMs);
+}
 
 function reserveWebResearch(senderId, isOwner = false) {
     if (isOwner) return true;
@@ -510,6 +545,7 @@ async function handleAiCommandCore(context) {
         quotedBotReplyContext = '',
         quotedImageContext = '',
         isVoiceInput = false,
+        isOwnerRequest = false,
         replyWithAudio,
         skipAiCooldown = false
     } = context;
@@ -993,12 +1029,20 @@ async function handleAiCommandCore(context) {
             const sourceReply = result.usedWebTools
                 ? addSourceAttribution(aiReply, result.sources || [], isVoiceInput ? false : hasExplicitSourceRequest(prompt))
                 : aiReply;
-            const multiMessageParts = multiMessageRepliesEnabled &&
+            const parsedMultiMessageParts = multiMessageRepliesEnabled &&
                 !isVoiceInput &&
                 !explicitVoiceReplyRequested &&
                 result.usedWebTools !== true &&
                 !assistantToolExecuted
                 ? parseMultiMessageReply(sourceReply)
+                : null;
+            const multiMessageCooldownMs = getMultiMessageCooldownMs();
+            const multiMessageSuppressedByCooldown = !!parsedMultiMessageParts &&
+                !isOwnerRequest &&
+                multiMessageCooldownMs > 0 &&
+                getMultiMessageCooldownRemaining(senderId) > 0;
+            const multiMessageParts = parsedMultiMessageParts && !multiMessageSuppressedByCooldown
+                ? parsedMultiMessageParts
                 : null;
             const finalReply = removeMultiMessageMarkers(sourceReply);
             const sourceMemory = result.usedWebTools && Array.isArray(result.sources) && result.sources.length
@@ -1022,6 +1066,7 @@ async function handleAiCommandCore(context) {
                     } else {
                         await message.reply(mentionRendered.body);
                     }
+                    if (!isOwnerRequest) markMultiMessageCooldown(senderId, multiMessageCooldownMs);
                 }
                 if (secondPart && multiMessageParts.type === 'voice') {
                     if (!await tryVoiceReply(secondPart)) await message.reply(secondPart);
@@ -1036,8 +1081,10 @@ async function handleAiCommandCore(context) {
                     allowExplicitMentions
                 );
                 const deliveredReply = mentionRendered.body;
-                const autoShortVoiceReply = autoShortVoiceReplies && isShortReply(deliveredReply);
-                const voiceDelivered = !mentionRendered.mentions.length &&
+                const autoShortVoiceReply = !multiMessageSuppressedByCooldown &&
+                    autoShortVoiceReplies && isShortReply(deliveredReply);
+                const voiceDelivered = !multiMessageSuppressedByCooldown &&
+                    !mentionRendered.mentions.length &&
                     (isVoiceInput || explicitVoiceReplyRequested || autoShortVoiceReply) &&
                     await tryVoiceReply(deliveredReply);
 
