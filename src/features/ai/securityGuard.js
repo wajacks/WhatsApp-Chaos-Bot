@@ -13,14 +13,14 @@ function positiveEnvInteger(name, fallback, min, max) {
 }
 
 function getOveruseBanSteps() {
-    const fallback = [40, 180, 900, 3600];
+    const fallback = [40, 180, 0, 3600];
     const configured = String(process.env.AI_OVERUSE_BAN_STEPS_SECONDS || '').trim();
     if (!configured) return fallback.map(seconds => seconds * 1000);
     const steps = configured.split(',')
         .map(value => Number.parseInt(value.trim(), 10))
-        .filter(seconds => Number.isFinite(seconds) && seconds > 0)
+        .filter(seconds => Number.isFinite(seconds) && seconds >= 0)
         .slice(0, 8)
-        .map(seconds => Math.max(30, Math.min(3600, seconds)) * 1000);
+        .map(seconds => seconds === 0 ? 0 : Math.max(30, Math.min(3600, seconds)) * 1000);
     return steps.length ? steps : fallback.map(seconds => seconds * 1000);
 }
 
@@ -186,16 +186,19 @@ function beginOverusePause(record, now, reason) {
     events.push(now);
     record.overuseEvents = events;
     record.usageBannedUntil = now + durationMs;
-    // A pause resets the burst windows so the user can return after waiting
-    // without immediately retriggering the same penalty.
+    // Reset the prompt burst window so the user can return after the warning or pause.
     record.promptTimes = [];
-    const extra = strike >= 4
-        ? 'Repeated bursts now trigger the longest configured pause.'
-        : strike === 3
-            ? 'This is a warning; another rapid burst can lead to the longest pause.'
-            : 'A quiet period lowers the penalty level.';
-    const message = '⏳ I’m pausing AI for ' + formatDuration(durationMs) +
-        ' because requests came too quickly. Normal bot commands still work. ' + extra;
+    const nextDurationMs = OVERUSE_BAN_STEPS_MS[Math.min(strike, OVERUSE_BAN_STEPS_MS.length - 1)];
+    const message = durationMs === 0
+        ? '⚠️ This is a warning after repeated AI requests. Please slow down. Normal bot commands still work. ' +
+            (nextDurationMs > 0
+                ? 'A further rapid burst may pause AI for ' + formatDuration(nextDurationMs) + '.'
+                : 'Please space out future AI requests.')
+        : '⏳ I’m pausing AI for ' + formatDuration(durationMs) +
+            ' because requests came too quickly. Normal bot commands still work. ' +
+            (strike >= 4
+                ? 'Repeated bursts now trigger the longest configured pause.'
+                : 'A quiet period lowers the penalty level.');
     return { strike, durationMs, message, reason };
 }
 
