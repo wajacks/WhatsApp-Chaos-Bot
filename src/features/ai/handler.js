@@ -21,7 +21,8 @@ const FEATURE_ACTIONS = [
 const webResearchUsage = new Map();
 const DEFAULT_WEB_RESEARCH_DAILY_LIMIT = 20;
 
-function reserveWebResearch(senderId) {
+function reserveWebResearch(senderId, isOwner = false) {
+    if (isOwner) return true;
     const configured = Number.parseInt(process.env.AI_WEB_RESEARCH_DAILY_LIMIT || '', 10);
     const limit = Number.isFinite(configured) && configured >= 0
         ? configured
@@ -564,7 +565,7 @@ async function handleAiCommandCore(context) {
         String(process.env.AZURE_OPENAI_KEY || '').trim() &&
         typeof fetch === 'function'
     );
-    const useAzureWebSearch = webResearch && canUseAzureWebSearch && reserveWebResearch(senderId);
+    const useAzureWebSearch = webResearch && canUseAzureWebSearch && reserveWebResearch(senderId, isOwnerRequest);
     const recentHistory = getRelevantAiHistory(history, prompt, quotedContext, MAX_AI_MEMORY);
     const geminiContents = recentHistory.map(item => ({
         role: item.role === 'assistant' || item.role === 'model' ? 'model' : 'user',
