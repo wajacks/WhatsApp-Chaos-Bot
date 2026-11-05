@@ -516,7 +516,7 @@ async function handleAiCommandCore(context) {
 
     const explicitVoiceReplyRequested = requestsVoiceReply(text);
     const autoShortVoiceReplies = !/^false$/i.test(String(process.env.AI_VOICE_AUTO_SHORT_REPLIES === undefined ? 'true' : process.env.AI_VOICE_AUTO_SHORT_REPLIES).trim());
-    const multiMessageRepliesEnabled = !/^(?:false|0|no|off)$/i.test(String(process.env.AI_VOICE_MIXED_REPLIES_ENABLED === undefined ? 'true' : process.env.AI_VOICE_MIXED_REPLIES_ENABLED).trim());
+    const multiMessageRepliesEnabled = !/^(?:false|0|no|off)$/i.test(String(process.env.AI_MULTI_MESSAGE_REPLIES_ENABLED === undefined ? 'true' : process.env.AI_MULTI_MESSAGE_REPLIES_ENABLED).trim());
     const tryVoiceReply = async content => {
         if (typeof replyWithAudio !== 'function') return false;
         try {
