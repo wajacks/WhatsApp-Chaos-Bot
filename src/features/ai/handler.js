@@ -173,20 +173,30 @@ function isShortReply(text) {
     const value = String(text || '').trim();
     return value.length > 0 && value.length <= 220 && value.split(/\s+/).length <= 30;
 }
+const SECOND_TEXT_MESSAGE_MARKER = '[[SECOND_TEXT_MESSAGE]]';
 const MIXED_VOICE_REPLY_MARKER = '[[VOICE_NOTE_PART]]';
 
-function parseMixedVoiceReply(text) {
+function parseMultiMessageReply(text) {
     const value = String(text || '');
-    const parts = value.split(MIXED_VOICE_REPLY_MARKER);
-    if (parts.length !== 2) return null;
-    const textPart = parts[0].trim();
-    const voicePart = parts[1].trim();
-    if (!textPart || !voicePart || voicePart.length > 500 || voicePart.split(/\s+/).length > 65) return null;
-    return { text: textPart, voice: voicePart };
+    const markers = [
+        { marker: SECOND_TEXT_MESSAGE_MARKER, type: 'text' },
+        { marker: MIXED_VOICE_REPLY_MARKER, type: 'voice' }
+    ];
+    const selected = markers.filter(item => value.split(item.marker).length === 2);
+    if (selected.length !== 1) return null;
+    const parts = value.split(selected[0].marker);
+    const first = parts[0].trim();
+    const second = parts[1].trim();
+    if (!first || !second || second.length > 500 || second.split(/\s+/).length > 65) return null;
+    return { first, second, type: selected[0].type };
 }
 
-function removeMixedVoiceReplyMarker(text) {
-    return String(text || '').split(MIXED_VOICE_REPLY_MARKER).join(' ').replace(/\s+/g, ' ').trim();
+function removeMultiMessageMarkers(text) {
+    return String(text || '')
+        .split(SECOND_TEXT_MESSAGE_MARKER).join(' ')
+        .split(MIXED_VOICE_REPLY_MARKER).join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
 }
 
 function detectCurrentMediaIntent(prompt, hasImageContext) {
@@ -506,7 +516,7 @@ async function handleAiCommandCore(context) {
 
     const explicitVoiceReplyRequested = requestsVoiceReply(text);
     const autoShortVoiceReplies = !/^false$/i.test(String(process.env.AI_VOICE_AUTO_SHORT_REPLIES === undefined ? 'true' : process.env.AI_VOICE_AUTO_SHORT_REPLIES).trim());
-    const mixedVoiceRepliesEnabled = !/^(?:false|0|no|off)$/i.test(String(process.env.AI_VOICE_MIXED_REPLIES_ENABLED === undefined ? 'true' : process.env.AI_VOICE_MIXED_REPLIES_ENABLED).trim());
+    const multiMessageRepliesEnabled = !/^(?:false|0|no|off)$/i.test(String(process.env.AI_VOICE_MIXED_REPLIES_ENABLED === undefined ? 'true' : process.env.AI_VOICE_MIXED_REPLIES_ENABLED).trim());
     const tryVoiceReply = async content => {
         if (typeof replyWithAudio !== 'function') return false;
         try {
@@ -643,8 +653,8 @@ async function handleAiCommandCore(context) {
         'Use current web research only when the user asks to search/research, provides a public URL, or asks a genuinely time-sensitive fact. Keep research answers to about 1–3 short sentences. Do not give a source list, links, background essay, or self-validating explanation unless the user asks for sources or more detail.',
         'When no web tool was used, do not claim that you checked the internet. Say briefly when a current fact could not be verified.',
         'Short AI replies may be sent automatically as voice notes. When a user explicitly asks for a voice-note reply, synthesize the AI answer as a voice note; if synthesis fails, send the same answer as text. For bot actions that deliver their own native content such as a contact card, complete that workflow instead of replacing it with speech.',
-        mixedVoiceRepliesEnabled && !isVoiceInput && !explicitVoiceReplyRequested
-            ? 'For an occasional casual, non-factual chat reply only, you may choose a two-part delivery: send a concise text reply first, then add one short spoken continuation as a voice note. Put the exact marker [[VOICE_NOTE_PART]] on its own line between the text and the words to speak. The marker is internal and must never be spoken or sent. Do not repeat the text in the voice part. Do not use this for web research, timetable/weather data, sensitive topics, bot commands/actions, factual answers, or when the user requests a specific format. Use at most one text message plus one voice note, and only when the second part adds natural warmth.'
+        multiMessageRepliesEnabled && !isVoiceInput && !explicitVoiceReplyRequested
+            ? 'For an occasional casual, non-factual chat reply only, you may choose a two-part delivery: send a concise text reply first, then add either one short text follow-up or one short spoken continuation as a voice note. Put exactly one marker on its own line between the parts: [[SECOND_TEXT_MESSAGE]] for text or [[VOICE_NOTE_PART]] for voice. Markers are internal and must never be sent or spoken. Make the second part add a natural thought without repeating the first. Do not use this for web research, timetable/weather data, sensitive topics, tool-based answers, factual answers, or when the user requests a specific format. Send at most two messages total.'
             : 'For this turn, use a single reply in the requested format; do not use the mixed voice marker.',
         'The contact_owner action sends the public Master Owner vCard only when the user asks for the owner’s contact card. It does not expose owner-only commands or grant owner access.',
         'Use the live capability catalog below to understand the actual features and workflows available to this sender. It is supplied on every turn; use get_bot_capabilities for a fuller guide when needed. Do not invent commands or capabilities.',
@@ -983,26 +993,26 @@ async function handleAiCommandCore(context) {
             const sourceReply = result.usedWebTools
                 ? addSourceAttribution(aiReply, result.sources || [], isVoiceInput ? false : hasExplicitSourceRequest(prompt))
                 : aiReply;
-            const mixedVoiceParts = mixedVoiceRepliesEnabled &&
+            const multiMessageParts = multiMessageRepliesEnabled &&
                 !isVoiceInput &&
                 !explicitVoiceReplyRequested &&
                 result.usedWebTools !== true &&
                 !assistantToolExecuted
-                ? parseMixedVoiceReply(sourceReply)
+                ? parseMultiMessageReply(sourceReply)
                 : null;
-            const finalReply = removeMixedVoiceReplyMarker(sourceReply);
+            const finalReply = removeMultiMessageMarkers(sourceReply);
             const sourceMemory = result.usedWebTools && Array.isArray(result.sources) && result.sources.length
                 ? '\n[Research sources available if asked: ' + result.sources.map(source => source.title + ' — ' + source.url).join(' | ') + ']'
                 : '';
             let memoryReply = finalReply;
 
-            if (mixedVoiceParts) {
+            if (multiMessageParts) {
                 const mentionRendered = renderCurrentMentionTargets(
-                    mixedVoiceParts.text,
+                    multiMessageParts.first,
                     explicitMentionTargets,
                     allowExplicitMentions
                 );
-                const spokenPart = removeMixedVoiceReplyMarker(mixedVoiceParts.voice)
+                const secondPart = removeMultiMessageMarkers(multiMessageParts.second)
                     .replace(/<<TAGGED_USER_\d+>>/g, '')
                     .trim();
 
@@ -1013,10 +1023,12 @@ async function handleAiCommandCore(context) {
                         await message.reply(mentionRendered.body);
                     }
                 }
-                if (spokenPart && !await tryVoiceReply(spokenPart)) {
-                    await message.reply(spokenPart);
+                if (secondPart && multiMessageParts.type === 'voice') {
+                    if (!await tryVoiceReply(secondPart)) await message.reply(secondPart);
+                } else if (secondPart) {
+                    await message.reply(secondPart);
                 }
-                memoryReply = [mentionRendered.body, spokenPart].filter(Boolean).join(' ');
+                memoryReply = [mentionRendered.body, secondPart].filter(Boolean).join(' ');
             } else {
                 const mentionRendered = renderCurrentMentionTargets(
                     finalReply,
