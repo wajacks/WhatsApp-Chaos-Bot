@@ -9,14 +9,7 @@ const FEATURE_ACTIONS = [
     'show_menu', 'show_help', 'show_games', 'game_help',
     'show_balance', 'show_profile', 'show_store', 'claim_daily',
     'random_song', 'search_video', 'generate_image', 'contact_owner',
-    'create_wordforge_lobby', 'join_wordforge', 'start_wordforge',
-    'create_wordchain_lobby', 'join_wordchain', 'start_wordchain',
-    'create_wordle_lobby', 'join_wordle', 'start_wordle',
-    'create_scramble_lobby', 'join_scramble', 'start_scramble',
-    'create_mafia_lobby', 'join_mafia', 'start_mafia',
-    'create_rebus_lobby', 'join_rebus', 'start_rebus',
-    'create_truthhunt_lobby', 'join_truthhunt', 'start_truthhunt',
-    'create_numberrun_lobby', 'join_numberrun', 'start_numberrun'
+    'open_game_picker'
 ];
 
 const webResearchUsage = new Map();

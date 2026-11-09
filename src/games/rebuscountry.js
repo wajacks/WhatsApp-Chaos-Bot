@@ -232,10 +232,9 @@ function startRebusLobby(groupId, client, hostId, hostName) {
     activeGames.set(groupId, gameState);
 
     return `🧩 *COUNTRY REBUS LOBBY OPEN*
-Host: *${hostName}* (host must also join with !joinrebus)
-Players: use !joinrebus. Minimum: 2.
-Only the host can use !startrebus or !stoprebus.
-The lobby stays open until the host starts or stops it.`;
+Host: *${hostName}* (automatically joined)
+Reply JOIN or !JOIN to this message to join. The host can reply START or !START to begin, or STOP or !STOP to close the lobby.
+Minimum players: 2.`;
 }
 
 // ============================================================
@@ -245,7 +244,7 @@ The lobby stays open until the host starts or stops it.`;
 function joinRebusLobby(groupId, senderId, userName) {
 
     if (!activeGames.has(groupId)) {
-        return '❌ No active game! Start one with `!rebus`.';
+        return '❌ No active game lobby. Use `!play` to open one.';
     }
 
     const game = activeGames.get(groupId);
@@ -275,7 +274,7 @@ function startRebusGame(groupId, senderId, client) {
     const game = activeGames.get(groupId);
     if (!game || game.status !== 'LOBBY') return '❌ No Country Rebus lobby is waiting to start.';
     if (senderId !== game.hostId) return '❌ Only the host can start this game.';
-    if (!game.players.has(senderId)) return '❌ The host must join with !joinrebus before starting.';
+    if (!game.players.has(senderId)) return '❌ The host is automatically added when the lobby opens.';
     if (game.players.size < 2) return '❌ At least 2 registered players are required.';
     startActiveGame(groupId, client);
     return '🌍 Country Rebus has started.';

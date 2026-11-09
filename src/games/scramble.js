@@ -143,15 +143,14 @@ function startScrambleLobby(chatId, client, hostId, hostName) {
     activeScrambleGames.set(chatId, game);
     
     return `🔀 *SCRAMBLE LOBBY OPEN*
-Host: *${hostName}* (host must also join with !joinscramble)
-Players: use !joinscramble. Minimum: 2.
-Only the host can use !startscramble or !stopscramble.
-The lobby stays open until the host starts or stops it.`;
+Host: *${hostName}* (automatically joined)
+Reply JOIN or !JOIN to this message to join. The host can reply START or !START to begin, or STOP or !STOP to close the lobby.
+Minimum players: 2.`;
 }
 
 function joinScrambleLobby(chatId, senderId, userName) {
     const game = activeScrambleGames.get(chatId);
-    if (!game) return '❌ No Scrambled Word lobby is open. Start one with `!scramble`.';
+    if (!game) return '❌ No Scrambled Word lobby is open. Use `!play` to open a game.';
     if (game.status !== 'LOBBY') return '⚠️ This Scrambled Word match has already started.';
     if (game.players.has(senderId)) return `⚠️️ *${userName}*, you are already registered!`;
     game.players.set(senderId, { id: senderId, name: userName, points: 0, solves: 0, streak: 0, longestStreak: 0, fastestSolveMs: null, usedHint: false });
@@ -169,7 +168,7 @@ function startScrambleGame(chatId, senderId, client) {
     const game = activeScrambleGames.get(chatId);
     if (!game || game.status !== 'LOBBY') return '❌ No Scramble lobby is waiting to start.';
     if (senderId !== game.hostId) return '❌ Only the host can start this game.';
-    if (!game.players.has(senderId)) return '❌ The host must join with !joinscramble before starting.';
+    if (!game.players.has(senderId)) return '❌ The host is automatically added when the lobby opens.';
     if (game.players.size < 2) return '❌ At least 2 registered players are required.';
     startNextRound(chatId, client);
     return '🔀 Scrambled Word has started.';

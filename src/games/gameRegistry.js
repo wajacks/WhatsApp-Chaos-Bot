@@ -1,5 +1,6 @@
 const activeGamesByGroup = new Map();
 const participantsByGame = new Map();
+const lobbyMessagesByGroup = new Map();
 
 function claimGame(groupId, gameName) {
     if (!groupId || !gameName) {
@@ -11,7 +12,10 @@ function claimGame(groupId, gameName) {
         return { ok: false, activeGame };
     }
 
-    if (!activeGame) participantsByGame.set(groupId, { gameName, userIds: new Set() });
+    if (!activeGame) {
+        participantsByGame.set(groupId, { gameName, userIds: new Set() });
+        lobbyMessagesByGroup.delete(groupId);
+    }
     activeGamesByGroup.set(groupId, gameName);
     return { ok: true, activeGame: gameName };
 }
@@ -33,6 +37,7 @@ function releaseGame(groupId, gameName) {
     if (activeGamesByGroup.get(groupId) !== gameName) return false;
     activeGamesByGroup.delete(groupId);
     participantsByGame.delete(groupId);
+    lobbyMessagesByGroup.delete(groupId);
     return true;
 }
 
@@ -40,4 +45,14 @@ function getActiveGame(groupId) {
     return activeGamesByGroup.get(groupId) || null;
 }
 
-module.exports = { claimGame, releaseGame, getActiveGame, recordGameParticipant };
+function setGameLobbyMessage(groupId, gameName, messageId) {
+    if (!groupId || !messageId || activeGamesByGroup.get(groupId) !== gameName) return false;
+    lobbyMessagesByGroup.set(groupId, String(messageId));
+    return true;
+}
+
+function getGameLobbyMessage(groupId) {
+    return lobbyMessagesByGroup.get(groupId) || null;
+}
+
+module.exports = { claimGame, releaseGame, getActiveGame, recordGameParticipant, setGameLobbyMessage, getGameLobbyMessage };

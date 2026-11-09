@@ -329,14 +329,14 @@ function startWordForgeLobby(groupId, playerId, userName, client, aliases) {
     }
 
     return '⚒️ WORD FORGE LOBBY OPEN!\n\n' +
-        '*' + safeName(userName) + '* is the host and must also join with !joinforge.\n' +
-        'Players: use !joinforge to register (2–10 players).\n' +
-        'Only the host can use !startforge or !stopforge. The lobby has no time limit.';
+        '*' + safeName(userName) + '* is the host and is automatically joined.\n' +
+        'Reply JOIN or !JOIN to this message to register (2–10 players).\n' +
+        'The host can reply START or !START to begin, or STOP or !STOP to close the lobby. The lobby has no time limit.';
 }
 
 function joinWordForgeLobby(groupId, playerId, userName, client, aliases) {
     const game = activeGames.get(groupId);
-    if (!game) return '❌ There is no Word Forge lobby in this group. Start one with !wordforge.';
+    if (!game) return '❌ There is no Word Forge lobby in this group. Use !play to open one.';
     if (game.phase !== 'LOBBY') return '⚠️ This Word Forge match has already started.';
     const bundle = identityBundle(playerId, aliases);
     if (!bundle.canonical) return '❌ I could not identify you for Word Forge.';
@@ -357,7 +357,7 @@ function joinWordForgeLobby(groupId, playerId, userName, client, aliases) {
         'Your private Word Forge leaderboard ID is *' + player.anonymousId +
         '*; only you will know this ID until the final reveal.');
     return '✅ *' + player.name + '* joined Word Forge. (' +
-        game.playerOrder.length + '/' + MAX_PLAYERS + ')\n\nOnly the host can start with !startforge.';
+        game.playerOrder.length + '/' + MAX_PLAYERS + ')';
 }
 
 function startWordForgeGame(groupId, senderId, client, aliases) {
@@ -366,7 +366,7 @@ function startWordForgeGame(groupId, senderId, client, aliases) {
     if (game.phase !== 'LOBBY') return '⚠️ The Word Forge match has already started.';
     const bundle = identityBundle(senderId, aliases);
     if (bundle.canonical !== game.hostId && !(bundle.aliases || []).includes(game.hostId)) return '❌ Only the host can start this Word Forge match.';
-    if (!game.players[game.hostId]) return '❌ The host must join with !joinforge before starting.';
+    if (!game.players[game.hostId]) return '❌ The host is automatically added when the lobby opens.';
     if (game.playerOrder.length < MIN_PLAYERS) return '❌ At least 2 players are required to start Word Forge.';
 
     clearTimer(getTimerSet(groupId), 'lobby');
@@ -823,7 +823,7 @@ function cancelMatch(groupId, client, reason) {
         } catch (saveError) {
             console.error('[WORD FORGE DB] Could not persist paused cancelled match:', saveError.message);
         }
-        safeSend(client, groupId, '⚠️ Word Forge could not safely archive this match, so it remains paused. Try !stopforge again later.');
+        safeSend(client, groupId, '⚠️ Word Forge could not safely archive this match, so it remains paused. Please contact the bot administrator.');
         return false;
     }
 
