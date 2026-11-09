@@ -205,7 +205,7 @@ function startWordleLobby(chatId, client, hostId, hostName) {
     if (activeGames.has(chatId)) {
         const game = activeGames.get(chatId);
         if (game.status === 'LOBBY') {
-            return '⚠️ Lobby is already open! Type `!join` to enter.';
+            return '⚠️ A Wordle lobby is already open in this group.';
         }
         return '⚠️ A Wordle match is currently active in this chat!';
     }
@@ -237,24 +237,23 @@ function startWordleLobby(chatId, client, hostId, hostName) {
 
     return `🔤 *WORDLE LOBBY OPEN*
 Guess the shared 5-letter word; type guesses in the group (up to 15 rounds).
-Host: *${hostName}* (host must also join with !join)
-Players: use !join. Minimum: 2.
-Only the host can use !startwordle or !stopwordle.
-The lobby stays open until the host starts or stops it.`;
+Host: *${hostName}* (automatically joined)
+Reply JOIN or !JOIN to this message to join. The host can reply START or !START to begin, or STOP or !STOP to close the lobby.
+Minimum players: 2.`;
 }
 
 function startWordleGame(chatId, senderId, client) {
     const game = activeGames.get(chatId);
     if (!game || game.status !== 'LOBBY') return '❌ No Wordle lobby is waiting to start.';
     if (senderId !== game.hostId) return '❌ Only the host can start this Wordle game.';
-    if (!game.players.has(game.hostId)) return '❌ The host must join with !join before starting.';
+    if (!game.players.has(game.hostId)) return '❌ The host is automatically added when the lobby opens.';
     if (game.players.size < 2) return '❌ At least 2 registered players are required.';
     startNextRound(chatId, client);
     return '🟩 Wordle has started.';
 }
 
 function joinLobby(chatId, senderId, userName) {
-    if (!activeGames.has(chatId)) return '❌ No active game! Start one with `!wordle`.';
+    if (!activeGames.has(chatId)) return '❌ No active game lobby. Use `!play` to open one.';
     const game = activeGames.get(chatId);
 
     if (game.status !== 'LOBBY') return '⚠️ Match already in progress! You can join the next match lobby.';

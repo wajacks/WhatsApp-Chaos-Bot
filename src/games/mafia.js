@@ -988,13 +988,12 @@ class MafiaGame {
         const botNumber = this.client.info?.wid?.user || '';
         const botDmLink = botNumber ? `https://wa.me/${botNumber}` : 'the bot\'s private chat';
 
-        await this.client.sendMessage(
+        const lobbyMessage = await this.client.sendMessage(
             channelId,
             '*MAFIA LOBBY OPEN*\n\n' +
-            `Host: *${this.hostName}* (host must also join with !joinmafia)\n` +
-            'Players: use !joinmafia. Minimum: 4.\n' +
-            'Only the host can use !startmafia or !stopmafia.\n' +
-            'The lobby stays open until the host starts or stops it.\n\n' +
+            `Host: *${this.hostName}* (automatically joined)\n` +
+            'Reply JOIN or !JOIN to this message to join. Minimum: 4.\n' +
+            'The host can reply START or !START to begin, or STOP or !STOP to close the lobby.\n\n' +
             'Secret roles are sent by private message after the host starts the game.'
         );
 
@@ -1088,7 +1087,8 @@ class MafiaGame {
             );
         }
 
-
+        this.lobbyMessageId = lobbyMessage?.id?._serialized || lobbyMessage?.id?.id || lobbyMessage?._data?.id || null;
+        return { lobbyMessageId: this.lobbyMessageId };
     }
 
     // ============================================================
@@ -1308,7 +1308,7 @@ class MafiaGame {
             return (
                 `❌ *${player.username}*, I cannot send you private messages!\n\n` +
                 `Please open a direct chat with the bot first: ${botDmLink}\n` +
-                'Send a quick message (like `hi` or `!ping`), then try `!joinmafia` again.'
+                'Send a quick message (like `hi` or `!ping`), then reply JOIN to the Mafia lobby again.'
             );
         }
 
@@ -1541,7 +1541,7 @@ class MafiaGame {
             return;
         }
         if (!this.getPlayerById(this.hostId)) {
-            await this.client.sendMessage(channelId, 'The host must join with !joinmafia before starting.');
+            await this.client.sendMessage(channelId, 'The host is automatically added when the lobby opens.');
             return;
         }
 
@@ -3185,7 +3185,7 @@ module.exports = {
             const game = global.activeMafiaGame;
             if (!game || !game.inLobby || game.channelId !== chatId) return '❌ No Mafia lobby is waiting to start.';
             if (game.canonicalizeIdentity(senderId) !== game.hostId) return '❌ Only the host can start this Mafia game.';
-            if (!game.getPlayerById(game.hostId)) return '❌ The host must join with !joinmafia before starting.';
+            if (!game.getPlayerById(game.hostId)) return '❌ The host is automatically added when the lobby opens.';
             if (game.players.length < 4) return `❌ At least 4 registered players are required (currently ${game.players.length}).`;
             await game.startGame(chatId, senderId);
             return null;

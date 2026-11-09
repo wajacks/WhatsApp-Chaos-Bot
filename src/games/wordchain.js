@@ -181,12 +181,7 @@ async function startWordChainLobby(message) {
 
     if (existingGame) {
         if (existingGame.state === LOBBY_STATE) {
-            await message.reply(
-                '⚠️ A Word Chain lobby is already open in this chat.\n\n' +
-                'Use `!wjoin` to join or `!startwordchain` to start.'
-            );
-
-            return;
+            return '⚠️ A Word Chain lobby is already open in this chat.';
         }
 
         if (
@@ -194,11 +189,7 @@ async function startWordChainLobby(message) {
             existingGame.state === RULES_READ_STATE ||
             existingGame.state === STOPPING_STATE
         ) {
-            await message.reply(
-                '⚠️ A Word Chain game is already running in this chat.'
-            );
-
-            return;
+            return '⚠️ A Word Chain game is already running in this chat.';
         }
     }
 
@@ -211,8 +202,7 @@ async function startWordChainLobby(message) {
 
     const claim = claimGame(chatId, 'wordchain');
     if (!claim.ok) {
-        await message.reply(`⚠️ A ${claim.activeGame} game is already active in this group.`);
-        return;
+        return `⚠️ A ${claim.activeGame} game is already active in this group.`;
     }
 
     activeWordChainGames.set(chatId, {
@@ -243,24 +233,19 @@ async function startWordChainLobby(message) {
         clientRef: null
     });
 
-    await message.reply(
-        '🔗 *WORD CHAIN LOBBY OPEN!*\n\n' +
-        `Host: *${userName}*\n\n` +
-        'Players can join using:\n' +
-        '`!wjoin`\n\n' +
-        'Host must also join with !wjoin. Minimum players: *2*\n' +
-        'Each player gets *10 turns* of up to *30 seconds*.\n' +
-        'Ends after all turns (max *5 minutes × players* + 20s briefing).\n\n' +
-        'When everyone is ready, the host can use:\n' +
-        '`!startwordchain`'
-    );
+    return '🔗 *WORD CHAIN LOBBY OPEN!*\n\n' +
+        `Host: *${userName}* (automatically joined)\n\n` +
+        'Reply JOIN or !JOIN to this message to join.\n' +
+        'The host can reply START or !START to begin, or STOP or !STOP to close the lobby.\n' +
+        'Minimum players: *2*. Each player gets *10 turns* of up to *30 seconds*.\n' +
+        'Ends after all turns (max *5 minutes × players* + 20s briefing).';
 }
 
 // ============================================================
 // JOIN WORD CHAIN
 // ============================================================
 
-async function joinWordChain(message) {
+async function joinWordChain(message, { silent = false } = {}) {
     const chatId = message.from;
     const playerId =
         message.author || message.from;
@@ -269,16 +254,16 @@ async function joinWordChain(message) {
         activeWordChainGames.get(chatId);
 
     if (!game) {
-        await message.reply(
+        if (!silent) await message.reply(
             '❌ No active Word Chain lobby.\n\n' +
-            'Start one with `!wordchain`.'
+            'Use `!play` to open a game.'
         );
 
         return false;
     }
 
     if (game.state !== LOBBY_STATE) {
-        await message.reply(
+        if (!silent) await message.reply(
             '❌ The Word Chain game has already started.\n\n' +
             'You cannot join this match now.'
         );
@@ -292,7 +277,7 @@ async function joinWordChain(message) {
         );
 
     if (alreadyJoined) {
-        await message.reply(
+        if (!silent) await message.reply(
             '⚠️ You are already in the Word Chain lobby.'
         );
 
@@ -312,10 +297,10 @@ async function joinWordChain(message) {
         name: userName
     });
 
-    await message.reply(
+    if (!silent) await message.reply(
         `🔗 *${userName} joined Word Chain!*\n\n` +
         `Players: *${game.players.length}*\n\n` +
-        'Waiting for the host to use `!startwordchain`.'
+        'Reply JOIN to the lobby message to join. The host replies START when ready.'
     );
     return true;
 }
@@ -335,7 +320,7 @@ async function startWordChainGame(message, client) {
     if (!game) {
         await message.reply(
             '❌ No active Word Chain lobby.\n\n' +
-            'Start one with `!wordchain`.'
+            'Use `!play` to open a game.'
         );
 
         return;
@@ -358,7 +343,7 @@ async function startWordChainGame(message, client) {
     }
 
     if (!game.players.some(player => player.id === game.host)) {
-        await message.reply('❌ The host must join with !wjoin before starting.');
+        await message.reply('❌ The host is automatically added when the lobby opens.');
         return;
     }
 

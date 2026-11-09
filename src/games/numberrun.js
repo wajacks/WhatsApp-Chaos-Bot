@@ -222,16 +222,16 @@ function startNumberRunLobby(groupId, hostId, hostName) {
     });
 
     return '🔢 *NUMBER RUN LOBBY OPEN*\n\n' +
-        '*' + hostName + '* is the host and must also join with !joinnumberrun.\n' +
-        'Players: use !joinnumberrun (2 or more players).\n' +
-        'The host starts with !startnumberrun or closes the lobby with !stopnumberrun.\n' +
+        '*' + hostName + '* is the host and is automatically joined.\n' +
+        'Reply JOIN or !JOIN to this message to join (2 or more players).\n' +
+        'The host can reply START or !START to begin, or STOP or !STOP to close the lobby.\n' +
         'No turn timer; each player gets one guess per turn.';
 }
 
 function joinNumberRunLobby(groupId, playerId, playerName) {
     const game = activeGames.get(groupId);
     if (!game || game.phase !== 'LOBBY') {
-        return '❌ No Number Run lobby is open here. Start one with !numberrun.';
+        return '❌ No Number Run lobby is open here. Use !play to open one.';
     }
     if (game.players.has(playerId)) return '⚠️ You already joined this Number Run lobby.';
 
@@ -244,7 +244,7 @@ async function startNumberRunGame(groupId, senderId, generateBanter) {
     const game = activeGames.get(groupId);
     if (!game || game.phase !== 'LOBBY') return '❌ No Number Run lobby is waiting to start.';
     if (senderId !== game.hostId) return '❌ Only the host can start this match.';
-    if (!game.players.has(senderId)) return '❌ The host must join with !joinnumberrun before starting.';
+    if (!game.players.has(senderId)) return '❌ The host is automatically added when the lobby opens.';
     if (game.players.size < MIN_PLAYERS) return '❌ Number Run needs at least 2 registered players.';
 
     game.playerCount = game.players.size;

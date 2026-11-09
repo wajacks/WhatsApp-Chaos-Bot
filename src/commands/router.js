@@ -1,7 +1,19 @@
 // Dispatches command messages and active-game inputs in the original order.
 const { beginGamePicker, resolveGamePickerInput, clearGamePicker } = require('../games/gamePicker');
-const { openSelectedGame, startActiveGame, stopActiveGame } = require('../games/gameActions');
-const { getActiveGame, recordGameParticipant } = require('../games/gameRegistry');
+const { openSelectedGame, joinSelectedGame, isReplyToGameLobby, startActiveGame, stopActiveGame } = require('../games/gameActions');
+const { getActiveGame } = require('../games/gameRegistry');
+
+const RETIRED_GAME_COMMANDS = new Set([
+    '!startgame', '!stopgame',
+    '!wordforge', '!joinforge', '!startforge', '!stopforge',
+    '!numberrun', '!joinnumberrun', '!startnumberrun', '!stopnumberrun',
+    '!truthhunt', '!jointruth', '!starttruth', '!stoptruth',
+    '!wordchain', '!wjoin', '!startwordchain', '!stopwordchain',
+    '!wordle', '!startwordle', '!end', '!stopwordle',
+    '!scramble', '!joinscramble', '!startscramble', '!stopscramble',
+    '!mafia', '!startmafia', '!joinmafia', '!endmafia', '!stopmafia',
+    '!rebus', '!startrebus', '!stoprebus', '!joinrebus', '!rjoin'
+]);
 
 function createCommandRouter(dependencies) {
     const {
@@ -151,7 +163,40 @@ function createCommandRouter(dependencies) {
                 await message.reply('🎮 Use !play in a group chat to open a game lobby.');
                 return true;
             }
+            const activeGame = getActiveGame(chatId);
+            if (activeGame) {
+                await message.reply(`🎮 *${activeGame}* already has an open lobby here. Reply JOIN to its lobby message, or as host reply START or STOP.`);
+                return true;
+            }
             await message.reply(beginGamePicker(chatId, senderId));
+            return true;
+        }
+
+        const controlActions = new Map([
+            ['join', 'join'], ['!join', 'join'],
+            ['start', 'start'], ['!start', 'start'],
+            ['stop', 'stop'], ['!stop', 'stop']
+        ]);
+        const lobbyAction = controlActions.get(lowerText);
+        const requiresReply = Boolean(lobbyAction && (lowerText.startsWith('!') || message.hasQuotedMsg));
+        if (requiresReply) {
+            clearGamePicker(chatId, senderId);
+            if (!isGroup) {
+                await message.reply('🎮 Reply to the game lobby message in its group chat to use JOIN, START, or STOP.');
+                return true;
+            }
+            if (!await isReplyToGameLobby(message, chatId)) {
+                await message.reply('↩️ Reply directly to the bot’s game lobby message with JOIN, START, or STOP.');
+                return true;
+            }
+            const activeGame = getActiveGame(chatId);
+            if (!activeGame) {
+                await message.reply('🎮 There is no open game lobby in this group. Type !play to choose one.');
+                return true;
+            }
+            if (lobbyAction === 'join') await joinSelectedGame(activeGame, context, dependencies);
+            else if (lobbyAction === 'start') await startActiveGame(context, dependencies);
+            else await stopActiveGame(context, dependencies);
             return true;
         }
 
@@ -173,27 +218,10 @@ function createCommandRouter(dependencies) {
             return true;
         }
 
-        if (lowerText === '!startgame' || lowerText === '!stopgame') {
-            if (!isGroup) {
-                await message.reply('🎮 Use game lobby controls in the group where the lobby was opened.');
-                return true;
-            }
-            if (lowerText === '!startgame') await startActiveGame(context, dependencies);
-            else await stopActiveGame(context, dependencies);
+        if (RETIRED_GAME_COMMANDS.has(lowerText)) {
+            await message.reply('🎮 Game lobbies now open through !play. Reply JOIN to the lobby message to join; the host replies START or STOP.');
             return true;
         }
-
-        const recordJoinedGame = (gameKey, response) => {
-            const responseText = typeof response === 'string' ? response.toLowerCase() : '';
-            const successfulResponse = response === true ||
-                (/(?:\bjoined\b|\bregistered successfully\b)/.test(responseText) &&
-                    !/already|not (?:open|in)|no .*lobby|failed|cannot|can't/.test(responseText));
-            if (!successfulResponse || getActiveGame(chatId) !== gameKey) return;
-            const userId = economyUserId || senderId;
-            if (recordGameParticipant(chatId, gameKey, userId) && typeof dependencies.recordGameJoin === 'function') {
-                dependencies.recordGameJoin(userId, userName, gameKey);
-            }
-        };
 
         // ====================================================
                 // MENU
@@ -498,227 +526,11 @@ function createCommandRouter(dependencies) {
                     return true;
                 }
         
-                // ====================================================
-                // WORD FORGE
-                // ====================================================
-        
-                if (lowerText === '!wordforge') {
-                    const response = startWordForgeLobby(
-                        chatId, senderId, userName, client, [message.author, senderContact]
-                    );
-                    await message.reply(response);
-                    return true;
-                }
-        
-                if (lowerText === '!joinforge') {
-                    const response = joinWordForgeLobby(
-                        chatId, senderId, userName, client, [message.author, senderContact]
-                    );
-                    await message.reply(response);
-                    recordJoinedGame('wordforge', response);
-                    return true;
-                }
-        
-                if (lowerText === '!startforge') {
-                    const response = startWordForgeGame(
-                        chatId, senderId, client, [message.author, senderContact]
-                    );
-                    await message.reply(response);
-                    return true;
-                }
-        
-                if (lowerText === '!stopforge') {
-                    const response = stopWordForgeGame(
-                        chatId, senderId, client, [message.author, senderContact]
-                    );
-                    await message.reply(response);
-                    return true;
-                }
-        
-                // ====================================================
-                // NUMBER RUN
-                // ====================================================
-
-                if (lowerText === '!numberrun') {
-                    await message.reply(startNumberRunLobby(chatId, senderId, userName));
-                    return true;
-                }
-
-                if (lowerText === '!joinnumberrun') {
-                    const response = joinNumberRunLobby(chatId, senderId, userName);
-                    await message.reply(response);
-                    recordJoinedGame('numberrun', response);
-                    return true;
-                }
-
-                if (lowerText === '!startnumberrun') {
-                    await message.reply(await startNumberRunGame(chatId, senderId, generateNumberRunBanter));
-                    return true;
-                }
-
-                if (lowerText === '!stopnumberrun') {
-                    await message.reply(stopNumberRunGame(chatId, senderId));
-                    return true;
-                }
-
-                // ====================================================
-                // TRUTH HUNT
-                // ====================================================
-
-                if (lowerText === '!truthhunt') {
-                    await message.reply(startTruthHuntLobby(chatId, senderId, userName));
-                    return true;
-                }
-
-                if (lowerText === '!jointruth') {
-                    const response = joinTruthHuntLobby(chatId, senderId, userName);
-                    await message.reply(response);
-                    recordJoinedGame('truthhunt', response);
-                    return true;
-                }
-
-                if (lowerText === '!starttruth') {
-                    const response = await startTruthHuntGame(chatId, senderId, client, generateTruthHuntHint);
-                    if (response) await message.reply(response);
-                    return true;
-                }
-
-                if (lowerText === '!stoptruth') {
-                    await message.reply(stopTruthHuntGame(chatId, senderId));
-                    return true;
-                }
-
-                // ====================================================
-                // WORD CHAIN
-                // ====================================================
-        
-                if (lowerText === '!wordchain') {
-                    await startWordChainLobby(message);
-                    return true;
-                }
-        
-                if (lowerText === '!wjoin') {
-                    const joined = await joinWordChain(message);
-                    recordJoinedGame('wordchain', joined);
-                    return true;
-                }
-        
-                if (lowerText === '!startwordchain') {
-                    await startWordChainGame(message, client);
-                    return true;
-                }
-        
-                if (lowerText === '!stopwordchain') {
-                    await stopWordChainCommand(message, client);
-                    return true;
-                }
-        
-                // ====================================================
-                // WORDLE
-                // ====================================================
-        
-                if (lowerText === '!wordle') {
-                    const response = startWordleLobby(chatId, client, senderId, userName);
-                    await message.reply(response);
-                    return true;
-                }
-        
-                if (lowerText === '!startwordle') {
-                    await message.reply(startWordleGame(chatId, senderId, client));
-                    return true;
-                }
-        
-                if (lowerText === '!end' || lowerText === '!stopwordle') {
-                    const resultMessage = stopGame(chatId, senderId);
-                    await message.reply(resultMessage);
-                    return true;
-                }
-        
-                // ====================================================
-                // SCRAMBLED WORD
-                // ====================================================
-        
-                if (lowerText === '!scramble') {
-                    await message.reply(startScrambleLobby(chatId, client, senderId, userName));
-                    return true;
-                }
-        
-                if (lowerText === '!joinscramble') {
-                    const response = joinScrambleLobby(chatId, senderId, userName);
-                    await message.reply(response);
-                    recordJoinedGame('scramble', response);
-                    return true;
-                }
-        
                 if (lowerText === '!scramblehint') {
                     await message.reply(processScrambleHint(chatId, senderId, client));
                     return true;
                 }
-        
-                if (lowerText === '!startscramble') {
-                    await message.reply(startScrambleGame(chatId, senderId, client));
-                    return true;
-                }
-        
-                if (lowerText === '!stopscramble') {
-                    await message.reply(stopScrambleGame(chatId, senderId, client));
-                    return true;
-                }
-        
-                // ====================================================
-                // MAFIA
-                // ====================================================
-        
-                // --- Active Game Logic ---
-        
-                if (lowerText === '!mafia') {
-                    await startMafiaLobby(chatId, client, MessageMedia, senderId, userName, generateMafiaNarration);
-                    return true;
-                }
-        
-                if (lowerText === '!startmafia') {
-                    const startResponse = await startMafiaGame(chatId, senderId);
-                    if (startResponse) await message.reply(startResponse);
-                    return true;
-                }
-        
-                if (lowerText === '!joinmafia') {
-                    const mafiaContact = senderContact || (await getSenderContact(message));
-                    const mafiaSenderId = getCanonicalJid(mafiaContact) || senderId;
-        
-                    const mafiaResponse = await joinMafiaLobby(
-                        chatId,
-                        mafiaSenderId,
-                        userName,
-                        mafiaContact
-                    );
-        
-                    if (mafiaResponse) {
-                        await message.reply(mafiaResponse);
-                    }
-                    recordJoinedGame('mafia', mafiaResponse);
-                    return true;
-                }
-        
-                if (lowerText === '!endmafia' || lowerText === '!stopmafia') {
-                    const endResponse = await endMafiaGame(chatId, senderId);
-                    if (endResponse) {
-                        await message.reply(endResponse);
-                    }
-                    return true;
-                }
-        
-                // ====================================================
-                // WORDLE JOIN
-                // ====================================================
-        
-                if (lowerText === '!join') {
-                    const wordleResponse = joinLobby(chatId, senderId, userName);
-                    await message.reply(wordleResponse);
-                    recordJoinedGame('wordle', wordleResponse);
-                    return true;
-                }
-        
+
                 // ====================================================
                 // TRUTH HUNT TOPIC INPUT AND VOTING
                 // ====================================================
@@ -767,31 +579,6 @@ function createCommandRouter(dependencies) {
                 // ====================================================
                 // REBUS / COUNTRY GAME
                 // ====================================================
-        
-                if (lowerText === '!rebus') {
-                    const rebusResult = await startRebusLobby(chatId, client, senderId, userName);
-                    if (rebusResult) {
-                        await client.sendMessage(chatId, rebusResult);
-                    }
-                    return true;
-                }
-        
-                if (lowerText === '!startrebus') {
-                    await message.reply(startRebusGame(chatId, senderId, client));
-                    return true;
-                }
-        
-                if (lowerText === '!stoprebus') {
-                    await message.reply(stopRebusGame(chatId, senderId));
-                    return true;
-                }
-        
-                if (lowerText === '!joinrebus' || lowerText === '!rjoin') {
-                    const joinRes = joinRebusLobby(chatId, senderId, userName);
-                    await message.reply(joinRes);
-                    recordJoinedGame('rebus', joinRes);
-                    return true;
-                }
         
                 if (lowerText === '!hint') {
                     const hintRes = processRebusHint(chatId, senderId, client);

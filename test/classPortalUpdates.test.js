@@ -23,7 +23,8 @@ const {
 } = require('../src/tools/classSession');
 const { GAME_CHOICES, beginGamePicker, resolveGamePickerInput, PICK_TIMEOUT_MS } = require('../src/games/gamePicker');
 const { claimGame, getActiveGame, recordGameParticipant, releaseGame } = require('../src/games/gameRegistry');
-const { startActiveGame, stopActiveGame } = require('../src/games/gameActions');
+const { openSelectedGame, joinSelectedGame, isReplyToGameLobby, startActiveGame, stopActiveGame } = require('../src/games/gameActions');
+const { createCommandRouter } = require('../src/commands/router');
 const { getMostJoinedGame } = require('../src/commands/profile');
 const { handleClassNotesInput } = require('../src/commands/classNotes');
 const { sanitizeNavigationQuestion, buildOfflineNavigationReply } = require('../src/features/ai/classPortalNavigation');
@@ -125,6 +126,121 @@ test('students receive selected notes at their registered WhatsApp number', asyn
         assert.equal(sends.length, 1);
         assert.equal(sends[0][0], '254700000001@c.us');
         assert.equal(sends[0][1].filename, 'lecture.pdf');
+    } finally {
+        fs.rmSync(rootDir, { recursive: true, force: true });
+    }
+});
+
+test('reps and assistant reps can read one uploaded note directly in chat', async () => {
+    const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chaos-class-notes-rep-read-'));
+    try {
+        const saved = await saveClassNoteFile('BSIT/2024', {
+            filename: 'lecture.pdf', mimetype: 'application/pdf',
+            data: Buffer.from('lecture notes').toString('base64')
+        }, { rootDir });
+        const classData = {
+            repId: 'rep@example.test',
+            assistantReps: ['assistant@example.test'],
+            notes: [{ id: 'file-rep', unit: 'CALCULUS I', title: 'Lecture 1', fileName: 'lecture.pdf', ...saved }]
+        };
+        const db = { classes: { 'BSIT/2024': classData } };
+        const sends = [];
+        const client = { sendMessage: async (...args) => sends.push(args) };
+        for (const userId of ['rep@example.test', 'assistant@example.test']) {
+            const session = {
+                state: 'REP_NOTES_READ_FILES',
+                data: { loggedInClass: 'BSIT/2024', notesUnit: 'CALCULUS I' }
+            };
+            await handleClassNotesInput({
+                client, message: { reply: async () => {} }, userId, input: '1', session, db,
+                notesStorageOptions: { rootDir },
+                updateSessionState: (_id, state, data) => { session.state = state; session.data = data || {}; },
+                sendRepDashboard: async () => {}, sendStudentDashboard: async () => {}
+            });
+        }
+        assert.equal(sends.length, 2);
+        assert.deepEqual(sends.map(send => send[0]), ['rep@example.test', 'assistant@example.test']);
+        assert.equal(sends[0][1].filename, 'lecture.pdf');
+    } finally {
+        fs.rmSync(rootDir, { recursive: true, force: true });
+    }
+});
+
+test('authorized class administrators can choose a class and receive all its notes', async () => {
+    const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chaos-class-notes-admin-'));
+    try {
+        const saved = await saveClassNoteFile('BSIT/2024', {
+            filename: 'lecture.pdf', mimetype: 'application/pdf',
+            data: Buffer.from('lecture notes').toString('base64')
+        }, { rootDir });
+        const db = { classes: { 'BSIT/2024': {
+            notes: [{ id: 'file-admin', unit: 'CALCULUS I', title: 'Lecture 1', fileName: 'lecture.pdf', ...saved }]
+        } } };
+        const session = { state: 'ADMIN_NOTES_CLASSES', data: {} };
+        const sends = [];
+        const client = { sendMessage: async (...args) => sends.push(args) };
+        const common = {
+            client, message: { reply: async () => {} }, userId: 'admin@example.test', session, db,
+            notesStorageOptions: { rootDir }, isClassAdmin: true,
+            updateSessionState: (_id, state, data) => { session.state = state; session.data = data || {}; },
+            sendMainMenu: async () => {}
+        };
+        await handleClassNotesInput({ ...common, input: '1' });
+        assert.equal(session.state, 'ADMIN_NOTES_UNITS');
+        await handleClassNotesInput({ ...common, input: '1' });
+        assert.equal(session.state, 'ADMIN_NOTES_FILES');
+        await handleClassNotesInput({ ...common, input: 'A' });
+        assert.equal(sends.length, 1);
+        assert.equal(sends[0][0], 'admin@example.test');
+        assert.equal(sends[0][1].filename, 'lecture.pdf');
+    } finally {
+        fs.rmSync(rootDir, { recursive: true, force: true });
+    }
+});
+
+test('class note review does not expose administrator states to unauthorized users', async () => {
+    const session = { state: 'ADMIN_NOTES_CLASSES', data: {} };
+    const replies = [];
+    await handleClassNotesInput({
+        client: {}, message: { reply: async text => replies.push(text) }, userId: 'student@example.test',
+        input: '1', session, db: { classes: {} }, isClassAdmin: false,
+        updateSessionState: (_id, state, data) => { session.state = state; session.data = data || {}; },
+        sendMainMenu: async () => {}
+    });
+    assert.equal(session.state, 'MAIN_MENU');
+    assert.match(replies[0], /Administrator access is required/);
+});
+
+test('deleting the last note returns reps to the notes menu without a stale unit picker', async () => {
+    const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chaos-class-notes-delete-last-'));
+    try {
+        const saved = await saveClassNoteFile('BSIT/2024', {
+            filename: 'lecture.pdf', mimetype: 'application/pdf',
+            data: Buffer.from('lecture notes').toString('base64')
+        }, { rootDir });
+        const classData = {
+            repId: 'rep@example.test',
+            notes: [{ id: 'last-file', unit: 'CALCULUS I', title: 'Lecture 1', fileName: 'lecture.pdf', ...saved }]
+        };
+        const db = { classes: { 'BSIT/2024': classData } };
+        const session = {
+            state: 'REP_NOTES_DELETE_CONFIRM',
+            data: { loggedInClass: 'BSIT/2024', notesUnit: 'CALCULUS I', notesTargetId: 'last-file' }
+        };
+        const replies = [];
+        const context = {
+            client: {}, message: { reply: async text => replies.push(text) }, userId: 'rep@example.test',
+            session, db, notesStorageOptions: { rootDir }, writeClassDB: () => {},
+            updateSessionState: (_id, state, data) => { session.state = state; session.data = data || {}; },
+            sendRepDashboard: async () => {}, sendStudentDashboard: async () => {}
+        };
+        await handleClassNotesInput({ ...context, input: '1' });
+        assert.equal(classData.notes.length, 0);
+        assert.equal(session.state, 'REP_NOTES_MENU');
+        assert.match(replies[0], /No uploaded files remain/);
+        assert.doesNotMatch(replies[0], /CHOOSE A UNIT TO MANAGE/);
+        await handleClassNotesInput({ ...context, input: '0' });
+        assert.equal(session.state, 'REP_DASHBOARD');
     } finally {
         fs.rmSync(rootDir, { recursive: true, force: true });
     }
@@ -300,6 +416,118 @@ test('generic game controls dispatch to the group’s currently open lobby', asy
     assert.deepEqual(calls.filter(call => call[0] === 'start'), [['start', groupId, context.senderId]]);
     assert.deepEqual(calls.filter(call => call[0] === 'stop'), [['stop', groupId, context.senderId]]);
     assert.equal(getActiveGame(groupId), null);
+});
+
+test('!play selection auto-joins the host and binds controls to that bot lobby message', async () => {
+    const groupId = 'test-play-auto-host@g.us';
+    const replies = [];
+    const profileJoins = [];
+    const joinedPlayers = new Set();
+    const hostContext = {
+        message: {
+            author: 'host@example.test',
+            reply: async text => {
+                replies.push(text);
+                return { id: { _serialized: 'lobby-message-1' } };
+            }
+        },
+        client: {}, chatId: groupId, senderId: 'host@example.test', economyUserId: 'host@example.test',
+        userName: 'Host', senderContact: null
+    };
+    const dependencies = {
+        startWordleLobby: chatId => {
+            assert.equal(claimGame(chatId, 'wordle').ok, true);
+            return '🔤 *WORDLE LOBBY OPEN*';
+        },
+        joinLobby: (_chatId, senderId, userName) => {
+            if (joinedPlayers.has(senderId)) return `⚠️ ${userName} already joined.`;
+            joinedPlayers.add(senderId);
+            return `✅ ${userName} joined the match!`;
+        },
+        recordGameJoin: (userId, _userName, gameKey) => profileJoins.push([userId, gameKey])
+    };
+    try {
+        assert.equal(await openSelectedGame('wordle', hostContext, dependencies), true);
+        assert.equal(joinedPlayers.has('host@example.test'), true);
+        assert.deepEqual(profileJoins, [['host@example.test', 'wordle']]);
+        assert.match(replies[0], /WORDLE LOBBY OPEN/);
+
+        const quote = { fromMe: true, body: '🔤 WORDLE LOBBY OPEN', id: { _serialized: 'lobby-message-1' } };
+        assert.equal(await isReplyToGameLobby({ hasQuotedMsg: true, getQuotedMessage: async () => quote }, groupId), true);
+        assert.equal(await isReplyToGameLobby({
+            hasQuotedMsg: true,
+            getQuotedMessage: async () => ({ ...quote, id: { _serialized: 'old-lobby-message' } })
+        }, groupId), false);
+
+        const playerContext = { ...hostContext, senderId: 'player@example.test', economyUserId: 'player@example.test', userName: 'Player' };
+        await joinSelectedGame('wordle', playerContext, dependencies);
+        await joinSelectedGame('wordle', playerContext, dependencies);
+        assert.deepEqual(profileJoins, [
+            ['host@example.test', 'wordle'],
+            ['player@example.test', 'wordle']
+        ]);
+    } finally {
+        releaseGame(groupId, 'wordle');
+    }
+});
+
+test('reply controls start the current lobby and reject unquoted or stale commands', async () => {
+    const groupId = 'test-reply-controls@g.us';
+    const starts = [];
+    const replies = [];
+    const router = createCommandRouter({
+        startWordleGame: (chatId, senderId) => {
+            starts.push([chatId, senderId]);
+            return 'Wordle started.';
+        }
+    });
+    claimGame(groupId, 'wordle');
+    const currentLobby = { fromMe: true, body: '🔤 WORDLE LOBBY OPEN', id: { _serialized: 'current-lobby' } };
+    const context = quoted => ({
+        message: {
+            hasQuotedMsg: Boolean(quoted),
+            getQuotedMessage: async () => quoted,
+            reply: async text => replies.push(text)
+        },
+        client: {}, chatId: groupId, senderId: 'host@example.test',
+        text: '!START', lowerText: '!start', isGroup: true
+    });
+    const { setGameLobbyMessage } = require('../src/games/gameRegistry');
+    setGameLobbyMessage(groupId, 'wordle', 'current-lobby');
+    try {
+        const plainStart = context(currentLobby);
+        plainStart.text = 'START';
+        plainStart.lowerText = 'start';
+        assert.equal(await router(plainStart), true);
+        assert.deepEqual(starts, [[groupId, 'host@example.test']]);
+        assert.match(replies.pop(), /Wordle started/);
+
+        assert.equal(await router(context(currentLobby)), true);
+        assert.equal(starts.length, 2);
+        assert.match(replies.pop(), /Wordle started/);
+
+        await router(context({ ...currentLobby, id: { _serialized: 'stale-lobby' } }));
+        assert.equal(starts.length, 2);
+        assert.match(replies.pop(), /Reply directly to the bot/);
+
+        await router(context(null));
+        assert.equal(starts.length, 2);
+        assert.match(replies.pop(), /Reply directly to the bot/);
+
+        const playContext = context(null);
+        playContext.text = '!play';
+        playContext.lowerText = '!play';
+        await router(playContext);
+        assert.match(replies.pop(), /already has an open lobby/);
+
+        const retiredContext = context(null);
+        retiredContext.text = '!wordle';
+        retiredContext.lowerText = '!wordle';
+        await router(retiredContext);
+        assert.match(replies.pop(), /lobbies now open through !play/);
+    } finally {
+        releaseGame(groupId, 'wordle');
+    }
 });
 
 test('navigation help redacts credential values and falls back to the current station', () => {

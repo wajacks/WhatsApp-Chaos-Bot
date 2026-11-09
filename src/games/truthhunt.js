@@ -223,14 +223,14 @@ function startTruthHuntLobby(groupId, hostId, hostName) {
     });
 
     return '🧠 *TRUTH HUNT LOBBY OPEN*\n\n' +
-        '*' + safeName(hostName) + '* is the host and must join with !jointruth.\n' +
-        'Players use !jointruth to register. The host starts with !starttruth or closes with !stoptruth.\n' +
+        '*' + safeName(hostName) + '* is the host and is automatically joined.\n' +
+        'Reply JOIN or !JOIN to this message to register. The host can reply START or !START to begin, or STOP or !STOP to close the lobby.\n' +
         'Each round mixes claims from three different topics. Read in the group, then answer privately.';
 }
 
 function joinTruthHuntLobby(groupId, playerId, playerName) {
     const game = activeGames.get(groupId);
-    if (!game || game.phase !== 'LOBBY') return '❌ No Truth Hunt lobby is open here. Start one with !truthhunt.';
+    if (!game || game.phase !== 'LOBBY') return '❌ No Truth Hunt lobby is open here. Use !play to open one.';
     if (game.players.has(playerId)) return '⚠️ You already joined this Truth Hunt lobby.';
     if (game.players.size >= MAX_PLAYERS) return '⚠️ Truth Hunt supports up to ' + MAX_PLAYERS + ' players.';
 
@@ -253,7 +253,7 @@ async function startTruthHuntGame(groupId, senderId, client, generateHint) {
     const game = activeGames.get(groupId);
     if (!game || game.phase !== 'LOBBY') return '❌ No Truth Hunt lobby is waiting to start.';
     if (senderId !== game.hostId) return '❌ Only the host can start Truth Hunt.';
-    if (!game.players.has(senderId)) return '❌ The host must join with !jointruth before starting.';
+    if (!game.players.has(senderId)) return '❌ The host is automatically added when the lobby opens.';
     if (game.players.size < MIN_PLAYERS) return '❌ Truth Hunt needs at least 2 registered players.';
 
     game.client = client;

@@ -82,29 +82,10 @@
 
 ┌── ░◈ _*GAME CENTER*_ ◈░ ─────────┐
 │
-│🟩 \`!wordle\`
-│     ☞『_*Open a Wordle lobby*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🌍 \`!rebus\`
-│     ☞『_*Open a Country Rebus lobby*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🔀 \`!scramble\`
-│     ☞『_*Open a Scramble lobby*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🔗 \`!wordchain\`
-│     ☞『_*Open a Word Chain lobby*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│⚒️ \`!wordforge\`
-│     ☞『_*Open a Word Forge lobby*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🔢 \`!numberrun\`
-│     ☞『_*Open a Number Run lobby; answer with a number*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🧠 \`!truthhunt\`
-│     ☞『_*AI fact trivia with private answers*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
-│🕵️ \`!mafia\`
-│     ☞『_*Open a Mafia lobby*_』
+│🎮 \`!play\`
+│     ☞『_*Choose a game and open a lobby*_』
+│     ☞『_*Host joins automatically; players reply JOIN_*』
+│     ☞『_*Host replies START or STOP to the lobby*_』
 │
 └──────────────────────────────┘
 

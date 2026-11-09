@@ -438,7 +438,7 @@ function registerMessageHandler(client, dependencies) {
                         await message.reply(
                             '✅ *Private channel established!*\n\n' +
                             'Your direct chat session with the bot is now active.\n' +
-                            'Head back to the group and type `!joinmafia` to complete your registration!'
+                            'Head back to the group and reply JOIN to the Mafia lobby message to register!'
                         );
                         return;
                     }
@@ -2000,30 +2000,7 @@ function registerMessageHandler(client, dependencies) {
             random_song: '!song',
             generate_image: '!draw',
             contact_owner: '!contactowner',
-            create_wordforge_lobby: '!wordforge',
-            join_wordforge: '!joinforge',
-            start_wordforge: '!startforge',
-            create_wordchain_lobby: '!wordchain',
-            join_wordchain: '!wjoin',
-            start_wordchain: '!startwordchain',
-            create_wordle_lobby: '!wordle',
-            join_wordle: '!join',
-            start_wordle: '!startwordle',
-            create_scramble_lobby: '!scramble',
-            join_scramble: '!joinscramble',
-            start_scramble: '!startscramble',
-            create_mafia_lobby: '!mafia',
-            join_mafia: '!joinmafia',
-            start_mafia: '!startmafia',
-            create_rebus_lobby: '!rebus',
-            join_rebus: '!joinrebus',
-            start_rebus: '!startrebus',
-            create_truthhunt_lobby: '!truthhunt',
-            join_truthhunt: '!jointruth',
-            start_truthhunt: '!starttruth',
-            create_numberrun_lobby: '!numberrun',
-            join_numberrun: '!joinnumberrun',
-            start_numberrun: '!startnumberrun'
+            open_game_picker: '!play'
         };
         const executeBotFeature = async ({ action, query, prompt }) => {
             const baseCommand = AI_FEATURE_COMMANDS[action];

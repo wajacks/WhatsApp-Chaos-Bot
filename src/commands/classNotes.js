@@ -51,7 +51,7 @@ function getUnitNotes(classData, unit) {
 function buildNumberedUnits(title, units, options = {}) {
     let body = `📚 *${title}*\n━━━━━━━━━━━━━━━━━━\n`;
     if (units.length) body += units.map((unit, index) => `${index + 1}. ${unit}`).join('\n') + '\n';
-    else body += '\nNo units have been added yet.\n';
+    else body += '\nNo uploaded notes are available yet.\n';
     if (options.allowNew) body += '\nA. Add a unit name\n';
     body += '\n0. 🔙 Back';
     return body;
@@ -118,10 +118,37 @@ async function handleClassNotesInput(context) {
         notesStorageOptions = {},
         updateSessionState,
         sendRepDashboard,
-        sendStudentDashboard
+        sendStudentDashboard,
+        sendMainMenu,
+        isClassAdmin = false
     } = context;
     const state = session.state;
-    if (!state.startsWith('REP_NOTES_') && !state.startsWith('STUDENT_NOTES_')) return false;
+    const isAdminState = state.startsWith('ADMIN_NOTES_');
+    if (!state.startsWith('REP_NOTES_') && !state.startsWith('STUDENT_NOTES_') && !isAdminState) return false;
+
+    if (isAdminState && !isClassAdmin) {
+        updateSessionState(userId, 'MAIN_MENU');
+        await message.reply('❌ Administrator access is required to review class notes.');
+        return true;
+    }
+
+    if (state === 'ADMIN_NOTES_CLASSES') {
+        const classes = Object.keys(db.classes || {});
+        if (input === '0') {
+            updateSessionState(userId, 'MAIN_MENU');
+            await sendMainMenu(message);
+            return true;
+        }
+        const index = Number(input) - 1;
+        if (!Number.isInteger(index) || index < 0 || index >= classes.length) {
+            await message.reply(buildNumberedUnits('CHOOSE A CLASS TO REVIEW', classes));
+            return true;
+        }
+        const className = classes[index];
+        updateSessionState(userId, 'ADMIN_NOTES_UNITS', { ...session.data, loggedInClass: className });
+        await message.reply(buildNumberedUnits(`${className} — NOTES UNITS`, getNotesUnits(db.classes[className])));
+        return true;
+    }
 
     const className = session.data?.loggedInClass;
     const classData = db.classes?.[className];
@@ -132,8 +159,9 @@ async function handleClassNotesInput(context) {
     }
 
     const isRepState = state.startsWith('REP_NOTES_');
+    const isStudentState = state.startsWith('STUDENT_NOTES_');
     if ((isRepState && !isClassRep(userId, session, classData)) ||
-        (!isRepState && !isClassStudent(userId, session, classData))) {
+        (isStudentState && !isClassStudent(userId, session, classData))) {
         updateSessionState(userId, 'MAIN_MENU');
         await message.reply('❌ Please sign in to your Class Portal account again.');
         return true;
@@ -144,9 +172,12 @@ async function handleClassNotesInput(context) {
         if (isRepState) {
             updateSessionState(userId, 'REP_DASHBOARD', session.data);
             await sendRepDashboard(message, className);
-        } else {
+        } else if (isStudentState) {
             updateSessionState(userId, 'STUDENT_DASHBOARD', session.data);
             await sendStudentDashboard(message, className, session.data.studentName);
+        } else {
+            updateSessionState(userId, 'MAIN_MENU');
+            await sendMainMenu(message);
         }
     };
 
@@ -167,15 +198,72 @@ async function handleClassNotesInput(context) {
                 const units = getNotesUnits(classData);
                 updateSessionState(userId, 'REP_NOTES_MANAGE_UNIT', session.data);
                 await message.reply(buildNumberedUnits('CHOOSE A UNIT TO MANAGE', units));
+            } else if (input === '3') {
+                const units = getNotesUnits(classData);
+                updateSessionState(userId, 'REP_NOTES_READ_UNIT', session.data);
+                await message.reply(buildNumberedUnits('CHOOSE A UNIT TO READ', units));
             } else {
-                await message.reply('❌ Choose 1 to upload a file, 2 to manage files, or 0 to go back.');
+                await message.reply('❌ Choose 1 to upload, 2 to browse or delete, 3 to read files, or 0 to go back.');
             }
             return true;
+
+        case 'REP_NOTES_READ_UNIT': {
+            const units = getNotesUnits(classData);
+            if (input === '0') {
+                updateSessionState(userId, 'REP_NOTES_MENU', session.data);
+                await message.reply('🗂️ *NOTES & MATERIALS*\n━━━━━━━━━━━━━━━━━━\n1. 📤 Upload a file\n2. 🗑️ Browse or delete files\n3. 📖 Read uploaded files\n\n0. 🔙 Back to Dashboard');
+                return true;
+            }
+            const index = Number(input) - 1;
+            if (!Number.isInteger(index) || index < 0 || index >= units.length) {
+                await message.reply(buildNumberedUnits('CHOOSE A UNIT TO READ', units));
+                return true;
+            }
+            updateSessionState(userId, 'REP_NOTES_READ_FILES', { ...session.data, notesUnit: units[index] });
+            await message.reply(buildStudentFilesMenu(units[index], getUnitNotes(classData, units[index])));
+            return true;
+        }
+
+        case 'REP_NOTES_READ_FILES': {
+            const unit = session.data.notesUnit;
+            const unitNotes = getUnitNotes(classData, unit);
+            if (input === '0') {
+                updateSessionState(userId, 'REP_NOTES_READ_UNIT', session.data);
+                await message.reply(buildNumberedUnits('CHOOSE A UNIT TO READ', getNotesUnits(classData)));
+                return true;
+            }
+            const selection = input.toUpperCase() === 'A'
+                ? unitNotes
+                : (() => {
+                    const index = Number(input) - 1;
+                    return Number.isInteger(index) && index >= 0 && index < unitNotes.length ? [unitNotes[index]] : null;
+                })();
+            if (!selection) {
+                await message.reply(buildStudentFilesMenu(unit, unitNotes));
+                return true;
+            }
+            let sent = 0;
+            let failed = 0;
+            for (const note of selection) {
+                try {
+                    await sendOneNote(client, userId, className, unit, note, notesStorageOptions);
+                    sent++;
+                } catch (error) {
+                    failed++;
+                    console.warn(`[CLASS NOTES] Could not send ${note.id} to a representative:`, error.message);
+                }
+            }
+            const summary = failed
+                ? `📎 Sent ${sent} of ${selection.length} file${selection.length === 1 ? '' : 's'}. ${failed} could not be delivered.`
+                : `📎 Sent ${sent} file${sent === 1 ? '' : 's'} directly to this chat.`;
+            await message.reply(`${summary}\n\nChoose another file or reply 0 to go back.`);
+            return true;
+        }
 
         case 'REP_NOTES_UPLOAD_UNIT': {
             if (input === '0') {
                 updateSessionState(userId, 'REP_NOTES_MENU', session.data);
-                await message.reply('🗂️ *NOTES MANAGEMENT*\n\n1. Upload a file\n2. Browse or delete files\n\n0. 🔙 Back to Dashboard');
+                await message.reply('🗂️ *NOTES & MATERIALS*\n━━━━━━━━━━━━━━━━━━\n1. 📤 Upload a file\n2. 🗑️ Browse or delete files\n3. 📖 Read uploaded files\n\n0. 🔙 Back to Dashboard');
                 return true;
             }
             const units = getTimetableUnits(classData);
@@ -201,7 +289,7 @@ async function handleClassNotesInput(context) {
                     await message.reply(buildNumberedUnits('CHOOSE A UNIT FOR UPLOAD', getTimetableUnits(classData), { allowNew: true }));
                 } else {
                     updateSessionState(userId, 'REP_NOTES_MENU', session.data);
-                    await message.reply('🗂️ *NOTES MANAGEMENT*\n\n1. Upload a file\n2. Browse or delete files\n\n0. 🔙 Back to Dashboard');
+                    await message.reply('🗂️ *NOTES & MATERIALS*\n━━━━━━━━━━━━━━━━━━\n1. 📤 Upload a file\n2. 🗑️ Browse or delete files\n3. 📖 Read uploaded files\n\n0. 🔙 Back to Dashboard');
                 }
                 return true;
             }
@@ -272,7 +360,7 @@ async function handleClassNotesInput(context) {
                 notes.push(note);
                 addClassLog(classData, `Notes file uploaded: ${note.unit} — ${note.title}`);
                 context.writeClassDB(db);
-                await message.reply(`✅ *FILE SAVED*\n\n${note.title} is now attached to *${note.unit}*. Students can receive it from Notes & Materials in their dashboard.`);
+                await message.reply(`✅ *FILE SAVED*\n\n${note.title} is now attached to *${note.unit}*. Students, representatives, and administrators can read it from Notes & Materials.`);
                 if (session.data.notesReturnState === 'REP_NOTES_MANAGE_FILES') {
                     await showRepFiles(message, updateSessionState, userId, session, className, session.data.notesUnit, classData);
                 } else {
@@ -288,10 +376,15 @@ async function handleClassNotesInput(context) {
         case 'REP_NOTES_MANAGE_UNIT': {
             if (input === '0') {
                 updateSessionState(userId, 'REP_NOTES_MENU', session.data);
-                await message.reply('🗂️ *NOTES MANAGEMENT*\n\n1. Upload a file\n2. Browse or delete files\n\n0. 🔙 Back to Dashboard');
+                await message.reply('🗂️ *NOTES & MATERIALS*\n━━━━━━━━━━━━━━━━━━\n1. 📤 Upload a file\n2. 🗑️ Browse or delete files\n3. 📖 Read uploaded files\n\n0. 🔙 Back to Dashboard');
                 return true;
             }
             const units = getNotesUnits(classData);
+            if (!units.length) {
+                updateSessionState(userId, 'REP_NOTES_MENU', session.data);
+                await message.reply('📭 No uploaded files are available to browse or delete yet.\n\n🗂️ *NOTES & MATERIALS*\n1. Upload a file\n2. Browse or delete files\n3. Read uploaded files\n\n0. 🔙 Back to Dashboard');
+                return true;
+            }
             const index = Number(input) - 1;
             if (!Number.isInteger(index) || index < 0 || index >= units.length) {
                 await message.reply(buildNumberedUnits('CHOOSE A UNIT TO MANAGE', units));
@@ -345,12 +438,72 @@ async function handleClassNotesInput(context) {
                     classData.notes = notes.filter(note => note.id !== target.id);
                     addClassLog(classData, `Notes file deleted: ${target.unit} — ${target.title}`);
                     context.writeClassDB(db);
-                    await message.reply(`✅ *FILE DELETED*\n\n${cleanLabel(target.title)} was removed from *${target.unit}*.\n\n` + buildRepFilesMenu(target.unit, getUnitNotes(classData, target.unit)));
+                    const remainingUnits = getNotesUnits(classData);
+                    if (remainingUnits.length) {
+                        updateSessionState(userId, 'REP_NOTES_MANAGE_UNIT', { ...session.data, notesTargetId: null });
+                        await message.reply(`✅ *FILE DELETED*\n\n${cleanLabel(target.title)} was removed from *${target.unit}*.\n\n` + buildNumberedUnits('CHOOSE A UNIT TO MANAGE', remainingUnits));
+                    } else {
+                        updateSessionState(userId, 'REP_NOTES_MENU', { ...session.data, notesTargetId: null, notesUnit: null });
+                        await message.reply(`✅ *FILE DELETED*\n\n${cleanLabel(target.title)} was removed from *${target.unit}*. No uploaded files remain.\n\n🗂️ *NOTES & MATERIALS*\n1. Upload a file\n2. Browse or delete files\n3. Read uploaded files\n\n0. 🔙 Back to Dashboard`);
+                    }
                 } catch (error) {
                     await message.reply(`❌ The file could not be deleted: ${error.message}`);
                 }
             }
-            updateSessionState(userId, 'REP_NOTES_MANAGE_FILES', { ...session.data, notesTargetId: null });
+            if (!target) updateSessionState(userId, 'REP_NOTES_MANAGE_UNIT', { ...session.data, notesTargetId: null });
+            return true;
+        }
+
+        case 'ADMIN_NOTES_UNITS': {
+            const units = getNotesUnits(classData);
+            if (input === '0') {
+                updateSessionState(userId, 'ADMIN_NOTES_CLASSES', {});
+                await message.reply(buildNumberedUnits('CHOOSE A CLASS TO REVIEW', Object.keys(db.classes || {})));
+                return true;
+            }
+            const index = Number(input) - 1;
+            if (!Number.isInteger(index) || index < 0 || index >= units.length) {
+                await message.reply(buildNumberedUnits(`${className} — NOTES UNITS`, units));
+                return true;
+            }
+            updateSessionState(userId, 'ADMIN_NOTES_FILES', { ...session.data, notesUnit: units[index] });
+            await message.reply(buildStudentFilesMenu(units[index], getUnitNotes(classData, units[index])));
+            return true;
+        }
+
+        case 'ADMIN_NOTES_FILES': {
+            const unit = session.data.notesUnit;
+            const unitNotes = getUnitNotes(classData, unit);
+            if (input === '0') {
+                updateSessionState(userId, 'ADMIN_NOTES_UNITS', session.data);
+                await message.reply(buildNumberedUnits(`${className} — NOTES UNITS`, getNotesUnits(classData)));
+                return true;
+            }
+            const selection = input.toUpperCase() === 'A'
+                ? unitNotes
+                : (() => {
+                    const index = Number(input) - 1;
+                    return Number.isInteger(index) && index >= 0 && index < unitNotes.length ? [unitNotes[index]] : null;
+                })();
+            if (!selection) {
+                await message.reply(buildStudentFilesMenu(unit, unitNotes));
+                return true;
+            }
+            let sent = 0;
+            let failed = 0;
+            for (const note of selection) {
+                try {
+                    await sendOneNote(client, userId, className, unit, note, notesStorageOptions);
+                    sent++;
+                } catch (error) {
+                    failed++;
+                    console.warn(`[CLASS NOTES] Could not send ${note.id} to an administrator:`, error.message);
+                }
+            }
+            const summary = failed
+                ? `📎 Sent ${sent} of ${selection.length} file${selection.length === 1 ? '' : 's'}. ${failed} could not be delivered.`
+                : `📎 Sent ${sent} file${sent === 1 ? '' : 's'} directly to this chat.`;
+            await message.reply(`${summary}\n\nChoose another file or reply 0 to go back.`);
             return true;
         }
 

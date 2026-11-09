@@ -368,6 +368,10 @@ async function handleClassCommand(client, message, userId, userName) {
 
 // Helper to send the Main Menu
 async function sendMainMenu(message) {
+  const isAdmin = isClassApproverId(message.author || message.from);
+  const adminNotesOption = isAdmin
+      ? `➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ\n│📚 \`3\`\n│    ☞『_*Admin: Review Class Notes*_』\n`
+      : '';
   const menu = `╭──────────────────────────────╮
 │        ⚡ _*TUM*_ × _*CHAOS*_ ⚡        
 │                               
@@ -385,7 +389,7 @@ async function sendMainMenu(message) {
 ➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🛠️ \`2\`
 │    ☞『_*Create a New Class (Reps)*_』
-➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
+${adminNotesOption}➫➫➫➫ΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞΞ
 │🚪 \`99\`
 │    ☞『_*Exit gateway*_』
 │
@@ -406,7 +410,7 @@ async function sendMainMenu(message) {
 
 function getPortalStateDescription(state, role) {
     const descriptions = {
-        MAIN_MENU: 'Class Portal entry menu: choose a class to log in, choose setup to create a portal if you are an authorized representative, or use 99 to exit.',
+        MAIN_MENU: 'Class Portal entry menu: choose a class to log in, choose setup to create a portal if you are an authorized representative, or use 99 to exit. Authorized system administrators can use option 3 to review uploaded class notes.',
         SELECT_CLASS: 'Choose a class from the numbered class list. Reply 0 to return to the portal entry menu.',
         ENTER_CLASS_PASS: 'Enter the password for the selected class in this private chat. Never send the password to the AI. Reply 0 to choose another class.',
         STUDENT_GATEWAY: 'Student sign-in screen: choose login for an existing account or registration for a new account. Reply 0 to return to the class list.',
@@ -418,7 +422,8 @@ function getPortalStateDescription(state, role) {
     if (descriptions[state]) return descriptions[state];
 
     const families = [
-        [/^REP_NOTES_/, 'Representative Notes Management: upload files under a unit, browse files, or confirm deletion of one file. Reply 0 to go back one step.'],
+        [/^REP_NOTES_/, 'Representative Notes Management: upload files under a unit, browse or delete files, and read uploaded files directly. Reply 0 to go back one step.'],
+        [/^ADMIN_NOTES_/, 'Administrator notes review: choose a class, choose a unit, then receive one file or all files in the selected unit. Reply 0 to go back one step.'],
         [/^STUDENT_NOTES_/, 'Student Notes & Materials: choose a unit, then choose one file or send all files for that unit. Reply 0 to go back one step.'],
         [/^REP_TIMETABLE/, 'Representative timetable management and timetable setup. Reply 0 to go back one step.'],
         [/^REP_UPDATES/, 'Representative class updates and announcements. Reply 0 to go back one step.'],
@@ -445,7 +450,7 @@ function sendPortalGuide(message, userId, session, role) {
           `• Use *1* to create or update the timetable and *2* to post class updates.\n` +
           `• Use *6* to open a roll call manually and *7* to close one. Scheduled classes also get automatic student reminders and roll-call notices.\n` +
           `• Use *8* for deadlines and *12* for class polls.\n` +
-          `• Use *14 — Notes & Materials* to upload files by unit, browse files, or delete one file. Students can request a file or send all files for a unit from their dashboard.\n` +
+          `• Use *14 — Notes & Materials* to upload files by unit, read uploaded files, browse them, or delete one file. You can send one file or all files in a unit directly to your chat.\n` +
           `• Assistant Representatives can use the same class tools. Notes files are sent directly in the private Class Portal chat.\n` +
           `• Reply *HELP* in any portal step for private, context-aware navigation help. The AI explains the screen and never performs portal actions.\n\n` +
           `Reply *0* to return to your dashboard or *99* to log out.`
@@ -555,7 +560,9 @@ async function handleInput(client, message, userId, text, userName, assistantCli
             updateSessionState,
             writeClassDB,
             sendRepDashboard,
-            sendStudentDashboard
+            sendStudentDashboard,
+            sendMainMenu,
+            isClassAdmin: isClassApproverId(userId)
         });
         if (notesHandled) return;
 
@@ -594,8 +601,18 @@ async function handleInput(client, message, userId, text, userName, assistantCli
                         `(Type *0* to go back)`
                     );
                 } 
+                else if (input === '3' && isClassApproverId(userId)) {
+                    const classes = Object.keys(db.classes || {});
+                    updateSessionState(userId, 'ADMIN_NOTES_CLASSES', {});
+                    let classList = `🛡️ *ADMIN NOTES REVIEW — CHOOSE A CLASS*\n━━━━━━━━━━━━━━━━━━\n`;
+                    classList += classes.length ? classes.map((cls, idx) => `${idx + 1}. ${cls}`).join('\n') : '\nNo classes are available.\n';
+                    classList += '\n\n0. 🔙 Back to Portal Menu';
+                    await message.reply(classList);
+                }
                 else {
-                    await message.reply('❌ Invalid choice. Reply with 1, 2, or 99 to exit.');
+                    await message.reply(isClassApproverId(userId)
+                        ? '❌ Invalid choice. Reply with 1, 2, 3, or 99 to exit.'
+                        : '❌ Invalid choice. Reply with 1, 2, or 99 to exit.');
                 }
                 break;
             }
@@ -985,7 +1002,7 @@ async function handleInput(client, message, userId, text, userName, assistantCli
                     );
                 } else if (input === '14') {
                     updateSessionState(userId, 'REP_NOTES_MENU', session.data);
-                    await message.reply('🗂️ *NOTES & MATERIALS*\n━━━━━━━━━━━━━━━━━━\n1. 📤 Upload a file\n2. 🗑️ Browse or delete files\n\n0. 🔙 Back to Dashboard');
+                    await message.reply('🗂️ *NOTES & MATERIALS*\n━━━━━━━━━━━━━━━━━━\n1. 📤 Upload a file\n2. 🗑️ Browse or delete files\n3. 📖 Read uploaded files\n\n0. 🔙 Back to Dashboard');
                 } else if (input === '15') {
                     await sendPortalGuide(message, userId, session, 'rep');
                  } else {
