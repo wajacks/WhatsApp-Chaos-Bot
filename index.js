@@ -50,7 +50,7 @@ const {
 // COMMANDS
 // ============================================================
 
-const { handleProfileCommand } = require('./src/commands/profile');
+const { handleProfileCommand, recordGameJoin } = require('./src/commands/profile');
 
 const {
     startWordleLobby,
@@ -316,6 +316,7 @@ function initializeChaosBot(options) {
         writeDB,
         resetEconomy,
         handleProfileCommand,
+        recordGameJoin,
         startWordleLobby,
         startWordleGame,
         joinLobby,

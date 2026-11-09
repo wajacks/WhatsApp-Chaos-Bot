@@ -49,7 +49,8 @@ function getUser(userId, userName = 'Unknown Player') {
             wordsSolved: 0,
             wordsAttempted: 0,
             totalStolen: 0,
-            lastDaily: 0
+            lastDaily: 0,
+            gameJoins: {}
         };
         writeDB(db);
     } else {
@@ -59,6 +60,10 @@ function getUser(userId, userName = 'Unknown Player') {
         if (db[userId].wordsSolved === undefined) { db[userId].wordsSolved = 0; updated = true; }
         if (db[userId].wordsAttempted === undefined) { db[userId].wordsAttempted = 0; updated = true; }
         if (db[userId].totalStolen === undefined) { db[userId].totalStolen = 0; updated = true; }
+        if (!db[userId].gameJoins || typeof db[userId].gameJoins !== 'object' || Array.isArray(db[userId].gameJoins)) {
+            db[userId].gameJoins = {};
+            updated = true;
+        }
         
         // Keep username updated
         if (userName !== 'Unknown Player' && db[userId].name !== userName) {

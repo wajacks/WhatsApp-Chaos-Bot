@@ -278,7 +278,7 @@ function registerMessageHandler(client, dependencies) {
                 }
 
                 // Route your standard portal menu input directly to the class state machine
-                await classHandler.handleInput(client, message, senderId, text, userName);
+                await classHandler.handleInput(client, message, senderId, text, userName, { ai, azureClient });
                 return; // CRITICAL: Stop execution for regular portal inputs
             }
         }

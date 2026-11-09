@@ -141,6 +141,45 @@ function getEconomyUserId(message, contact = null) {
     return getCanonicalJid(rawSender);
 }
 
+const GAME_PROFILE_LABELS = Object.freeze({
+    rebus: 'Country Rebus',
+    wordle: 'Wordle',
+    wordchain: 'Word Chain',
+    scramble: 'Scrambled Word',
+    wordforge: 'Word Forge',
+    numberrun: 'Number Run',
+    truthhunt: 'Truth Hunt',
+    mafia: 'Mafia'
+});
+
+function getMostJoinedGame(gameJoins = {}) {
+    const entries = Object.entries(gameJoins || {})
+        .filter(([game, count]) => GAME_PROFILE_LABELS[game] && Number(count) > 0)
+        .map(([game, count]) => ({ game, count: Number(count), label: GAME_PROFILE_LABELS[game] }));
+    if (!entries.length) return null;
+    const highestCount = Math.max(...entries.map(entry => entry.count));
+    const topGames = entries.filter(entry => entry.count === highestCount);
+    return {
+        label: topGames.map(entry => entry.label).join(' / '),
+        count: highestCount,
+        tied: topGames.length > 1
+    };
+}
+
+function recordGameJoin(userId, userName, gameKey) {
+    if (!userId || !GAME_PROFILE_LABELS[gameKey]) return false;
+    getUser(userId, userName || 'Unknown Player');
+    const db = readDB();
+    const user = db[userId];
+    if (!user) return false;
+    if (!user.gameJoins || typeof user.gameJoins !== 'object' || Array.isArray(user.gameJoins)) {
+        user.gameJoins = {};
+    }
+    user.gameJoins[gameKey] = (Number(user.gameJoins[gameKey]) || 0) + 1;
+    writeDB(db);
+    return user.gameJoins[gameKey];
+}
+
 async function handleProfileCommand(message, client) {
     const text = message.body.trim();
 
@@ -170,6 +209,8 @@ async function handleProfileCommand(message, client) {
         const assets =
             getUserAssets(senderId);
 
+        const mostJoinedGame = getMostJoinedGame(user.gameJoins);
+
         const response =
 `👑 *PLAYER PROFILE* 👑
 ━━━━━━━━━━━━━━━━━━
@@ -180,6 +221,7 @@ async function handleProfileCommand(message, client) {
 💵 *Dollars:* $${(user.coins || 0).toLocaleString()}
 ⚔️ *Wins/Losses:* ${user.wins || 0}W - ${user.losses || 0}L
 🔤 *Wordle Solves:* ${wordleSolved}
+🎮 *Most joined game:* ${mostJoinedGame ? `${mostJoinedGame.label} (${mostJoinedGame.count} lobbies${mostJoinedGame.tied ? ', tied' : ''})` : 'No games joined yet'}
 🚘 *Vehicle:* ${assets.car}
 🏠 *Residence:* ${assets.house}
 
@@ -317,5 +359,7 @@ async function handleProfileCommand(message, client) {
 
 module.exports = {
     handleProfileCommand,
-    getEconomyUserId
+    getEconomyUserId,
+    getMostJoinedGame,
+    recordGameJoin
 };
