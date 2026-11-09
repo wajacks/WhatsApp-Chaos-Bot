@@ -274,7 +274,7 @@ async function joinWordChain(message) {
             'Start one with `!wordchain`.'
         );
 
-        return;
+        return false;
     }
 
     if (game.state !== LOBBY_STATE) {
@@ -283,7 +283,7 @@ async function joinWordChain(message) {
             'You cannot join this match now.'
         );
 
-        return;
+        return false;
     }
 
     const alreadyJoined =
@@ -296,7 +296,7 @@ async function joinWordChain(message) {
             '⚠️ You are already in the Word Chain lobby.'
         );
 
-        return;
+        return false;
     }
 
     const contact =
@@ -317,6 +317,7 @@ async function joinWordChain(message) {
         `Players: *${game.players.length}*\n\n` +
         'Waiting for the host to use `!startwordchain`.'
     );
+    return true;
 }
 
 // ============================================================

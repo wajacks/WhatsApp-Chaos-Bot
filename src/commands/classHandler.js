@@ -1,8 +1,10 @@
 const crypto = require('crypto');
 const { readClassDB, writeClassDB, flushClassDB, classExists, isUserAlreadyRep } = require('../database/classdb');
-const { createSession, updateSessionState, getSession, endSession, getPortalMetrics, closeActiveRollCall, getEATDateKey } = require('../tools/classSession');
+const { createSession, updateSessionState, getSession, endSession, getPortalMetrics, closeActiveRollCall, getEATDateKey, getEATParts, getRollCallCheckInStatus } = require('../tools/classSession');
 const { timeToMinutes, minutesToTime, checkCollision } = require('../tools/timeHelper');
 const { hashSecret, verifySecret, generateAuthorizationCode, generateNumericOtp } = require('../utils/credentials');
+const { answerClassPortalNavigation } = require('../features/ai/classPortalNavigation');
+const { handleClassNotesInput, getNotesUnits } = require('./classNotes');
 
 // --- NEW: MARKETPLACE LIVE CHAT REGISTRY ---
 const activeMarketChats = new Map();
@@ -108,6 +110,23 @@ function trackClassNavigation(message, userId, input = null) {
 
     message.__classNavigationTracked = true;
     message.reply = async (...args) => {
+        const sessionBeforeReply = getSession(userId);
+        const bodyBeforeReply = getReplyText(args);
+        const inputIsHelp = /^(?:help|ai help|navigation help|\?)(?:\s|$)/i.test(String(input || '').trim());
+        if (sessionBeforeReply && !inputIsHelp && input !== '0' &&
+            /(?:invalid (?:choice|selection)|please (?:choose|enter)|not a valid)/i.test(bodyBeforeReply)) {
+            const previousFailure = sessionBeforeReply.navigationInvalidAttempt;
+            const count = previousFailure?.state === sessionBeforeReply.state ? previousFailure.count + 1 : 1;
+            sessionBeforeReply.navigationInvalidAttempt = count >= 2
+                ? null
+                : { state: sessionBeforeReply.state, count };
+            if (count >= 2 && typeof args[0] === 'string') {
+                args[0] += '\n\nNeed help with this step? Reply *HELP* for private navigation guidance.';
+            }
+        } else if (sessionBeforeReply && (inputIsHelp || input === '0')) {
+            sessionBeforeReply.navigationInvalidAttempt = null;
+        }
+
         const result = await originalReply(...args);
         const currentSession = getSession(userId);
         if (!currentSession) return result;
@@ -119,6 +138,7 @@ function trackClassNavigation(message, userId, input = null) {
         if (isNumberedMenu(body)) {
             currentSession.navigationMenus[currentState] = body;
             currentSession.pendingBackState = null;
+            currentSession.navigationInvalidAttempt = null;
             if (input === '0' && currentState !== stateAtInput) returnedToParentMenu = true;
             return result;
         }
@@ -384,8 +404,63 @@ async function sendMainMenu(message) {
   await message.reply(menu);
 }
 
+function getPortalStateDescription(state, role) {
+    const descriptions = {
+        MAIN_MENU: 'Class Portal entry menu: choose a class to log in, choose setup to create a portal if you are an authorized representative, or use 99 to exit.',
+        SELECT_CLASS: 'Choose a class from the numbered class list. Reply 0 to return to the portal entry menu.',
+        ENTER_CLASS_PASS: 'Enter the password for the selected class in this private chat. Never send the password to the AI. Reply 0 to choose another class.',
+        STUDENT_GATEWAY: 'Student sign-in screen: choose login for an existing account or registration for a new account. Reply 0 to return to the class list.',
+        REP_DASHBOARD: 'Representative dashboard: 1 timetable, 2 updates, 3 members and attendance, 4 issues, 5 audit logs, 6 open roll call, 7 close roll call, 8 deadlines, 9 study groups, 10 whisper inbox, 11 marketplace, 12 polls, 13 holiday mode, 14 notes and materials, 15 guide. Reply 0 to the portal entry menu.',
+        STUDENT_DASHBOARD: 'Student dashboard: 1 today’s classes, 2 full timetable, 3 deadlines, 4 updates, 5 classmates, 6 next class, 7 feedback, 8 attendance, 9 marketplace, 10 polls, 11 my week, 12 notes and materials, 13 guide. Reply 0 to the portal entry menu.',
+        STUDENT_VIEW_ONLY: 'This is a read-only student information screen. Reply 0 to return to the Student Dashboard.',
+        PORTAL_GUIDE_VIEW: 'This is the hardcoded role-specific Class Portal guide. Reply 0 to return to the dashboard.'
+    };
+    if (descriptions[state]) return descriptions[state];
+
+    const families = [
+        [/^REP_NOTES_/, 'Representative Notes Management: upload files under a unit, browse files, or confirm deletion of one file. Reply 0 to go back one step.'],
+        [/^STUDENT_NOTES_/, 'Student Notes & Materials: choose a unit, then choose one file or send all files for that unit. Reply 0 to go back one step.'],
+        [/^REP_TIMETABLE/, 'Representative timetable management and timetable setup. Reply 0 to go back one step.'],
+        [/^REP_UPDATES/, 'Representative class updates and announcements. Reply 0 to go back one step.'],
+        [/^REP_MEMBERS|^REP_ATTENDANCE/, 'Representative class member and attendance tools. Reply 0 to go back one step.'],
+        [/^REP_ISSUES/, 'Representative account issue and access recovery tools. Reply 0 to go back one step.'],
+        [/^REP_DEADLINES/, 'Representative deadlines and assessment tools. Reply 0 to go back one step.'],
+        [/^REP_SYNDICATE/, 'Representative study group and project tools. Reply 0 to go back one step.'],
+        [/^REP_WHISPER/, 'Representative anonymous feedback inbox. Reply 0 to go back one step.'],
+        [/^REP_POLL/, 'Representative poll management. Reply 0 to go back one step.'],
+        [/^REP_HOLIDAY/, 'Representative holiday mode settings. Reply 0 to go back one step.'],
+        [/^STUDENT_/, 'Student sign-in, registration, or student dashboard flow. Follow the prompt on screen; reply 0 to go back one step.'],
+        [/^REP_/, 'Representative setup or dashboard flow. Follow the prompt on screen; reply 0 to go back one step.'],
+        [/^CREATE_CLASS_/, 'Authorized Class Representative portal setup. Follow the prompt on screen; reply 0 to go back one step.']
+    ];
+    return families.find(([pattern]) => pattern.test(String(state || '')))?.[1]
+        || `${role === 'rep' ? 'Representative' : 'Student'} Class Portal step. Follow the prompt on screen; reply 0 to go back one step.`;
+}
+
+function sendPortalGuide(message, userId, session, role) {
+    const isRep = role === 'rep';
+    updateSessionState(userId, 'PORTAL_GUIDE_VIEW', { ...session.data, portalGuideRole: role });
+    const guide = isRep
+        ? `🧭 *CLASS REPRESENTATIVE GUIDE*\n━━━━━━━━━━━━━━━━━━\n\n` +
+          `• Use *1* to create or update the timetable and *2* to post class updates.\n` +
+          `• Use *6* to open a roll call manually and *7* to close one. Scheduled classes also get automatic student reminders and roll-call notices.\n` +
+          `• Use *8* for deadlines and *12* for class polls.\n` +
+          `• Use *14 — Notes & Materials* to upload files by unit, browse files, or delete one file. Students can request a file or send all files for a unit from their dashboard.\n` +
+          `• Assistant Representatives can use the same class tools. Notes files are sent directly in the private Class Portal chat.\n` +
+          `• Reply *HELP* in any portal step for private, context-aware navigation help. The AI explains the screen and never performs portal actions.\n\n` +
+          `Reply *0* to return to your dashboard or *99* to log out.`
+        : `🧭 *STUDENT PORTAL GUIDE*\n━━━━━━━━━━━━━━━━━━\n\n` +
+          `• Use *1* for today’s classes, *2* for the full timetable, and *3* for deadlines.\n` +
+          `• Use *8* to sign attendance while a roll call is open. You can also reply *PRESENT* in this private chat.\n` +
+          `• Use *12 — Notes & Materials*, choose a unit, then choose a file or reply *A* to receive all files for that unit directly in this chat.\n` +
+          `• Use *4* for class updates, *10* for polls, and *7* for private feedback to your representative.\n` +
+          `• Reply *HELP* in any portal step for private, context-aware navigation help. The AI explains the screen and cannot see your attendance or other class records.\n\n` +
+          `Reply *0* to return to your dashboard or *99* to log out.`;
+    return message.reply(guide);
+}
+
 // The core state router that processes raw text while logged in
-async function handleInput(client, message, userId, text, userName) {
+async function handleInput(client, message, userId, text, userName, assistantClients = {}) {
     const session = getSession(userId);
     if (!session) return;
 
@@ -434,8 +509,56 @@ async function handleInput(client, message, userId, text, userName) {
     }
     // ========================================================
 
+    const helpMatch = input.match(/^(?:help|ai help|navigation help)(?:\s+([\s\S]*))?$/i);
+    if (helpMatch || input === '?') {
+        const db = readClassDB();
+        const currentClass = session.data?.loggedInClass || session.data?.selectedClass;
+        const classData = db.classes?.[currentClass];
+        const isRep = session.data?.isMainRep === true || session.state.startsWith('REP_') ||
+            Boolean(classData && (userId === classData.repId || classData.assistantReps?.includes(userId)));
+        const role = isRep ? 'rep' : 'student';
+        const answer = await answerClassPortalNavigation({
+            ...assistantClients,
+            senderId: userId,
+            role,
+            state: session.state,
+            station: getPortalStateDescription(session.state, role),
+            question: helpMatch?.[1] || ''
+        });
+        await message.reply(`${answer}\n\nYou are still on this screen. Reply *0* to go back one step.`);
+        return;
+    }
+
     try {
         const db = readClassDB();
+
+        if (session.state === 'PORTAL_GUIDE_VIEW') {
+            if (input === '0') {
+                const role = session.data.portalGuideRole === 'rep' ? 'rep' : 'student';
+                const dashboard = role === 'rep' ? 'REP_DASHBOARD' : 'STUDENT_DASHBOARD';
+                updateSessionState(userId, dashboard, session.data);
+                if (role === 'rep') await sendRepDashboard(message, session.data.loggedInClass);
+                else await sendStudentDashboard(message, session.data.loggedInClass, session.data.studentName);
+            } else {
+                await message.reply('Reply *0* to return to your dashboard, or *HELP* to ask the navigation assistant a question.');
+            }
+            return;
+        }
+
+        const notesHandled = await handleClassNotesInput({
+            client,
+            message,
+            userId,
+            input,
+            session,
+            db,
+            updateSessionState,
+            writeClassDB,
+            sendRepDashboard,
+            sendStudentDashboard
+        });
+        if (notesHandled) return;
+
         switch (session.state) {
             case 'MAIN_MENU': {
                 if (input === '1') {
@@ -715,12 +838,12 @@ async function handleInput(client, message, userId, text, userName) {
                     // They are the Class Rep or Assistant Rep
                     updateSessionState(userId, 'REP_DASHBOARD', { loggedInClass: targetClass, isMainRep });
                     const roleTitle = isMainRep ? 'Class Rep' : 'Assistant Rep';
-                    await message.reply(`✅ *Access Granted*\nWelcome back, ${roleTitle} ${userName}!`);
+                    await message.reply(`✅ *Access Granted*\nWelcome back, ${roleTitle} ${userName}! Reply *HELP* whenever you want private guidance for the current portal screen.`);
                     await sendRepDashboard(message, targetClass);
                 } else {
                     // They are a Student
                     updateSessionState(userId, 'STUDENT_GATEWAY', { loggedInClass: targetClass });
-                    await message.reply(`✅ *Access Granted*\nWelcome to the ${targetClass} portal.`);
+                    await message.reply(`✅ *Access Granted*\nWelcome to the ${targetClass} portal. Reply *HELP* whenever you want private guidance for the current screen.`);
                     await sendStudentGateway(message, targetClass);
                 }
                 break;
@@ -765,7 +888,8 @@ async function handleInput(client, message, userId, text, userName) {
                 } else if (input === '6') {
                     // Start Roll Call
                     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-                    const todayIdx = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Nairobi"})).getDay();
+                    const todayIdx = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+                        .indexOf(getEATParts().weekday.toLowerCase());
                     const todayStr = days[todayIdx];
                     const todayClasses = db.classes[session.data.loggedInClass].timetable[todayStr];
 
@@ -791,18 +915,24 @@ async function handleInput(client, message, userId, text, userName) {
                         return;
                     }
 
-                    const attendees = Object.values(activeRC.attendees || {});
-                    let report = `🛑 *ROLL CALL CLOSED*\n━━━━━━━━━━━━━━━━━━\n📚 Unit: *${activeRC.unit}*\n📅 Date: *${activeRC.date}*\n👥 Total Present: *${attendees.length}*\n━━━━━━━━━━━━━━━━━━\n\n`;
-                    
-                    if (attendees.length === 0) {
-                        report += `No students marked themselves present. 📭`;
+                    const closedRollCall = closeActiveRollCall(db.classes[session.data.loggedInClass]);
+                    const record = closedRollCall?.attendanceRecord;
+                    const attendance = record?.attendance || [];
+                    const onTime = attendance.filter(student => student.status === 'PRESENT').length;
+                    const late = attendance.filter(student => student.status === 'LATE').length;
+                    const absent = attendance.filter(student => student.status === 'ABSENT').length;
+                    let report = `🛑 *ROLL CALL CLOSED*\n━━━━━━━━━━━━━━━━━━\n📚 Unit: *${activeRC.unit}*\n📅 Date: *${activeRC.date}*\n` +
+                        `✅ Present on time: *${onTime}*\n⏰ Late: *${late}*\n❌ Absent: *${absent}*\n` +
+                        `⚠️ Failed student DMs: *${Number(record?.deliveryFailureCount) || 0}*\n━━━━━━━━━━━━━━━━━━\n\n`;
+                    if (!attendance.length) {
+                        report += 'No students were on the register. 📭';
                     } else {
-                        attendees.forEach((student, idx) => {
-                            report += `${idx + 1}. ${student.name} (${student.regNo}) - [${student.timestamp}]\n`;
+                        attendance.forEach((student, idx) => {
+                            const icon = student.status === 'PRESENT' ? '✅' : student.status === 'LATE' ? '⏰' : '❌';
+                            report += `${idx + 1}. ${icon} ${student.name} (${student.admission || 'No admission number'}) — ${student.status}` +
+                                (student.checkInTime ? ` [${student.checkInTime}]` : '') + '\n';
                         });
                     }
-
-                    closeActiveRollCall(db.classes[session.data.loggedInClass]);
                     writeClassDB(db);
 
                     await message.reply(report + `\n\n(Type *0* to go back to Dashboard)`);
@@ -853,8 +983,13 @@ async function handleInput(client, message, userId, text, userName) {
                         `2. 🔴 Turn Holiday Mode OFF\n\n` +
                         `0. 🔙 Back to Dashboard`
                     );
+                } else if (input === '14') {
+                    updateSessionState(userId, 'REP_NOTES_MENU', session.data);
+                    await message.reply('🗂️ *NOTES & MATERIALS*\n━━━━━━━━━━━━━━━━━━\n1. 📤 Upload a file\n2. 🗑️ Browse or delete files\n\n0. 🔙 Back to Dashboard');
+                } else if (input === '15') {
+                    await sendPortalGuide(message, userId, session, 'rep');
                  } else {
-                    await message.reply(`❌ Invalid choice. Type 1-13, 0 to go back, or 99 to exit.`);
+                    await message.reply(`❌ Invalid choice. Type 1-15, 0 to go back, or 99 to exit.`);
                 } 
                 break;
             }
@@ -1176,6 +1311,12 @@ async function handleInput(client, message, userId, text, userName) {
                     }
                 }
 
+                const activeRollCall = db.classes[session.data.loggedInClass].activeRollCall;
+                if (activeRollCall?.unit === targetUnit) {
+                    activeRollCall.deliveryFailureCount = Math.max(0, memberIds.length - sentCount);
+                    writeClassDB(db);
+                }
+
                 updateSessionState(userId, 'REP_DASHBOARD', session.data);
                 await message.reply(`✅ *BLAST COMPLETE*\n\nSuccessfully sent roll call DMs to ${sentCount} students.\n\nSelect Option *7* in your dashboard to view the list and close the attendance.`);
                 await sendRepDashboard(message, session.data.loggedInClass);
@@ -1412,8 +1553,7 @@ async function handleInput(client, message, userId, text, userName) {
                 if (!classData.exceptions) classData.exceptions = {};
 
                 // Get exactly today's date in EAT (Mombasa time) for Temporary tracking
-                const todayEAT = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Nairobi"}));
-                const dateKey = todayEAT.toISOString().split('T')[0]; 
+                const dateKey = getEATDateKey();
 
                 if (session.data.editType === 'CANCEL') {
                     if (isTemp) {
@@ -1528,26 +1668,27 @@ async function handleInput(client, message, userId, text, userName) {
                 const newEndTimeStr = minutesToTime(newEndMins);
 
                 // Mombasa Base Date Math
-                const todayEAT = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Nairobi"}));
+                const todayDateKey = getEATDateKey();
+                const [todayYear, todayMonth, todayDay] = todayDateKey.split('-').map(Number);
+                const todayUtc = new Date(Date.UTC(todayYear, todayMonth - 1, todayDay));
                 
                 if (isTemp) {
                     if (!classData.exceptions) classData.exceptions = {};
                     
                     // 1. Cancel the original class for TODAY
-                    const dateKey = todayEAT.toISOString().split('T')[0]; 
+                    const dateKey = todayDateKey;
                     if (!classData.exceptions[dateKey]) classData.exceptions[dateKey] = {};
                     classData.exceptions[dateKey][target.unit] = { status: 'CANCELLED' };
 
                     // 2. Calculate the future date of the Make-up class
                     const daysMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-                    const currentDayIdx = todayEAT.getDay(); 
+                    const currentDayIdx = todayUtc.getUTCDay();
                     const targetDayIdx = daysMap.indexOf(newDay.toLowerCase());
                     
                     let daysAhead = targetDayIdx - currentDayIdx;
                     if (daysAhead < 0) daysAhead += 7; // If target day passed, it means next week
                     
-                    const targetDate = new Date(todayEAT);
-                    targetDate.setDate(todayEAT.getDate() + daysAhead); // JS handles month-wrapping automatically
+                    const targetDate = new Date(Date.UTC(todayYear, todayMonth - 1, todayDay + daysAhead));
                     const targetDateKey = targetDate.toISOString().split('T')[0];
 
                     // 3. Inject the "Ghost Class" into that future date
@@ -3523,7 +3664,8 @@ async function handleInput(client, message, userId, text, userName) {
                 if (input === '1') {
                     // View Today's Timetable
                     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-                    const todayIdx = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Nairobi"})).getDay();
+                    const todayIdx = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+                        .indexOf(getEATParts().weekday.toLowerCase());
                     const todayStr = days[todayIdx];
                     const todayClasses = sDb.timetable[todayStr];
                     
@@ -3637,9 +3779,8 @@ async function handleInput(client, message, userId, text, userName) {
                     await message.reply(cmStr + `\n(Type *0* to go back)`);
                 } else if (input === '6') {
                     // ⏱️ THE CHRONOS ENGINE
-                    const currentEAT = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Nairobi"}));
-                    const daysList = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-                    const todayStr = daysList[currentEAT.getDay()];
+                    const { weekday, currentMinutes } = getEATParts();
+                    const todayStr = weekday.toLowerCase();
                     const todayClasses = sDb.timetable[todayStr] || [];
 
                     if (todayClasses.length === 0) {
@@ -3647,7 +3788,7 @@ async function handleInput(client, message, userId, text, userName) {
                         return;
                     }
 
-                    const currentMins = (currentEAT.getHours() * 60) + currentEAT.getMinutes();
+                    const currentMins = currentMinutes;
                     let nextClass = null;
                     let minDiff = Infinity;
 
@@ -3698,6 +3839,8 @@ async function handleInput(client, message, userId, text, userName) {
                         return;
                     }
 
+                    const checkedInAt = Date.now();
+                    const attendanceStatus = getRollCallCheckInStatus(sDb.activeRollCall, checkedInAt);
                     studentData.attendedClasses = (studentData.attendedClasses || 0) + 1;
                     studentData.lastSigned = sDb.activeRollCall.dateKey || sDb.activeRollCall.date;
                     // Push students to the Rep's active register
@@ -3705,12 +3848,13 @@ async function handleInput(client, message, userId, text, userName) {
                         name: studentData.name,
                         regNo: studentData.admission,
                         timestamp: new Date().toLocaleTimeString("en-US", {timeZone: "Africa/Nairobi"}),
-                        checkedInAt: Date.now(),
-                        status: 'PRESENT'
+                        checkedInAt,
+                        status: attendanceStatus
                     };
                     writeClassDB(db);
 
-                    await message.reply(`✅ *ATTENDANCE LOGGED*\nYour presence has been recorded in the Ghost Tracker.\n\n(Type *0* to go back)`);
+                    const attendanceLabel = attendanceStatus === 'LATE' ? '⏰ LATE' : '✅ PRESENT';
+                    await message.reply(`${attendanceStatus === 'LATE' ? '⏰' : '✅'} *ATTENDANCE LOGGED*\nYour ${attendanceStatus === 'LATE' ? 'late arrival' : 'presence'} has been recorded in the Ghost Tracker as *${attendanceLabel}*.\n\n(Type *0* to go back)`);
                 } else if (input === '9') {
                     // Enter Hustle Board
                     if (!sDb.marketplace) { sDb.marketplace = []; writeClassDB(db); }
@@ -3791,8 +3935,17 @@ async function handleInput(client, message, userId, text, userName) {
                     }
                     updateSessionState(userId, 'STUDENT_VIEW_ONLY', session.data);
                     await message.reply(weekText + '\n\n(Type *0* to go back)');
+                } else if (input === '12') {
+                    const units = getNotesUnits(sDb);
+                    updateSessionState(userId, 'STUDENT_NOTES_UNITS', session.data);
+                    let noteMenu = `📚 *NOTES & MATERIALS*\n━━━━━━━━━━━━━━━━━━\n`;
+                    noteMenu += units.length ? units.map((unit, index) => `${index + 1}. ${unit}`).join('\n') : '\nNo files have been shared with your class yet.\n';
+                    noteMenu += '\n\n0. 🔙 Back to Dashboard';
+                    await message.reply(noteMenu);
+                } else if (input === '13') {
+                    await sendPortalGuide(message, userId, session, 'student');
                  } else {
-                    await message.reply(`❌ Invalid choice. Type 1-11, 0 to go back, or 99 to exit.`);
+                    await message.reply(`❌ Invalid choice. Type 1-13, 0 to go back, or 99 to exit.`);
                 }
                 break;
             }
@@ -3840,16 +3993,9 @@ async function handleInput(client, message, userId, text, userName) {
 
 // --- LIVE RADAR ENGINE ---
 function getCurrentClassStatus(classData) {
-    const currentEAT = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Nairobi"}));
-    const daysList = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const todayStr = daysList[currentEAT.getDay()];
-    const currentMins = (currentEAT.getHours() * 60) + currentEAT.getMinutes();
-    
-    // Get date key for temporary exceptions (e.g., 2026-09-23)
-    const y = currentEAT.getFullYear();
-    const m = String(currentEAT.getMonth() + 1).padStart(2, '0');
-    const d = String(currentEAT.getDate()).padStart(2, '0');
-    const dateKey = `${y}-${m}-${d}`;
+    const { weekday, currentMinutes, dateKey } = getEATParts();
+    const todayStr = weekday.toLowerCase();
+    const currentMins = currentMinutes;
 
     const todayClasses = classData.timetable?.[todayStr] || [];
     const todayExceptions = classData.exceptions?.[dateKey] || {};
@@ -3945,6 +4091,9 @@ async function sendRepDashboard(message, className) {
   │🛒 \`11\` ☞『_*Hustle Board (Market)*_』
   │📊 \`12\` ☞『_*Manage Polls*_』
   │🌴 \`13\` ☞『_*Toggle Holiday Mode*_』
+  │📚 \`14\` ☞『_*Notes & Materials*_』
+  │🧭 \`15\` ☞『_*Tutorial / Guide*_』
+  │Reply *HELP* for navigation help
   │🔙 \`0\` ☞『_*Main Menu*_』
   │🚪 \`99\` ☞『_*Logout*_』
   │
@@ -3997,6 +4146,9 @@ async function sendStudentDashboard(message, className, studentName) {
   │🛒 \`9\` ☞『_*Hustle Board (${marketCount} Active)*_』
   │📊 \`10\` ☞『_*View Polls (${activePollsCount} Active)*_』
   │🗓️ \`11\` ☞『_*My Week*_』
+  │📚 \`12\` ☞『_*Notes & Materials*_』
+  │🧭 \`13\` ☞『_*Tutorial / Guide*_』
+  │Reply *HELP* for navigation help
   │🔙 \`0\` ☞『_*Main Menu*_』
   │🚪 \`99\` ☞『_*Logout*_』
   │
@@ -4079,12 +4231,14 @@ async function handleAttendance(message, userId, client) {
     }
 
     // 4. Mark them present
+    const checkedInAt = Date.now();
+    const attendanceStatus = getRollCallCheckInStatus(activeRC, checkedInAt);
     activeRC.attendees[memberId] = {
         name: studentData.name,
         regNo: studentData.admission,
         timestamp: new Date().toLocaleTimeString("en-US", {timeZone: "Africa/Nairobi"}),
-        checkedInAt: Date.now(),
-        status: 'PRESENT'
+        checkedInAt,
+        status: attendanceStatus
     };
 
     // Update their Ghost Tracker tally
@@ -4093,7 +4247,8 @@ async function handleAttendance(message, userId, client) {
 
     writeClassDB(db);
 
-    await message.reply(`✅ *ATTENDANCE CONFIRMED*\n\nName: *${studentData.name}*\nUnit: *${activeRC.unit}*\nStatus: *PRESENT* 🟢`);
+    const statusLabel = attendanceStatus === 'LATE' ? 'LATE ⏰' : 'PRESENT 🟢';
+    await message.reply(`${attendanceStatus === 'LATE' ? '⏰' : '✅'} *ATTENDANCE CONFIRMED*\n\nName: *${studentData.name}*\nUnit: *${activeRC.unit}*\nStatus: *${statusLabel}*`);
     return true;
 }
 

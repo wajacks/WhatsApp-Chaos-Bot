@@ -1,4 +1,8 @@
 // Dispatches command messages and active-game inputs in the original order.
+const { beginGamePicker, resolveGamePickerInput, clearGamePicker } = require('../games/gamePicker');
+const { openSelectedGame, startActiveGame, stopActiveGame } = require('../games/gameActions');
+const { getActiveGame, recordGameParticipant } = require('../games/gameRegistry');
+
 function createCommandRouter(dependencies) {
     const {
             baseDir,
@@ -140,6 +144,56 @@ function createCommandRouter(dependencies) {
             lowerText,
             isGroup
         } = context;
+
+        if (lowerText === '!play') {
+            clearGamePicker(chatId, senderId);
+            if (!isGroup) {
+                await message.reply('🎮 Use !play in a group chat to open a game lobby.');
+                return true;
+            }
+            await message.reply(beginGamePicker(chatId, senderId));
+            return true;
+        }
+
+        const gamePick = resolveGamePickerInput(chatId, senderId, text);
+        if (gamePick.status === 'expired') {
+            await message.reply('⌛ That game picker expired. Type !play to open it again.');
+            return true;
+        }
+        if (gamePick.status === 'cancelled') {
+            await message.reply('🎮 Game selection cancelled. Type !play whenever you want to choose a game.');
+            return true;
+        }
+        if (gamePick.status === 'invalid') {
+            await message.reply('❌ Choose a game number from the list, or reply 0 to cancel.');
+            return true;
+        }
+        if (gamePick.status === 'selected') {
+            await openSelectedGame(gamePick.game.key, context, dependencies);
+            return true;
+        }
+
+        if (lowerText === '!startgame' || lowerText === '!stopgame') {
+            if (!isGroup) {
+                await message.reply('🎮 Use game lobby controls in the group where the lobby was opened.');
+                return true;
+            }
+            if (lowerText === '!startgame') await startActiveGame(context, dependencies);
+            else await stopActiveGame(context, dependencies);
+            return true;
+        }
+
+        const recordJoinedGame = (gameKey, response) => {
+            const responseText = typeof response === 'string' ? response.toLowerCase() : '';
+            const successfulResponse = response === true ||
+                (/(?:\bjoined\b|\bregistered successfully\b)/.test(responseText) &&
+                    !/already|not (?:open|in)|no .*lobby|failed|cannot|can't/.test(responseText));
+            if (!successfulResponse || getActiveGame(chatId) !== gameKey) return;
+            const userId = economyUserId || senderId;
+            if (recordGameParticipant(chatId, gameKey, userId) && typeof dependencies.recordGameJoin === 'function') {
+                dependencies.recordGameJoin(userId, userName, gameKey);
+            }
+        };
 
         // ====================================================
                 // MENU
@@ -461,6 +515,7 @@ function createCommandRouter(dependencies) {
                         chatId, senderId, userName, client, [message.author, senderContact]
                     );
                     await message.reply(response);
+                    recordJoinedGame('wordforge', response);
                     return true;
                 }
         
@@ -490,7 +545,9 @@ function createCommandRouter(dependencies) {
                 }
 
                 if (lowerText === '!joinnumberrun') {
-                    await message.reply(joinNumberRunLobby(chatId, senderId, userName));
+                    const response = joinNumberRunLobby(chatId, senderId, userName);
+                    await message.reply(response);
+                    recordJoinedGame('numberrun', response);
                     return true;
                 }
 
@@ -514,7 +571,9 @@ function createCommandRouter(dependencies) {
                 }
 
                 if (lowerText === '!jointruth') {
-                    await message.reply(joinTruthHuntLobby(chatId, senderId, userName));
+                    const response = joinTruthHuntLobby(chatId, senderId, userName);
+                    await message.reply(response);
+                    recordJoinedGame('truthhunt', response);
                     return true;
                 }
 
@@ -539,7 +598,8 @@ function createCommandRouter(dependencies) {
                 }
         
                 if (lowerText === '!wjoin') {
-                    await joinWordChain(message);
+                    const joined = await joinWordChain(message);
+                    recordJoinedGame('wordchain', joined);
                     return true;
                 }
         
@@ -584,7 +644,9 @@ function createCommandRouter(dependencies) {
                 }
         
                 if (lowerText === '!joinscramble') {
-                    await message.reply(joinScrambleLobby(chatId, senderId, userName));
+                    const response = joinScrambleLobby(chatId, senderId, userName);
+                    await message.reply(response);
+                    recordJoinedGame('scramble', response);
                     return true;
                 }
         
@@ -634,6 +696,7 @@ function createCommandRouter(dependencies) {
                     if (mafiaResponse) {
                         await message.reply(mafiaResponse);
                     }
+                    recordJoinedGame('mafia', mafiaResponse);
                     return true;
                 }
         
@@ -652,6 +715,7 @@ function createCommandRouter(dependencies) {
                 if (lowerText === '!join') {
                     const wordleResponse = joinLobby(chatId, senderId, userName);
                     await message.reply(wordleResponse);
+                    recordJoinedGame('wordle', wordleResponse);
                     return true;
                 }
         
@@ -725,6 +789,7 @@ function createCommandRouter(dependencies) {
                 if (lowerText === '!joinrebus' || lowerText === '!rjoin') {
                     const joinRes = joinRebusLobby(chatId, senderId, userName);
                     await message.reply(joinRes);
+                    recordJoinedGame('rebus', joinRes);
                     return true;
                 }
         
