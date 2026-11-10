@@ -5,6 +5,30 @@ const { timeToMinutes, minutesToTime, checkCollision } = require('../tools/timeH
 const { hashSecret, verifySecret, generateAuthorizationCode, generateNumericOtp } = require('../utils/credentials');
 const { answerClassPortalNavigation } = require('../features/ai/classPortalNavigation');
 const { handleClassNotesInput, getNotesUnits } = require('./classNotes');
+const {
+    DELIVERY_MODES,
+    cleanDeliveryValue,
+    formatDeliveryDetails,
+    isValidMeetingLink,
+    getTimetableSlotIdentity,
+    updateTimetableSlotDetails
+} = require('../tools/classDelivery');
+
+function getTimetableManagementMenu() {
+    return `📅 *TIMETABLE MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Current Timetable\n2. 🛠️ Run Timetable Wizard (Create new Timetable)\n3. Modify/Cancel Classes\n4. Set/change Physical or Online details\n\n0. 🔙 Back to Dashboard`;
+}
+
+function getTimetableDetailsDayMenu() {
+    return `📍 *SET CLASS DELIVERY DETAILS*\n━━━━━━━━━━━━━━━━━━\nChoose the day of the class:\n\n1. Monday\n2. Tuesday\n3. Wednesday\n4. Thursday\n5. Friday\n6. Saturday\n7. Sunday\n\n0. 🔙 Back to Timetable Management`;
+}
+
+function saveTimetableDeliveryDetails(className, day, identity, details) {
+    const db = readClassDB();
+    const classData = db.classes?.[className];
+    if (!classData || !updateTimetableSlotDetails(classData, day, identity, details)) return false;
+    writeClassDB(db);
+    return true;
+}
 
 // --- NEW: MARKETPLACE LIVE CHAT REGISTRY ---
 const activeMarketChats = new Map();
@@ -425,7 +449,7 @@ function getPortalStateDescription(state, role) {
         [/^REP_NOTES_/, 'Representative Notes Management: upload files under a unit, browse or delete files, and read uploaded files directly. Reply 0 to go back one step.'],
         [/^ADMIN_NOTES_/, 'Administrator notes review: choose a class, choose a unit, then receive one file or all files in the selected unit. Reply 0 to go back one step.'],
         [/^STUDENT_NOTES_/, 'Student Notes & Materials: choose a unit, then choose one file or send all files for that unit. Reply 0 to go back one step.'],
-        [/^REP_TIMETABLE/, 'Representative timetable management and timetable setup. Reply 0 to go back one step.'],
+        [/^REP_TIMETABLE/, 'Representative timetable management: view/build the timetable, modify or cancel classes, and use option 4 to add or change Physical room details or Online platform, meeting link, and optional password. These details appear in private Class Portal views and student DMs. Reply 0 to go back one step.'],
         [/^REP_UPDATES/, 'Representative class updates and announcements. Reply 0 to go back one step.'],
         [/^REP_MEMBERS|^REP_ATTENDANCE/, 'Representative class member and attendance tools. Reply 0 to go back one step.'],
         [/^REP_ISSUES/, 'Representative account issue and access recovery tools. Reply 0 to go back one step.'],
@@ -447,7 +471,7 @@ function sendPortalGuide(message, userId, session, role) {
     updateSessionState(userId, 'PORTAL_GUIDE_VIEW', { ...session.data, portalGuideRole: role });
     const guide = isRep
         ? `🧭 *CLASS REPRESENTATIVE GUIDE*\n━━━━━━━━━━━━━━━━━━\n\n` +
-          `• Use *1* to create or update the timetable and *2* to post class updates.\n` +
+          `• Use *1* to create or update the timetable. In timetable management, option *4* adds Physical room details or Online meeting details to a scheduled class.\n` +
           `• Use *6* to open a roll call manually and *7* to close one. Scheduled classes also get automatic student reminders and roll-call notices.\n` +
           `• Use *8* for deadlines and *12* for class polls.\n` +
           `• Use *14 — Notes & Materials* to upload files by unit, read uploaded files, browse them, or delete one file. You can send one file or all files in a unit directly to your chat.\n` +
@@ -877,7 +901,7 @@ async function handleInput(client, message, userId, text, userName, assistantCli
                 }
                 if (input === '1') {
                     updateSessionState(userId, 'REP_TIMETABLE_MENU', session.data);
-                    await message.reply(`📅 *TIMETABLE MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Current Timetable\n2. 🛠️ Run Timetable Wizard (Create new Timetable)\n3. Modify/Cancel Classes\n\n0. 🔙 Back to Dashboard`);
+                    await message.reply(getTimetableManagementMenu());
                 } else if (input === '2') {
                     updateSessionState(userId, 'REP_UPDATES_MENU', session.data);
                     await message.reply(`📢 *UPDATES MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Updates\n2. ✍️ Post New Update\n3. 🗑️ Clear All Updates\n4. 🔔 Remind Update\n\n0. 🔙 Back to Dashboard`);
@@ -917,7 +941,8 @@ async function handleInput(client, message, userId, text, userName, assistantCli
 
                     let rcStr = `✅ *SELECT CLASS FOR ROLL CALL*\n━━━━━━━━━━━━━━━━━━\nToday is *${todayStr.toUpperCase()}*.\n\n`;
                     todayClasses.forEach((c, idx) => {
-                        rcStr += `${idx + 1}. *${c.unit}* (@ ${c.time})\n`;
+                        const delivery = formatDeliveryDetails(c);
+                        rcStr += `${idx + 1}. *${c.unit}* (@ ${c.time})${delivery ? ` · ${delivery}` : ''}\n`;
                     });
                     rcStr += `\n*Reply with the number of the class:*\n(Type *0* to cancel)`;
 
@@ -1282,7 +1307,8 @@ async function handleInput(client, message, userId, text, userName, assistantCli
                     return;
                 }
 
-                const targetUnit = todayClasses[selectedIdx].unit;
+                const selectedClass = todayClasses[selectedIdx];
+                const targetUnit = selectedClass.unit;
                 const members = db.classes[session.data.loggedInClass].members;
                 const memberIds = Object.keys(members);
 
@@ -1321,7 +1347,8 @@ async function handleInput(client, message, userId, text, userName, assistantCli
                     const student = members[mId];
                     try {
                         // Custom prompt asking if they are present for that particular class
-                        await client.sendMessage(student.phoneId, `📢 *URGENT: ROLL CALL*\n\n🏫 Class: *${session.data.loggedInClass}*\n\nAre you present for *${targetUnit}*?\n\nReply directly to this message with the word:\n*PRESENT*`);
+                        const delivery = formatDeliveryDetails(selectedClass);
+                        await client.sendMessage(student.phoneId, `📢 *URGENT: ROLL CALL*\n\n🏫 Class: *${session.data.loggedInClass}*\n${delivery ? `📍 ${delivery}\n\n` : '\n'}Are you present for *${targetUnit}*?\n\nReply directly to this message with the word:\n*PRESENT*`);
                         sentCount++;
                     } catch (e) {
                         console.warn(`[CLASS PORTAL] Could not send roll call DM to ${student.name}`);
@@ -1356,7 +1383,10 @@ async function handleInput(client, message, userId, text, userName, assistantCli
                         if (!tt[d] || tt[d].length === 0) {
                             ttStr += `  Free Day 🏖️\n`;
                         } else {
-                            tt[d].forEach(c => ttStr += `  ▪️ ${c.unit} @ ${c.time}\n`);
+                            tt[d].forEach(c => {
+                                const delivery = formatDeliveryDetails(c);
+                                ttStr += `  ▪️ ${c.unit} @ ${c.time}${delivery ? ` · ${delivery}` : ''}\n`;
+                            });
                         }
                         ttStr += `\n`;
                     });
@@ -1386,6 +1416,9 @@ async function handleInput(client, message, userId, text, userName, assistantCli
                         `1. Monday\n2. Tuesday\n3. Wednesday\n4. Thursday\n5. Friday\n6. Saturday\n7. Sunday\n\n` +
                         `*Reply with a number (1-7):*\n(Type *0* to go back)`
                     );
+                } else if (input === '4') {
+                    updateSessionState(userId, 'REP_TIMETABLE_DETAILS_DAY', session.data);
+                    await message.reply(getTimetableDetailsDayMenu());
                 }
                 break;
             }
@@ -1393,7 +1426,182 @@ async function handleInput(client, message, userId, text, userName, assistantCli
             case 'REP_TIMETABLE_VIEW': {
                 if (input === '0') {
                     updateSessionState(userId, 'REP_TIMETABLE_MENU', session.data);
-                    await message.reply(`📅 *TIMETABLE MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Current Timetable\n2. 🛠️ Run Timetable Wizard (Create new Timetable)\n3. Modify/Cancel Classes\n\n0. 🔙 Back to Dashboard`);
+                    await message.reply(getTimetableManagementMenu());
+                }
+                break;
+            }
+
+            case 'REP_TIMETABLE_DETAILS_DAY': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_TIMETABLE_MENU', session.data);
+                    await message.reply(getTimetableManagementMenu());
+                    return;
+                }
+                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                const dayIndex = Number(input) - 1;
+                if (!Number.isInteger(dayIndex) || dayIndex < 0 || dayIndex >= days.length) {
+                    await message.reply('❌ Reply with a day number from 1 to 7, or 0 to go back.');
+                    return;
+                }
+                const selectedDay = days[dayIndex];
+                const daySchedule = db.classes[session.data.loggedInClass].timetable?.[selectedDay.toLowerCase()] || [];
+                if (!daySchedule.length) {
+                    await message.reply(`📭 No classes are scheduled for ${selectedDay}. Choose another day, or reply 0 to go back.`);
+                    return;
+                }
+                let text = `📅 *${selectedDay.toUpperCase()} — CHOOSE A CLASS*\n━━━━━━━━━━━━━━━━━━\n`;
+                daySchedule.forEach((slot, index) => {
+                    const delivery = formatDeliveryDetails(slot);
+                    text += `${index + 1}. ${slot.unit} @ ${slot.time}${delivery ? ` · ${delivery}` : ''}\n`;
+                });
+                text += '\n0. 🔙 Back to day selection';
+                updateSessionState(userId, 'REP_TIMETABLE_DETAILS_CLASS', {
+                    ...session.data,
+                    detailsDay: selectedDay,
+                    detailsDaySchedule: daySchedule
+                });
+                await message.reply(text);
+                break;
+            }
+
+            case 'REP_TIMETABLE_DETAILS_CLASS': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_TIMETABLE_DETAILS_DAY', session.data);
+                    await message.reply(getTimetableDetailsDayMenu());
+                    return;
+                }
+                const index = Number(input) - 1;
+                const targetSlot = session.data.detailsDaySchedule?.[index];
+                if (!Number.isInteger(index) || !targetSlot) {
+                    await message.reply('❌ Choose one of the listed classes, or reply 0 to go back.');
+                    return;
+                }
+                const nextData = {
+                    ...session.data,
+                    detailsSlotIdentity: getTimetableSlotIdentity(targetSlot),
+                    detailsSlotLabel: `${targetSlot.unit} @ ${targetSlot.time}`
+                };
+                updateSessionState(userId, 'REP_TIMETABLE_DETAILS_MODE', nextData);
+                await message.reply(`📍 *${nextData.detailsSlotLabel}*\n\n1. Physical\n2. Online\n\n0. 🔙 Back to class selection`);
+                break;
+            }
+
+            case 'REP_TIMETABLE_DETAILS_MODE': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_TIMETABLE_DETAILS_CLASS', session.data);
+                    const slots = session.data.detailsDaySchedule || [];
+                    let text = `📅 *${String(session.data.detailsDay).toUpperCase()} — CHOOSE A CLASS*\n━━━━━━━━━━━━━━━━━━\n`;
+                    slots.forEach((slot, index) => {
+                        const delivery = formatDeliveryDetails(slot);
+                        text += `${index + 1}. ${slot.unit} @ ${slot.time}${delivery ? ` · ${delivery}` : ''}\n`;
+                    });
+                    await message.reply(`${text}\n0. 🔙 Back to day selection`);
+                    return;
+                }
+                if (input === '1') {
+                    updateSessionState(userId, 'REP_TIMETABLE_DETAILS_ROOM', {
+                        ...session.data,
+                        detailsDraft: { deliveryMode: DELIVERY_MODES.PHYSICAL }
+                    });
+                    await message.reply(`🏫 Enter the building and room (for example, *Block B, Room 12*). If not assigned yet, enter *TBA*.\n\n0. 🔙 Back to Physical/Online`);
+                } else if (input === '2') {
+                    updateSessionState(userId, 'REP_TIMETABLE_DETAILS_PLATFORM', {
+                        ...session.data,
+                        detailsDraft: { deliveryMode: DELIVERY_MODES.ONLINE }
+                    });
+                    await message.reply(`💻 Enter the platform (for example, *Zoom* or *Google Meet*). Reply *SKIP* if no platform name is needed.\n\n0. 🔙 Back to Physical/Online`);
+                } else {
+                    await message.reply('❌ Choose 1 for Physical or 2 for Online, or 0 to go back.');
+                }
+                break;
+            }
+
+            case 'REP_TIMETABLE_DETAILS_ROOM': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_TIMETABLE_DETAILS_MODE', session.data);
+                    await message.reply(`📍 *${session.data.detailsSlotLabel}*\n\n1. Physical\n2. Online\n\n0. 🔙 Back to class selection`);
+                    return;
+                }
+                const room = cleanDeliveryValue(input, 80);
+                if (!room) {
+                    await message.reply('❌ Enter the room/building, or use *TBA*. Reply 0 to go back.');
+                    return;
+                }
+                try {
+                    const saved = saveTimetableDeliveryDetails(
+                        session.data.loggedInClass,
+                        session.data.detailsDay,
+                        session.data.detailsSlotIdentity,
+                        { ...session.data.detailsDraft, room }
+                    );
+                    if (!saved) throw new Error('That timetable slot changed while you were editing. Please select it again.');
+                    updateSessionState(userId, 'REP_TIMETABLE_MENU', session.data);
+                    await message.reply(`✅ Saved delivery details for *${session.data.detailsSlotLabel}*:\n📍 ${formatDeliveryDetails({ deliveryMode: DELIVERY_MODES.PHYSICAL, room })}\n\n${getTimetableManagementMenu()}`);
+                } catch (error) {
+                    await message.reply(`❌ ${error.message}\n\nReply with the room, or 0 to go back.`);
+                }
+                break;
+            }
+
+            case 'REP_TIMETABLE_DETAILS_PLATFORM': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_TIMETABLE_DETAILS_MODE', session.data);
+                    await message.reply(`📍 *${session.data.detailsSlotLabel}*\n\n1. Physical\n2. Online\n\n0. 🔙 Back to class selection`);
+                    return;
+                }
+                const platform = input.trim().toUpperCase() === 'SKIP' ? '' : cleanDeliveryValue(input, 50);
+                if (!platform && input.trim().toUpperCase() !== 'SKIP') {
+                    await message.reply('❌ Enter a platform name or type SKIP. Reply 0 to go back.');
+                    return;
+                }
+                updateSessionState(userId, 'REP_TIMETABLE_DETAILS_LINK', {
+                    ...session.data,
+                    detailsDraft: { ...session.data.detailsDraft, onlinePlatform: platform }
+                });
+                await message.reply(`🔗 Enter the online meeting link. A valid *http://* or *https://* link is required.\n\n0. 🔙 Back to platform`);
+                break;
+            }
+
+            case 'REP_TIMETABLE_DETAILS_LINK': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_TIMETABLE_DETAILS_PLATFORM', session.data);
+                    await message.reply(`💻 Enter the platform (for example, *Zoom* or *Google Meet*). Reply *SKIP* if no platform name is needed.\n\n0. 🔙 Back to Physical/Online`);
+                    return;
+                }
+                const meetingLink = cleanDeliveryValue(input, 500);
+                if (!meetingLink || !isValidMeetingLink(meetingLink)) {
+                    await message.reply('❌ Enter a complete meeting link beginning with http:// or https://. Reply 0 to go back.');
+                    return;
+                }
+                updateSessionState(userId, 'REP_TIMETABLE_DETAILS_PASSWORD', {
+                    ...session.data,
+                    detailsDraft: { ...session.data.detailsDraft, meetingLink }
+                });
+                await message.reply(`🔐 Enter the meeting password/passcode if one is required, or type *SKIP* if there is none.\n\n0. 🔙 Back to meeting link`);
+                break;
+            }
+
+            case 'REP_TIMETABLE_DETAILS_PASSWORD': {
+                if (input === '0') {
+                    updateSessionState(userId, 'REP_TIMETABLE_DETAILS_LINK', session.data);
+                    await message.reply('🔗 Enter the online meeting link. A valid http:// or https:// link is required.\n\n0. 🔙 Back to platform');
+                    return;
+                }
+                const meetingPassword = input.trim().toUpperCase() === 'SKIP' ? '' : cleanDeliveryValue(input, 100);
+                try {
+                    const details = { ...session.data.detailsDraft, meetingPassword };
+                    const saved = saveTimetableDeliveryDetails(
+                        session.data.loggedInClass,
+                        session.data.detailsDay,
+                        session.data.detailsSlotIdentity,
+                        details
+                    );
+                    if (!saved) throw new Error('That timetable slot changed while you were editing. Please select it again.');
+                    const delivery = formatDeliveryDetails({ ...details, deliveryMode: DELIVERY_MODES.ONLINE });
+                    updateSessionState(userId, 'REP_TIMETABLE_MENU', session.data);
+                    await message.reply(`✅ Saved delivery details for *${session.data.detailsSlotLabel}*:\n💻 ${delivery}\n\n${getTimetableManagementMenu()}`);
+                } catch (error) {
+                    await message.reply(`❌ ${error.message}\n\nEnter a valid meeting password/passcode or type SKIP. Reply 0 to go back.`);
                 }
                 break;
             }
@@ -1403,11 +1611,7 @@ async function handleInput(client, message, userId, text, userName, assistantCli
                     updateSessionState(userId, 'REP_TIMETABLE_MENU', session.data);
                     await message.reply(
                         `🛠️ *Wizard Aborted.* Your previous timetable remains safe and unchanged.\n\n` +
-                        `📅 *TIMETABLE MANAGEMENT*\n` +
-                        `1. View Current Timetable\n` +
-                        `2. Re-run Timetable Wizard (Overwrite)\n` +
-                        `3. Modify/Cancel Classes\n\n` +
-                        `0. 🔙 Back to Dashboard`
+                        getTimetableManagementMenu()
                     );
                     return;
                 }
@@ -1473,9 +1677,7 @@ async function handleInput(client, message, userId, text, userName, assistantCli
                 if (input === '0') {
                     // Back to the Timetable Menu
                     updateSessionState(userId, 'REP_TIMETABLE_MENU', session.data);
-                    await message.reply(
-                        `📅 *TIMETABLE MANAGEMENT*\n━━━━━━━━━━━━━━━━━━\n1. 👁️ View Current Timetable\n2. 🛠️ Run Timetable Wizard (Create new Timetable)\n3. Modify/Cancel Classes\n\n0. 🔙 Back to Dashboard`
-                    );
+                    await message.reply(getTimetableManagementMenu());
                     return;
                 }
 
@@ -1711,8 +1913,10 @@ async function handleInput(client, message, userId, text, userName, assistantCli
                     // 3. Inject the "Ghost Class" into that future date
                     if (!classData.exceptions[targetDateKey]) classData.exceptions[targetDateKey] = {};
                     classData.exceptions[targetDateKey][target.unit + "_TEMP"] = {
+                        ...target,
                         status: 'MOVED',
                         unit: target.unit + ' (Makeup Class)',
+                        time: newStartTimeStr,
                         startTime: newStartTimeStr,
                         endTime: newEndTimeStr,
                         startMinutes: newStartMins,
@@ -1730,7 +1934,9 @@ async function handleInput(client, message, userId, text, userName, assistantCli
                     // 2. Inject into new day
                     if (!classData.timetable[newDay]) classData.timetable[newDay] = [];
                     classData.timetable[newDay].push({
+                        ...target,
                         unit: target.unit,
+                        time: newStartTimeStr,
                         startTime: newStartTimeStr,
                         endTime: newEndTimeStr,
                         startMinutes: newStartMins,
@@ -3690,7 +3896,10 @@ async function handleInput(client, message, userId, text, userName, assistantCli
                     if (!todayClasses || todayClasses.length === 0) {
                         todayRes += `No classes scheduled for today! 🏖️\n`;
                     } else {
-                        todayClasses.forEach(c => todayRes += `▪️ *${c.unit}* @ ${c.time}\n`);
+                        todayClasses.forEach(c => {
+                            const delivery = formatDeliveryDetails(c);
+                            todayRes += `▪️ *${c.unit}* @ ${c.time}${delivery ? ` · ${delivery}` : ''}\n`;
+                        });
                     }
                     
                     // 🛡️ NEW: Locks them in a view state so 0 goes back to Dashboard
@@ -3704,7 +3913,10 @@ async function handleInput(client, message, userId, text, userName, assistantCli
                     daysList.forEach(d => {
                         if (sDb.timetable[d] && sDb.timetable[d].length > 0) {
                             ttFull += `*${d.toUpperCase()}*\n`;
-                            sDb.timetable[d].forEach(c => ttFull += `  ▪️ ${c.unit} @ ${c.time}\n`);
+                            sDb.timetable[d].forEach(c => {
+                                const delivery = formatDeliveryDetails(c);
+                                ttFull += `  ▪️ ${c.unit} @ ${c.time}${delivery ? ` · ${delivery}` : ''}\n`;
+                            });
                             ttFull += `\n`;
                         }
                     });
@@ -3831,7 +4043,8 @@ async function handleInput(client, message, userId, text, userName, assistantCli
                         const hrs = Math.floor(minDiff / 60);
                         const mins = minDiff % 60;
                         const timeString = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
-                        await message.reply(`⏱️ *CHRONOS ENGINE*\n━━━━━━━━━━━━━━━━━━\n**Next Class:** ${nextClass.unit}\n**Starts In:** ${timeString} (at ${nextClass.time})\n\n(Type *0* to go back)`);
+                        const delivery = formatDeliveryDetails(nextClass);
+                        await message.reply(`⏱️ *CHRONOS ENGINE*\n━━━━━━━━━━━━━━━━━━\n**Next Class:** ${nextClass.unit}\n**Starts In:** ${timeString} (at ${nextClass.time})${delivery ? `\n📍 ${delivery}` : ''}\n\n(Type *0* to go back)`);
                     } else {
                         await message.reply(`✅ All of today's scheduled classes have already passed.\n\n(Type *0* to go back)`);
                     }
@@ -3911,7 +4124,10 @@ async function handleInput(client, message, userId, text, userName, assistantCli
                         const classes = sDb.timetable?.[dayName] || [];
                         weekText += `* ${values.weekday} ${values.day} ${values.month}*\n`;
                         weekText += classes.length
-                            ? classes.slice(0, 5).map(item => `  • ${item.unit} @ ${item.time}`).join('\n') + '\n'
+                            ? classes.slice(0, 5).map(item => {
+                                const delivery = formatDeliveryDetails(item);
+                                return `  • ${item.unit} @ ${item.time}${delivery ? ` · ${delivery}` : ''}`;
+                            }).join('\n') + '\n'
                             : '  • No classes scheduled\n';
                     }
                     const deadlines = (sDb.assessments || [])
