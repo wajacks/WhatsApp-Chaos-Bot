@@ -301,7 +301,12 @@ test('the scheduler delivers the 10 AM reminder during the 7 AM class, then roll
         timetable: {
             monday: [
                 { unit: 'CALCULUS I', time: '7:00 AM' },
-                { unit: 'PROGRAMMING', startMinutes: 600, endMinutes: 780, startTime: '10:00 AM', endTime: '1:00 PM' }
+                {
+                    unit: 'PROGRAMMING', startMinutes: 600, endMinutes: 780,
+                    startTime: '10:00 AM', endTime: '1:00 PM', deliveryMode: 'ONLINE',
+                    onlinePlatform: 'Google Meet', meetingLink: 'https://meet.google.com/example',
+                    meetingPassword: '9062'
+                }
             ]
         }
     };
@@ -317,12 +322,14 @@ test('the scheduler delivers the 10 AM reminder during the 7 AM class, then roll
 
     await runTimetableTick({ sendMessage: async () => {} }, new Date('2026-11-09T06:15:00Z'), options);
     assert.equal(classData.activeRollCall.unit, 'CALCULUS I');
-    assert.ok(queued.some(item => item.text.includes('PROGRAMMING begins in 45 minutes')));
+    assert.ok(queued.some(item => item.text.includes('PROGRAMMING begins in 45 minutes') &&
+        item.text.includes('Online') && item.text.includes('https://meet.google.com/example') && item.text.includes('Password: 9062')));
 
     await runTimetableTick({ sendMessage: async () => {} }, new Date('2026-11-09T07:00:00Z'), options);
     assert.equal(classData.activeRollCall.unit, 'PROGRAMMING');
     assert.equal(classData.attendanceHistory[0].unit, 'CALCULUS I');
-    assert.ok(queued.some(item => item.text.includes('PROGRAMMING') && item.text.includes('CLASS IS STARTING')));
+    assert.ok(queued.some(item => item.text.includes('PROGRAMMING') && item.text.includes('CLASS IS STARTING') &&
+        item.text.includes('Google Meet') && item.text.includes('Password: 9062')));
 });
 
 test('scheduled roll-call closure records late and absent students for the rep summary', () => {

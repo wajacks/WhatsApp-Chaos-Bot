@@ -8,6 +8,7 @@ const cron = require('node-cron');
 const { readClassDB, writeClassDB, createClassDBBackup } = require('../database/classdb');
 const { createVerifiedOffsiteClassDBBackup } = require('../database/offsiteBackup');
 const { flushClassDB } = require('../database/classdb');
+const { formatDeliveryDetails } = require('./classDelivery');
 
 function getEATParts(date = new Date()) {
     const values = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
@@ -623,11 +624,12 @@ async function runTimetableTick(client, now = new Date(), options = {}) {
                 claimTimetableNotice(classData, 'preclass', todayDateKey, slot, nowTimestamp)) {
                 const minutesUntilStart = slot.startMinutes - currentMinutes;
                 const lead = minutesUntilStart === 1 ? '1 minute' : `${minutesUntilStart} minutes`;
+                const delivery = formatDeliveryDetails(slot);
                 queueClassNotice(
                     client,
                     className,
                     classData,
-                    `⏳ *UPCOMING CLASS*\n\n${slot.unit} begins in ${lead} at ${slot.startTime}.`
+                    `⏳ *UPCOMING CLASS*\n\n${slot.unit} begins in ${lead} at ${slot.startTime}.${delivery ? `\n📍 ${delivery}` : ''}`
                 );
                 dbChanged = true;
             }
@@ -648,7 +650,9 @@ async function runTimetableTick(client, now = new Date(), options = {}) {
                     if ((opened || alreadyOpen) && activeRollCall &&
                         claimTimetableNotice(classData, 'start', todayDateKey, slot, nowTimestamp)) {
                         const intro = slot.source === 'makeup' ? 'MAKEUP CLASS STARTING' : 'CLASS IS STARTING';
+                        const delivery = formatDeliveryDetails(slot);
                         const messageText = `🟢 *${intro}*\n\n🏫 *Unit:* ${slot.unit}\n⏰ *Time:* ${slot.startTime} - ${slot.endTime}\n\n` +
+                            (delivery ? `📍 ${delivery}\n\n` : '') +
                             `_The attendance register is now open. Choose how to sign in:_\n` +
                             `1️⃣ Reply with *PRESENT*\n` +
                             `2️⃣ Type *!class* ➔ Open Student Hub ➔ Select option *8* (Sign Attendance)`;
