@@ -1327,12 +1327,11 @@ function registerMessageHandler(client, dependencies) {
                                 [
                                     'stash',
                                     'push',
+                                    // --include-untracked leaves ignored files such as .env alone.
+                                    // An explicit exclude pathspec makes Git report ignored .env as an error.
                                     '--include-untracked',
                                     '-m',
-                                    stashLabel,
-                                    '--',
-                                    '.',
-                                    ':(exclude).env'
+                                    stashLabel
                                 ],
                                 { cwd: projectDir, maxBuffer: 5 * 1024 * 1024 }
                             );
